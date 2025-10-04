@@ -25,7 +25,11 @@ const generateAccessToken = (payload: CreateTokenInput): string => {
     type: "access",
   };
 
-  return jwt.sign(tokenPayload, ACCESS_SECRET, { expiresIn: "1h" });
+  return jwt.sign(
+    tokenPayload as any,
+    ACCESS_SECRET as any,
+    { expiresIn: ACCESS_EXPIRATION } as any
+  );
 };
 
 // Generate Refresh Token
@@ -36,7 +40,11 @@ const generateRefreshToken = (payload: CreateTokenInput): string => {
     type: "refresh",
   };
 
-  return jwt.sign(tokenPayload, REFRESH_SECRET, { expiresIn: "7d" });
+  return jwt.sign(
+    tokenPayload as any,
+    REFRESH_SECRET as any,
+    { expiresIn: REFRESH_EXPIRATION } as any
+  );
 };
 
 // Verify Access Token
@@ -44,7 +52,17 @@ const verifyAccessToken = (
   token: string
 ): { valid: true; decoded: string | JwtPayload } | { valid: false; error: string } => {
   try {
-    const decoded = jwt.verify(token, ACCESS_SECRET);
+    const decoded = jwt.verify(token, ACCESS_SECRET) as JwtPayload | string;
+
+    // Basic safety: ensure token type claim matches expected
+    if (
+      typeof decoded === "object" &&
+      (decoded as any).type &&
+      (decoded as any).type !== "access"
+    ) {
+      return { valid: false, error: "Token is not an access token" };
+    }
+
     return { valid: true, decoded };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -57,7 +75,17 @@ const verifyRefreshToken = (
   token: string
 ): { valid: true; decoded: string | JwtPayload } | { valid: false; error: string } => {
   try {
-    const decoded = jwt.verify(token, REFRESH_SECRET);
+    const decoded = jwt.verify(token, REFRESH_SECRET) as JwtPayload | string;
+
+    // Ensure token type claim is refresh
+    if (
+      typeof decoded === "object" &&
+      (decoded as any).type &&
+      (decoded as any).type !== "refresh"
+    ) {
+      return { valid: false, error: "Token is not a refresh token" };
+    }
+
     return { valid: true, decoded };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
