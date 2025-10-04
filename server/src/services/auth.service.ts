@@ -6,11 +6,22 @@ import {
   generateRefreshToken,
   verifyRefreshToken,
 } from "../utils/generateToken.js";
-import type { RegisterInput, LoginInput, UserResponse } from "../types/user.type.js";
+import type {
+  RegisterInput,
+  LoginInput,
+  UserResponse,
+  ChangePasswordInput,
+} from "../types/user.type.js";
+import { validateRegister, validateLogin, validateChangePassword } from "../utils/validateInput.js";
 
 //Register a new user
 export const registerUser = async (registerData: RegisterInput) => {
-  const { name, email, password } = registerData;
+  // Validate and normalize input
+  const { name, email, password } = validateRegister(
+    registerData.name,
+    registerData.email,
+    registerData.password
+  );
 
   // Check if user already exists
   const existingUser = await User.findByEmail(email);
@@ -32,7 +43,7 @@ export const registerUser = async (registerData: RegisterInput) => {
 
 // Login user
 export const loginUser = async (loginData: LoginInput) => {
-  const { email, password } = loginData;
+  const { email, password } = validateLogin(loginData.email, loginData.password);
 
   // Find user by email
   const user = await User.findByEmail(email);
@@ -134,4 +145,28 @@ export const logoutUser = async (token: string) => {
   return {
     message: "Logout successful",
   };
+};
+
+// Change password for a user (identified by email)
+export const changePassword = async (email: string, data: ChangePasswordInput) => {
+  const { currentPassword, newPassword } = validateChangePassword(
+    email,
+    data.currentPassword,
+    data.newPassword
+  );
+
+  // Find user
+  const user = await User.findByEmail(email);
+  if (!user) throw new Error("User not found");
+
+  // Verify current password
+  const isValid = await comparePassword(currentPassword, user.password);
+  if (!isValid) throw new Error("Current password is incorrect");
+
+  // Hash new password and save
+  const hashed = await hashPassword(newPassword);
+  user.password = hashed;
+  await user.save();
+
+  return { message: "Password changed successfully" };
 };
