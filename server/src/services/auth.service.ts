@@ -48,13 +48,15 @@ export const loginUser = async (loginData: LoginInput) => {
   // Find user by email
   const user = await User.findByEmail(email);
   if (!user) {
-    throw new Error("Invalid email or password");
+    // Standardized error message for wrong credentials
+    throw new Error("Account or password is incorrect");
   }
 
   // Verify password
   const isPasswordValid = await comparePassword(password, user.password);
   if (!isPasswordValid) {
-    throw new Error("Invalid email or password");
+    // Standardized error message for wrong credentials
+    throw new Error("Account or password is incorrect");
   }
 
   // Generate new tokens
@@ -125,25 +127,19 @@ export const refreshAccessToken = async (token: string) => {
   };
 };
 
-// Logout user by revoking refresh token
+// Logout user by revoking all refresh tokens for the user
 export const logoutUser = async (token: string) => {
-  // Find token in database
+  // Find token in database to identify the user
   const storedToken = await RefreshToken.findByToken(token);
   if (!storedToken) {
     throw new Error("Refresh token not found");
   }
 
-  // Check if already revoked
-  if (storedToken.is_revoked) {
-    throw new Error("Refresh token already revoked");
-  }
-
-  // Revoke the token
-  storedToken.is_revoked = true;
-  await storedToken.save();
+  // Revoke all tokens for this user (logout from all devices)
+  const revokedCount = await RefreshToken.revokeAllUserTokens(storedToken.user_id);
 
   return {
-    message: "Logout successful",
+    message: `Logout successful, revoked ${revokedCount} token(s)`,
   };
 };
 

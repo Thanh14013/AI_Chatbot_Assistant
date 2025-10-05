@@ -22,22 +22,57 @@ const RegisterPage: React.FC = () => {
   const { register, isLoading } = useAuth();
   const [error, setError] = useState<string>("");
 
+  // Controlled fields
+  const [name, setName] = useState<string>("");
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [confirmPassword, setConfirmPassword] = useState<string>("");
+
   /**
    * Handle form submission
-   * Validates and sends registration data to API
+   * Validates early and sends registration data to API
    */
-  const handleSubmit = async (values: RegisterRequest) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    // Early client-side validation
+    if (!name || name.trim().length < 2) {
+      const msg = "Please enter your name (at least 2 characters).";
+      setError(msg);
+      message.error(msg);
+      return;
+    }
+
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRe.test(email)) {
+      const msg = "Please enter a valid email address.";
+      setError(msg);
+      message.error(msg);
+      return;
+    }
+
+    if (!password || password.length < 6) {
+      const msg = "Password must be at least 6 characters.";
+      setError(msg);
+      message.error(msg);
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      const msg = "Passwords do not match.";
+      setError(msg);
+      message.error(msg);
+      return;
+    }
+
     try {
-      // Clear any previous errors
-      setError("");
-
-      // Attempt to register
-      await register(values);
-
-      // Show success message
-      message.success("Registration successful! Please login.");
+      const resp = await register({ name, email, password } as RegisterRequest);
+      const successMessage =
+        (resp && (resp as any).message) ||
+        "Registration successful! Please login.";
+      message.success(successMessage);
     } catch (err) {
-      // Handle registration errors
       const axiosError = err as AxiosError<{ message: string }>;
       const errorMessage =
         axiosError.response?.data?.message ||
@@ -73,7 +108,7 @@ const RegisterPage: React.FC = () => {
         {/* Registration Form */}
         <Form
           name="register"
-          onFinish={handleSubmit}
+          onSubmitCapture={handleSubmit}
           autoComplete="off"
           layout="vertical"
           requiredMark={false}
@@ -92,6 +127,8 @@ const RegisterPage: React.FC = () => {
               placeholder="Enter your full name"
               size="large"
               disabled={isLoading}
+              value={name}
+              onChange={(ev) => setName(ev.target.value)}
             />
           </Form.Item>
 
@@ -109,6 +146,8 @@ const RegisterPage: React.FC = () => {
               placeholder="Enter your email"
               size="large"
               disabled={isLoading}
+              value={email}
+              onChange={(ev) => setEmail(ev.target.value)}
             />
           </Form.Item>
 
@@ -126,6 +165,8 @@ const RegisterPage: React.FC = () => {
               placeholder="Enter your password"
               size="large"
               disabled={isLoading}
+              value={password}
+              onChange={(ev) => setPassword(ev.target.value)}
             />
           </Form.Item>
 
@@ -153,6 +194,8 @@ const RegisterPage: React.FC = () => {
               placeholder="Confirm your password"
               size="large"
               disabled={isLoading}
+              value={confirmPassword}
+              onChange={(ev) => setConfirmPassword(ev.target.value)}
             />
           </Form.Item>
 

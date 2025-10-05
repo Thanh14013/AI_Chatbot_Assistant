@@ -22,25 +22,71 @@ const LoginPage: React.FC = () => {
   const { login, isLoading } = useAuth();
   const [error, setError] = useState<string>("");
 
+  // Controlled form fields
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+
   /**
    * Handle form submission
-   * Validates and sends login credentials to API
+   * Validates early and sends login credentials to API
    */
-  const handleSubmit = async (values: LoginRequest) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    // Prevent browser from reloading the page
+    e.preventDefault();
+
+    // Clear previous errors
+    setError("");
+
+    // Early client-side validation
+    if (!email || !email.trim()) {
+      const msg = "Please enter your email.";
+      setError(msg);
+      message.error(msg);
+      return;
+    }
+    // Basic email format check
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRe.test(email)) {
+      const msg = "Please enter a valid email address.";
+      setError(msg);
+      message.error(msg);
+      return;
+    }
+
+    if (!password || password.length < 6) {
+      const msg = "Password must be at least 6 characters.";
+      setError(msg);
+      message.error(msg);
+      return;
+    }
+
     try {
-      // Clear any previous errors
-      setError("");
-
       // Attempt to login
-      await login(values);
+      const resp = await login({ email, password } as LoginRequest);
 
-      // Show success message
-      message.success("Login successful! Redirecting...");
+      // If backend returns a message, prefer it
+      const successMessage =
+        (resp && (resp as any).message) || "Login successful! Redirecting...";
+      message.success(successMessage);
     } catch (err) {
-      // Handle login errors
-      const axiosError = err as AxiosError<{ message: string }>;
-      const errorMessage =
-        axiosError.response?.data?.message || "Login failed. Please try again.";
+      // Handle login errors robustly and show server-provided message when available
+      const axiosError = err as AxiosError<any>;
+      let errorMessage = "Login failed. Please try again.";
+
+      if (axiosError?.response) {
+        const respData = axiosError.response.data;
+        if (respData?.message && typeof respData.message === "string") {
+          errorMessage = respData.message;
+        } else if (respData?.error && typeof respData.error === "string") {
+          errorMessage = respData.error;
+        } else if (typeof respData === "string") {
+          errorMessage = respData;
+        } else if (axiosError.response.status === 401) {
+          errorMessage = "Account or password is incorrect";
+        }
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
 
       setError(errorMessage);
       message.error(errorMessage);
@@ -72,7 +118,7 @@ const LoginPage: React.FC = () => {
         {/* Login Form */}
         <Form
           name="login"
-          onFinish={handleSubmit}
+          onSubmitCapture={handleSubmit}
           autoComplete="off"
           layout="vertical"
           requiredMark={false}
@@ -91,6 +137,8 @@ const LoginPage: React.FC = () => {
               placeholder="Enter your email"
               size="large"
               disabled={isLoading}
+              value={email}
+              onChange={(ev) => setEmail(ev.target.value)}
             />
           </Form.Item>
 
@@ -108,6 +156,8 @@ const LoginPage: React.FC = () => {
               placeholder="Enter your password"
               size="large"
               disabled={isLoading}
+              value={password}
+              onChange={(ev) => setPassword(ev.target.value)}
             />
           </Form.Item>
 

@@ -111,6 +111,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax" as const,
+      path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     };
 
@@ -129,11 +130,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     // Handle errors
     const errorMessage = error instanceof Error ? error.message : "Login failed";
 
-    // Check for specific error types
-    if (errorMessage.includes("Invalid email or password")) {
+    // Check for specific error types (credential errors)
+    if (errorMessage.includes("Account or password is incorrect")) {
+      // Return a standardized English message for wrong credentials
       res.status(401).json({
         success: false,
-        message: errorMessage,
+        message: "Account or password is incorrect",
       });
       return;
     }
@@ -212,24 +214,44 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
     // Prefer refresh token from cookie; fall back to body
     const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
 
-    // Validate refresh token presence
+    // If no token provided, still attempt to clear cookies but inform client
     if (!refreshToken) {
-      res.status(400).json({
-        success: false,
-        message: "Refresh token is required",
+      // Clear refresh token cookie if present (use same path & secure flag as when set)
+      res.clearCookie("refreshToken", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+      });
+
+      res.status(200).json({
+        success: true,
+        message: "Logout successful",
       });
       return;
     }
 
-    // Call service to logout user (revoke token in DB)
+    // Call service to logout user (revoke tokens in DB)
     const result = await logoutUser(refreshToken);
 
-    // Clear refresh token cookie
-    res.clearCookie("refreshToken", {
+    // Clear refresh token cookie (use same path & secure flag as when set)
+    const cookieClearOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-    });
+      path: "/",
+    } as const;
+
+    res.clearCookie("refreshToken", cookieClearOptions);
+    // Some browsers/proxies ignore clearCookie in certain cross-origin/proxy setups.
+    // Also explicitly expire the cookie by setting it with an immediate past expiry.
+    res.cookie("refreshToken", "", { ...cookieClearOptions, expires: new Date(0) });
+
+    // Debug log for server-side confirmation
+    console.debug(
+      "Cleared refreshToken cookie for logout (cookieClearOptions):",
+      cookieClearOptions
+    );
 
     // Send success response
     res.status(200).json({

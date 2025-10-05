@@ -90,6 +90,12 @@ axiosInstance.interceptors.response.use(
       originalRequest &&
       !originalRequest._retry
     ) {
+      // If the 401 came from authentication endpoints (login/register),
+      // don't attempt a token refresh or redirect — let the caller handle the error.
+      const url = originalRequest.url || "";
+      if (url.includes("/auth/login") || url.includes("/auth/register")) {
+        return Promise.reject(error);
+      }
       // If refresh endpoint fails, logout user
       if (originalRequest.url?.includes("/auth/refresh")) {
         clearTokens();
