@@ -29,7 +29,8 @@
     "pg": "^8.16.3",
     "pg-hstore": "^2.3.4",
     "sequelize": "^6.37.7",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "swagger-ui-express": "^4.6.3"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
@@ -40,6 +41,7 @@
     "@types/pg": "^8.15.5",
     "@types/sequelize": "^4.28.20",
     "@types/socket.io": "^3.0.1",
+    "@types/swagger-ui-express": "^4.1.8",
     "@typescript-eslint/eslint-plugin": "^8.45.0",
     "@typescript-eslint/parser": "^8.45.0",
     "eslint": "^9.37.0",
