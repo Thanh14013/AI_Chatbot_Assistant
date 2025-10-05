@@ -1,10 +1,26 @@
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.tsx'
-import { BrowserRouter } from 'react-router-dom'
+/**
+ * Application entry point
+ * Initializes React and renders the App
+ */
 
-createRoot(document.getElementById('root')!).render(
-  <BrowserRouter>
-    <App />
-  </BrowserRouter>
-)
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
+import App from "./App";
+import "./index.css";
+
+// Get root element from HTML
+const rootElement = document.getElementById("root");
+
+if (!rootElement) {
+  throw new Error("Failed to find the root element");
+}
+
+// Create React root and render app
+createRoot(rootElement).render(
+  <StrictMode>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </StrictMode>
+);
