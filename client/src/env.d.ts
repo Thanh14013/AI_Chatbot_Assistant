@@ -1,3 +1,6 @@
+// Ensure Vite's import.meta.env types are available to TypeScript
+/// <reference types="vite/client" />
+
 // Ambient declarations for process.env variables used in the client
 // Keeps TypeScript happy when accessing process.env.VITE_* variables
 

@@ -1,0 +1,61 @@
+/**
+ * RegisterPage styles
+ */
+
+.container {
+  /* Fullscreen fixed container to keep form centered and remove scrolling */
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  padding: 40px 24px;
+  overflow: hidden;
+}
+
+.card {
+  width: 40%;
+  min-width: 420px;
+  max-width: 760px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 28px;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.title {
+  margin-bottom: 8px;
+}
+
+.alert {
+  margin-bottom: 16px;
+}
+
+.submitButton {
+  margin-bottom: 8px;
+}
+
+.footer {
+  text-align: center;
+}
+
+.link {
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .card {
+    width: 100%;
+    max-width: 420px;
+    padding: 20px;
+  }
+  .container {
+    padding: 24px 12px;
+    position: fixed;
+  }
+}

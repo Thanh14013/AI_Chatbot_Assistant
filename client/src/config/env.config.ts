@@ -4,15 +4,17 @@
  */
 
 // API base URL - uses proxy in development, can be configured for production
-export const API_BASE_URL = process.env.VITE_API_BASE_URL || "/api";
+// Use Vite's import.meta.env instead of process.env to avoid referencing Node globals in the browser
+export const API_BASE_URL =
+  (import.meta.env.VITE_API_BASE_URL as string) || "/api";
 
 // Backend server URL for direct access
 export const BACKEND_URL =
-  process.env.VITE_BACKEND_URL || "http://localhost:3000";
+  (import.meta.env.VITE_BACKEND_URL as string) || "http://localhost:3000";
 
-// Application environment
-export const IS_DEVELOPMENT = process.env.NODE_ENV === "development";
-export const IS_PRODUCTION = process.env.NODE_ENV === "production";
+// Application environment (Vite exposes helpers)
+export const IS_DEVELOPMENT = Boolean(import.meta.env.DEV);
+export const IS_PRODUCTION = Boolean(import.meta.env.PROD);
 
 // Token expiration times (in milliseconds)
 const parseMs = (value: string | undefined, fallback: number) => {
@@ -22,14 +24,17 @@ const parseMs = (value: string | undefined, fallback: number) => {
 };
 
 export const ACCESS_TOKEN_EXPIRY = parseMs(
-  process.env.VITE_ACCESS_TOKEN_EXPIRY_MS,
+  import.meta.env.VITE_ACCESS_TOKEN_EXPIRY_MS as string | undefined,
   60 * 60 * 1000
 ); // 1 hour
 
 export const REFRESH_TOKEN_EXPIRY = parseMs(
-  process.env.VITE_REFRESH_TOKEN_EXPIRY_MS,
+  import.meta.env.VITE_REFRESH_TOKEN_EXPIRY_MS as string | undefined,
   7 * 24 * 60 * 60 * 1000
 ); // 7 days
 
 // API timeout
-export const API_TIMEOUT = parseMs(process.env.VITE_API_TIMEOUT_MS, 10000); // 10 seconds
+export const API_TIMEOUT = parseMs(
+  import.meta.env.VITE_API_TIMEOUT_MS as string | undefined,
+  10000
+); // 10 seconds

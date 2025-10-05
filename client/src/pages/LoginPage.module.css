@@ -1,0 +1,64 @@
+/**
+ * LoginPage styles
+ */
+
+.container {
+  /* Fullscreen fixed container to prevent scrolling and keep form centered */
+  position: fixed;
+  inset: 0; /* top:0; right:0; bottom:0; left:0 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  padding: 40px 24px;
+  overflow: hidden; /* remove scrollbars */
+}
+
+.card {
+  /* Desktop-first: use percentage width to stretch on large screens but keep readable limits */
+  width: 40%;
+  min-width: 420px;
+  max-width: 760px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 28px;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.title {
+  margin-bottom: 8px;
+}
+
+.alert {
+  margin-bottom: 16px;
+}
+
+.submitButton {
+  margin-bottom: 8px;
+}
+
+.footer {
+  text-align: center;
+}
+
+.link {
+  font-weight: 500;
+}
+
+/* Desktop layout: align card to left area with a sidebar look */
+/* Slightly adjust layout for small screens (mobile fallback) */
+@media (max-width: 768px) {
+  .card {
+    width: 100%;
+    max-width: 420px;
+    padding: 20px;
+  }
+  .container {
+    padding: 24px 12px;
+    position: fixed;
+  }
+}

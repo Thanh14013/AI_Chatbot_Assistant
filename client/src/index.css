@@ -26,8 +26,19 @@ body {
   margin: 0;
   display: flex;
   place-items: center;
+  /* Center horizontally and vertically by default so pages look good on desktop */
+  justify-content: center;
   min-width: 320px;
   min-height: 100vh;
+  /* Full-screen image background (falls back to gradient if image missing) */
+  background-image: url("/src/assets/background.jpg");
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center center;
+  background-attachment: fixed;
+  /* Fallback gradient if image fails to load */
+  background-color: #6b67d6;
+  background-blend-mode: overlay;
 }
 
 h1 {
@@ -65,4 +76,33 @@ button:focus-visible {
   button {
     background-color: #f9f9f9;
   }
+}
+
+/* Disable hover effects for form elements globally
+   - Targets native inputs/selects/textareas
+   - Targets Ant Design wrappers used in the project
+   - Only affects elements inside a <form> to avoid removing hover site-wide
+*/
+form input:hover,
+form textarea:hover,
+form select:hover,
+form .ant-input:hover,
+form .ant-input-affix-wrapper:hover,
+form .ant-form-item-control-input:hover,
+form .ant-btn:hover,
+form .ant-btn:hover > * {
+  /* Neutralize visual hover changes */
+  background-color: inherit !important;
+  border-color: inherit !important;
+  color: inherit !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+/* Prevent pointer cursor changes on hovered form controls if desired */
+form input:hover,
+form textarea:hover,
+form select:hover,
+form .ant-btn:hover {
+  cursor: default !important;
 }
