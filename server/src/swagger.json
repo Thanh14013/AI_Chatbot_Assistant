@@ -3,7 +3,7 @@
   "info": {
     "title": "AI Chatbot Assistant API",
     "version": "1.0.0",
-    "description": "API documentation for authentication endpoints"
+    "description": "API documentation for authentication, conversations, and messaging endpoints (Chat API)"
   },
   "servers": [
     {
@@ -168,9 +168,305 @@
           "404": { "description": "Refresh token not found" }
         }
       }
+    },
+    "/conversations": {
+      "post": {
+        "summary": "Create a new conversation",
+        "tags": ["Conversations"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateConversation" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Conversation created",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Conversation" } }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        }
+      },
+      "get": {
+        "summary": "List user's conversations",
+        "tags": ["Conversations"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "in": "query", "name": "page", "schema": { "type": "integer", "default": 1 } },
+          { "in": "query", "name": "limit", "schema": { "type": "integer", "default": 20 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated conversations list",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ConversationList" } }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/conversations/{id}": {
+      "get": {
+        "summary": "Get a conversation by ID",
+        "tags": ["Conversations"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversation",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Conversation" } }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Not found" }
+        }
+      },
+      "patch": {
+        "summary": "Update a conversation",
+        "tags": ["Conversations"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/UpdateConversation" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated conversation",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Conversation" } }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Not found" }
+        }
+      },
+      "delete": {
+        "summary": "Delete (soft) a conversation",
+        "tags": ["Conversations"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Deleted" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/conversations/{id}/messages": {
+      "get": {
+        "summary": "Get messages for a conversation (paginated)",
+        "tags": ["Messages"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "in": "query", "name": "page", "schema": { "type": "integer", "default": 1 } },
+          { "in": "query", "name": "limit", "schema": { "type": "integer", "default": 30 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated messages",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/MessageList" } }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Conversation not found" }
+        }
+      },
+      "post": {
+        "summary": "Send a message and get AI response",
+        "tags": ["Messages"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/SendMessage" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User and assistant messages returned",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SendMessageResponse" }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "401": { "description": "Unauthorized" },
+          "503": { "description": "OpenAI service unavailable" }
+        }
+      }
+    },
+    "/messages/{messageId}": {
+      "delete": {
+        "summary": "Delete a message",
+        "tags": ["Messages"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Deleted" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Not found" }
+        }
+      }
     }
   },
   "components": {
-    "schemas": {}
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Conversation": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "user_id": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "model": { "type": "string" },
+          "context_window": { "type": "integer" },
+          "total_tokens_used": { "type": "integer" },
+          "message_count": { "type": "integer" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateConversation": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "model": { "type": "string", "example": "gpt-5-nano" },
+          "context_window": { "type": "integer", "default": 10 }
+        },
+        "required": ["title"]
+      },
+      "UpdateConversation": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "model": { "type": "string" },
+          "context_window": { "type": "integer" }
+        }
+      },
+      "ConversationList": {
+        "type": "object",
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/Conversation" } },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": { "type": "integer" },
+              "limit": { "type": "integer" },
+              "total": { "type": "integer" },
+              "totalPages": { "type": "integer" }
+            }
+          }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "conversation_id": { "type": "string", "format": "uuid" },
+          "role": { "type": "string", "example": "user" },
+          "content": { "type": "string" },
+          "tokens_used": { "type": "integer" },
+          "model": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "MessageList": {
+        "type": "object",
+        "properties": {
+          "messages": { "type": "array", "items": { "$ref": "#/components/schemas/Message" } },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": { "type": "integer" },
+              "limit": { "type": "integer" },
+              "total": { "type": "integer" },
+              "totalPages": { "type": "integer" }
+            }
+          }
+        }
+      },
+      "SendMessage": {
+        "type": "object",
+        "properties": {
+          "content": { "type": "string" }
+        },
+        "required": ["content"]
+      },
+      "SendMessageResponse": {
+        "type": "object",
+        "properties": {
+          "userMessage": { "$ref": "#/components/schemas/Message" },
+          "assistantMessage": { "$ref": "#/components/schemas/Message" },
+          "conversation": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "total_tokens_used": { "type": "integer" },
+              "message_count": { "type": "integer" }
+            }
+          }
+        }
+      }
+    }
   }
 }

@@ -13,10 +13,18 @@ type CreateTokenInput = {
   email: string;
 };
 
-const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || "access_secret_key";
-const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "refresh_secret_key";
-const ACCESS_EXPIRATION = process.env.JWT_ACCESS_EXPIRATION || "1h";
-const REFRESH_EXPIRATION = process.env.JWT_REFRESH_EXPIRATION || "7d";
+const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET
+  ? process.env.JWT_ACCESS_SECRET.toString()
+  : "access_secret_key";
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET
+  ? process.env.JWT_REFRESH_SECRET.toString()
+  : "refresh_secret_key";
+const ACCESS_EXPIRATION = process.env.JWT_ACCESS_EXPIRATION
+  ? process.env.JWT_ACCESS_EXPIRATION.toString()
+  : "1h";
+const REFRESH_EXPIRATION = process.env.JWT_REFRESH_EXPIRATION
+  ? process.env.JWT_REFRESH_EXPIRATION.toString()
+  : "7d";
 // Generate Access Token
 const generateAccessToken = (payload: CreateTokenInput): string => {
   const tokenPayload: SignedTokenPayload = {

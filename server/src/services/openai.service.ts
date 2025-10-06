@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import dotenv from "dotenv";
+import type { CreateMessageInput } from "../types/message.type.js";
 
 dotenv.config();
 
@@ -30,7 +31,7 @@ try {
   }
 }
 
-// Hàm test kết nối (an toàn: không ném lỗi khi thiếu API key)
+// Test connection function (safe: doesn't throw when API key is missing)
 export async function testOpenAIConnection() {
   if (!apiKey) {
     console.warn(
@@ -52,6 +53,288 @@ export async function testOpenAIConnection() {
     // Log the full error object (some SDK errors are objects, not plain Error)
     console.error("❌ OpenAI connection failed:", error?.message ?? error);
   }
+}
+
+/**
+ * Interface for OpenAI chat completion parameters
+ */
+export interface ChatCompletionParams {
+  messages: Array<{
+    role: "system" | "user" | "assistant";
+    content: string;
+  }>;
+  model?: string; // Default: "gpt-5-nano"
+  temperature?: number; // Default: 0.7
+  // Use newer OpenAI parameter name expected by some models
+  max_completion_tokens?: number; // Default: 1000
+  stream?: boolean; // Default: false
+}
+
+/**
+ * Interface for chat completion response
+ */
+export interface ChatCompletionResponse {
+  content: string;
+  tokens_used: number;
+  model: string;
+  finish_reason: string;
+}
+
+/**
+ * Call OpenAI Chat Completion API
+ * Supports system prompt, temperature, and max_tokens parameters
+ * Handles streaming and non-streaming responses
+ *
+ * @param params - Chat completion parameters
+ * @returns Promise with AI response and token usage
+ * @throws Error if API call fails
+ */
+export async function getChatCompletion(
+  params: ChatCompletionParams
+): Promise<ChatCompletionResponse> {
+  // Check if API key is configured
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY not configured. Please set it in your .env file.");
+  }
+
+  // Set default values
+  const {
+    messages,
+    model = "gpt-5-nano",
+    temperature = 0.7,
+    max_completion_tokens = 1000,
+    stream = false,
+  } = params;
+
+  // Validate messages array
+  if (!messages || messages.length === 0) {
+    throw new Error("Messages array cannot be empty");
+  }
+
+  try {
+    // If streaming is enabled, handle stream response
+    if (stream) {
+      return await handleStreamingResponse({
+        messages,
+        model,
+        temperature,
+        max_completion_tokens,
+      });
+    }
+
+    // Build a request payload and only include parameters that are supported
+    // by the target model. Some models (for example, certain gpt-5 variants)
+    // don't support a custom temperature or expect a different token param name.
+    const modelCapabilities: Record<string, { supportsTemperature: boolean }> = {
+      // Based on runtime errors observed, gpt-5-nano does not accept custom temperatures
+      "gpt-5-nano": { supportsTemperature: false },
+      // Add other known model capabilities here as needed
+    };
+
+    const capabilities = modelCapabilities[model] ?? { supportsTemperature: true };
+
+    const requestPayload: any = {
+      model,
+      messages,
+      stream: false,
+    };
+
+    // Only add temperature if the model supports it
+    if (capabilities.supportsTemperature && typeof temperature === "number") {
+      requestPayload.temperature = temperature;
+    }
+
+    // Use max_completion_tokens when provided
+    if (typeof max_completion_tokens === "number") {
+      requestPayload.max_completion_tokens = max_completion_tokens;
+    }
+
+    // Non-streaming response
+    const response = await openai.chat.completions.create(requestPayload);
+
+    // Extract response data
+    const content = response.choices[0]?.message?.content || "";
+    const tokens_used = response.usage?.total_tokens || 0;
+    const finish_reason = response.choices[0]?.finish_reason || "stop";
+
+    return {
+      content,
+      tokens_used,
+      model,
+      finish_reason,
+    };
+  } catch (error: any) {
+    // Handle different types of errors
+    if (error?.status === 401) {
+      throw new Error("Invalid OpenAI API key");
+    } else if (error?.status === 429) {
+      throw new Error("OpenAI rate limit exceeded. Please try again later.");
+    } else if (error?.status === 500) {
+      throw new Error("OpenAI server error. Please try again later.");
+    } else if (error?.code === "ENOTFOUND" || error?.code === "ECONNREFUSED") {
+      throw new Error("Unable to connect to OpenAI API. Check your network connection.");
+    }
+
+    // Generic error
+    const errorMessage = error?.message || "Unknown error occurred";
+    throw new Error(`OpenAI API error: ${errorMessage}`);
+  }
+}
+
+/**
+ * Handle streaming response from OpenAI
+ * Collects all chunks and returns complete response
+ *
+ * @param params - Chat completion parameters
+ * @returns Promise with complete AI response
+ */
+async function handleStreamingResponse(params: {
+  messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+  model: string;
+  temperature: number;
+  max_completion_tokens: number;
+}): Promise<ChatCompletionResponse> {
+  const { messages, model, temperature, max_completion_tokens } = params;
+
+  try {
+    const modelCapabilities: Record<string, { supportsTemperature: boolean }> = {
+      "gpt-5-nano": { supportsTemperature: false },
+    };
+
+    const capabilities = modelCapabilities[model] ?? { supportsTemperature: true };
+
+    const payload: any = {
+      model,
+      messages,
+      stream: true,
+    };
+
+    if (capabilities.supportsTemperature && typeof temperature === "number") {
+      payload.temperature = temperature;
+    }
+
+    if (typeof max_completion_tokens === "number") {
+      payload.max_completion_tokens = max_completion_tokens;
+    }
+
+    const stream = await openai.chat.completions.create(payload);
+
+    let fullContent = "";
+    let tokens_used = 0;
+    let finish_reason = "stop";
+
+    // Collect all chunks from stream
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta;
+      if (delta?.content) {
+        fullContent += delta.content;
+      }
+      if (chunk.choices[0]?.finish_reason) {
+        finish_reason = chunk.choices[0].finish_reason;
+      }
+    }
+
+    // Estimate token usage (rough approximation: 1 token ≈ 4 characters)
+    tokens_used =
+      estimateTokenCount(fullContent) +
+      estimateTokenCount(messages.map((m) => m.content).join(" "));
+
+    return {
+      content: fullContent,
+      tokens_used,
+      model,
+      finish_reason,
+    };
+  } catch (error: any) {
+    throw new Error(`Streaming error: ${error?.message || "Unknown error"}`);
+  }
+}
+
+/**
+ * Estimate token count for text
+ * Simple approximation: 1 token ≈ 4 characters
+ * For more accurate counting, use tiktoken library
+ *
+ * @param text - Text to count tokens for
+ * @returns Estimated token count
+ */
+export function estimateTokenCount(text: string): number {
+  // Simple estimation: average 4 characters per token
+  // This is a rough approximation and should be replaced with tiktoken for production
+  return Math.ceil(text.length / 4);
+}
+
+/**
+ * Build context array from messages for OpenAI API
+ * Takes the N most recent messages and adds system prompt
+ * Truncates if total tokens exceed max limit
+ *
+ * @param messages - Array of conversation messages
+ * @param contextWindow - Number of recent messages to include
+ * @param systemPrompt - Optional system prompt to prepend
+ * @param maxTokens - Maximum total tokens allowed in context (default: 4000)
+ * @returns Array of messages formatted for OpenAI API
+ */
+export function buildContextArray(
+  messages: Array<{ role: "user" | "assistant" | "system"; content: string }>,
+  contextWindow: number = 10,
+  systemPrompt?: string,
+  maxTokens: number = 4000
+): Array<{ role: "system" | "user" | "assistant"; content: string }> {
+  const contextMessages: Array<{
+    role: "system" | "user" | "assistant";
+    content: string;
+  }> = [];
+
+  // Add system prompt if provided
+  if (systemPrompt) {
+    contextMessages.push({
+      role: "system",
+      content: systemPrompt,
+    });
+  }
+
+  // Get N most recent messages
+  const recentMessages = messages.slice(-contextWindow);
+
+  // Add messages and track token count
+  let totalTokens = systemPrompt ? estimateTokenCount(systemPrompt) : 0;
+
+  // Add messages in reverse order (newest first) to ensure we keep most recent
+  const messagesToAdd: typeof contextMessages = [];
+  for (let i = recentMessages.length - 1; i >= 0; i--) {
+    const message = recentMessages[i];
+    const messageTokens = estimateTokenCount(message.content);
+
+    // Check if adding this message would exceed max tokens
+    if (totalTokens + messageTokens > maxTokens) {
+      break; // Stop adding older messages
+    }
+
+    messagesToAdd.unshift({
+      role: message.role as "user" | "assistant" | "system",
+      content: message.content,
+    });
+    totalTokens += messageTokens;
+  }
+
+  // Combine system prompt with messages
+  return [...contextMessages, ...messagesToAdd];
+}
+
+/**
+ * Get N most recent messages from a conversation
+ * Useful for building context window
+ *
+ * @param allMessages - All messages in conversation
+ * @param count - Number of recent messages to get
+ * @returns Array of recent messages
+ */
+export function getRecentMessages<T>(allMessages: T[], count: number): T[] {
+  if (allMessages.length <= count) {
+    return allMessages;
+  }
+  return allMessages.slice(-count);
 }
 
 export default openai;
