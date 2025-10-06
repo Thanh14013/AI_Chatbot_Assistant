@@ -9,6 +9,7 @@ import { securityStack } from "./middlewares/generalMiddleware.js";
 import swaggerUi from "swagger-ui-express";
 import fs from "fs";
 import path from "path";
+import { testOpenAIConnection } from "./services/openai.service.js";
 
 // Load swagger JSON at runtime to avoid import-assertion issues in some Node setups
 const swaggerPath = path.resolve(process.cwd(), "src", "swagger.json");
