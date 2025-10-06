@@ -75,7 +75,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({
       {
         icon: <BulbOutlined />,
         title: "Get Ideas",
-        prompt: "Help me brainstorm ideas for a new project",
+        prompt: "Give me some new ideas",
       },
       {
         icon: <MessageOutlined />,

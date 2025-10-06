@@ -34,7 +34,7 @@ body {
   background-size: cover;
   background-position: center center;
   background-attachment: fixed;
-  /* Fallback gradient if image fails to load */
+  /* Fallback gradient/color if image fails to load */
   background-color: #6b67d6;
   background-blend-mode: overlay;
 }
