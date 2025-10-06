@@ -8,7 +8,7 @@ import { Routes, Route } from "react-router-dom";
 import { ConfigProvider, theme } from "antd";
 import { AuthProvider } from "./hooks";
 import { ProtectedRoute } from "./components";
-import { HomePage, LoginPage, RegisterPage, NotFoundPage } from "./pages";
+import { ChatPage, LoginPage, RegisterPage, NotFoundPage } from "./pages";
 
 const App: React.FC = () => {
   return (
@@ -35,7 +35,7 @@ const App: React.FC = () => {
             path="/"
             element={
               <ProtectedRoute>
-                <HomePage />
+                <ChatPage />
               </ProtectedRoute>
             }
           />

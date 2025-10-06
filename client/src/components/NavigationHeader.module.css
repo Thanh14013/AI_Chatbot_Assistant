@@ -15,8 +15,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  max-width: 1200px;
-  margin: 0 auto;
+  /* Allow header to span full width while keeping comfortable inner padding */
+  width: 100%;
+  padding: 0 20px;
   height: 64px;
 }
 

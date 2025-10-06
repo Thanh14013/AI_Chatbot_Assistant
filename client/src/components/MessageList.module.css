@@ -1,0 +1,120 @@
+/* MessageList Component Styles */
+
+.messageListContainer {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: #fafafa;
+}
+
+.messageList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar styling */
+.messageList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.messageList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.messageList::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.messageList::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Loading skeleton container */
+.loadingContainer {
+  padding: 20px;
+}
+
+.skeletonItem {
+  margin-bottom: 20px;
+  padding: 12px;
+  background-color: white;
+  border-radius: 8px;
+}
+
+/* Scroll to bottom button */
+.scrollButton {
+  position: absolute;
+  bottom: 80px;
+  right: 20px;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.scrollButton:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Loading indicator at bottom */
+.loadingIndicator {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: white;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.loadingText {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+/* Responsive design for mobile */
+@media (max-width: 768px) {
+  .messageList {
+    padding: 16px 12px;
+  }
+
+  .scrollButton {
+    bottom: 70px;
+    right: 16px;
+  }
+
+  .loadingIndicator {
+    bottom: 16px;
+  }
+}

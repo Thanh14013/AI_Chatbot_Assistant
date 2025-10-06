@@ -24,10 +24,8 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
-  /* Center horizontally and vertically by default so pages look good on desktop */
-  justify-content: center;
+  /* Use block layout so app can span full width of the viewport. */
+  display: block;
   min-width: 320px;
   min-height: 100vh;
   /* Full-screen image background (falls back to gradient if image missing) */

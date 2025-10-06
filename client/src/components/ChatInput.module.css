@@ -1,0 +1,97 @@
+/* ChatInput Component Styles */
+
+.chatInputContainer {
+  padding: 16px;
+  background-color: white;
+  border-top: 1px solid #f0f0f0;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.inputWrapper {
+  width: 100%;
+  display: flex;
+  gap: 8px;
+}
+
+/* Textarea styling */
+.textarea {
+  flex: 1;
+  font-size: 14px;
+  border-radius: 8px !important;
+  resize: none;
+  transition: all 0.3s ease;
+}
+
+.textarea:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+.textarea:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+
+/* Send button styling */
+.sendButton {
+  height: auto;
+  min-height: 32px;
+  padding: 4px 16px;
+  border-radius: 8px !important;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.sendButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+}
+
+.sendButton:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Character counter */
+.charCounter {
+  text-align: right;
+  margin-top: 4px;
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.charCounter .warning {
+  color: #ff4d4f;
+  font-weight: 500;
+}
+
+/* Hint text */
+.hintText {
+  text-align: center;
+  margin-top: 8px;
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.hintText strong {
+  color: rgba(0, 0, 0, 0.65);
+  font-weight: 600;
+}
+
+/* Responsive design for mobile */
+@media (max-width: 768px) {
+  .chatInputContainer {
+    padding: 12px;
+  }
+
+  .sendButton {
+    padding: 4px 12px;
+  }
+
+  .sendButton span:not(.anticon) {
+    display: none;
+  }
+
+  .hintText {
+    display: none;
+  }
+}

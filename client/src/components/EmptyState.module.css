@@ -1,0 +1,192 @@
+/* EmptyState Component Styles */
+
+.emptyContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+/* Empty icon styling */
+.emptyIcon {
+  font-size: 80px;
+  color: rgba(0, 0, 0, 0.25);
+}
+
+/* Description text */
+.description {
+  margin-top: 16px;
+}
+
+.description h4 {
+  color: rgba(0, 0, 0, 0.85);
+  margin-bottom: 8px;
+}
+
+.description p {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 14px;
+}
+
+/* Action button */
+.actionButton {
+  margin-top: 16px;
+  height: 40px;
+  padding: 0 24px;
+  font-size: 14px;
+}
+
+/* Welcome section for messages empty state */
+.welcomeSection {
+  margin-bottom: 32px;
+}
+
+.welcomeIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  border-radius: 50%;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+}
+
+.welcomeIcon :global(.anticon) {
+  font-size: 36px;
+  color: white;
+}
+
+.welcomeTitle {
+  margin-bottom: 12px !important;
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.welcomeText {
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 15px;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+/* Suggestions grid */
+.suggestionsGrid {
+  display: grid;
+  /* Force 3 columns on larger screens to get a 3x2 layout for 6 items */
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 20px;
+  max-width: 1100px;
+  width: 100%;
+  margin-top: 24px;
+  justify-items: stretch;
+}
+
+/* Suggestion card */
+.suggestionCard {
+  padding: 20px;
+  background-color: white;
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.suggestionCard:hover {
+  border-color: #1890ff;
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.suggestionCard:active {
+  transform: translateY(0);
+}
+
+.suggestionIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background-color: #e6f7ff;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.suggestionIcon :global(.anticon) {
+  font-size: 20px;
+  color: #1890ff;
+}
+
+.suggestionTitle {
+  display: block;
+  font-size: 15px;
+  color: rgba(0, 0, 0, 0.85);
+  margin-bottom: 8px;
+}
+
+.suggestionPrompt {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.45);
+  font-style: italic;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Focus state for accessibility */
+.suggestionCard:focus {
+  outline: 2px solid #1890ff;
+  outline-offset: 2px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .emptyContainer {
+    padding: 30px 16px;
+  }
+
+  .suggestionsGrid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .suggestionCard {
+    padding: 16px;
+  }
+
+  .welcomeIcon {
+    width: 64px;
+    height: 64px;
+  }
+
+  .welcomeIcon :global(.anticon) {
+    font-size: 28px;
+  }
+
+  .welcomeTitle {
+    font-size: 20px !important;
+  }
+
+  .welcomeText {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .emptyIcon {
+    font-size: 60px;
+  }
+
+  .description h4 {
+    font-size: 16px;
+  }
+
+  .description p {
+    font-size: 13px;
+  }
+}
