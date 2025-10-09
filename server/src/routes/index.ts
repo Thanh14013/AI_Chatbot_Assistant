@@ -1,6 +1,8 @@
 import { Router } from "express";
 import authRoutes from "./auth.route.js";
 import conversationRoutes from "./conversation.route.js";
+import { getChatCompletion } from "../services/openai.service.js";
+import openai from "../services/openai.service.js";
 
 const router = Router();
 

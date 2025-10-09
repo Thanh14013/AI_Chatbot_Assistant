@@ -28,20 +28,4 @@ export interface MessageResponse {
   model: string;
   createdAt: Date;
 }
-
-// Interface for sending a message and getting AI response
-export interface SendMessageInput {
-  conversation_id: string;
-  content: string;
-}
-
-// Interface for AI response with both user message and assistant reply
-export interface SendMessageResponse {
-  userMessage: MessageResponse;
-  assistantMessage: MessageResponse;
-  conversation: {
-    id: string;
-    total_tokens_used: number;
-    message_count: number;
-  };
-}
+// Streaming endpoint uses the same MessageResponse types; non-streaming wrappers removed

@@ -1,4 +1,6 @@
 export const messageListContainer: string;
+export const loadEarlierTop: string;
+export const earlierLoader: string;
 export const messageList: string;
 export const loadingContainer: string;
 export const skeletonItem: string;

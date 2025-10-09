@@ -82,7 +82,7 @@ export const create = async (req: Request, res: Response): Promise<void> => {
 /**
  * Get all conversations for authenticated user
  * GET /api/conversations
- * Query params: page, limit
+ * Query params: page, limit, search
  */
 export const getAll = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -96,9 +96,10 @@ export const getAll = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Extract pagination params
+    // Extract pagination params and search query
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
+    const search = req.query.search as string | undefined;
 
     // Validate pagination params
     if (page < 1 || limit < 1 || limit > 100) {
@@ -109,8 +110,8 @@ export const getAll = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Get conversations
-    const result = await getUserConversations(userId, page, limit);
+    // Get conversations with optional search
+    const result = await getUserConversations(userId, page, limit, search);
 
     // Send success response
     res.status(200).json({
@@ -308,10 +309,20 @@ export const remove = async (req: Request, res: Response): Promise<void> => {
     // Delete conversation
     const result = await deleteConversation(conversationId, userId);
 
-    // Send success response
+    // After deletion, fetch refreshed conversation list for the user.
+    // Use page/limit from query params if provided so the client can
+    // control which page is returned after delete; default to 1/20.
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+
+    const conversationsResult = await getUserConversations(userId, page, limit);
+
+    // Send success response with refreshed list
     res.status(200).json({
       success: true,
       message: result.message,
+      data: conversationsResult.conversations,
+      pagination: conversationsResult.pagination,
     });
   } catch (error) {
     // Handle errors

@@ -34,9 +34,7 @@ try {
 // Test connection function (safe: doesn't throw when API key is missing)
 export async function testOpenAIConnection() {
   if (!apiKey) {
-    console.warn(
-      "⚠️  OPENAI_API_KEY not set — skipping OpenAI connection test. Set OPENAI_API_KEY in your .env or environment to enable this test."
-    );
+    // OPENAI_API_KEY not set — skip connection test in silent mode
     return;
   }
 
@@ -47,11 +45,10 @@ export async function testOpenAIConnection() {
     });
 
     const text = response?.choices?.[0]?.message?.content;
-    console.log("✅ OpenAI connected successfully!");
-    console.log("Response:", text ?? JSON.stringify(response));
+    // Connection succeeded — intentionally silent (no console output)
   } catch (error: any) {
-    // Log the full error object (some SDK errors are objects, not plain Error)
-    console.error("❌ OpenAI connection failed:", error?.message ?? error);
+    // Re-throw the error so callers can handle/report it via configured logging
+    throw error;
   }
 }
 
@@ -66,7 +63,7 @@ export interface ChatCompletionParams {
   model?: string; // Default: "gpt-5-nano"
   temperature?: number; // Default: 0.7
   // Use newer OpenAI parameter name expected by some models
-  max_completion_tokens?: number; // Default: 1000
+  max_completion_tokens?: number; // Default: 2000
   stream?: boolean; // Default: false
 }
 
@@ -78,6 +75,9 @@ export interface ChatCompletionResponse {
   tokens_used: number;
   model: string;
   finish_reason: string;
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
 }
 
 /**
@@ -102,7 +102,7 @@ export async function getChatCompletion(
     messages,
     model = "gpt-5-nano",
     temperature = 0.7,
-    max_completion_tokens = 1000,
+    max_completion_tokens = 2000,
     stream = false,
   } = params;
 
@@ -152,16 +152,29 @@ export async function getChatCompletion(
     // Non-streaming response
     const response = await openai.chat.completions.create(requestPayload);
 
-    // Extract response data
+    // Extract response data and token breakdown when available
     const content = response.choices[0]?.message?.content || "";
-    const tokens_used = response.usage?.total_tokens || 0;
+    const prompt_tokens = response.usage?.prompt_tokens || 0;
+    const completion_tokens = response.usage?.completion_tokens || 0;
+    const total_tokens = response.usage?.total_tokens || prompt_tokens + completion_tokens || 0;
+
+    // If OpenAI returned an empty string for content, treat as an error so
+    // callers won't persist empty assistant messages. This can happen when
+    // the model or SDK returns an incomplete response.
+    if (!content || (typeof content === "string" && content.trim() === "")) {
+      throw new Error("OpenAI returned empty content");
+    }
+
     const finish_reason = response.choices[0]?.finish_reason || "stop";
 
     return {
       content,
-      tokens_used,
+      tokens_used: total_tokens,
       model,
       finish_reason,
+      prompt_tokens,
+      completion_tokens,
+      total_tokens,
     };
   } catch (error: any) {
     // Handle different types of errors
@@ -235,15 +248,23 @@ async function handleStreamingResponse(params: {
     }
 
     // Estimate token usage (rough approximation: 1 token ≈ 4 characters)
-    tokens_used =
-      estimateTokenCount(fullContent) +
-      estimateTokenCount(messages.map((m) => m.content).join(" "));
+    const estimated_completion_tokens = estimateTokenCount(fullContent);
+    const estimated_prompt_tokens = estimateTokenCount(messages.map((m) => m.content).join(" "));
+    tokens_used = estimated_completion_tokens + estimated_prompt_tokens;
+
+    // If streaming produced no content, treat as an error
+    if (!fullContent || fullContent.trim() === "") {
+      throw new Error("OpenAI streaming returned empty content");
+    }
 
     return {
       content: fullContent,
       tokens_used,
       model,
       finish_reason,
+      prompt_tokens: estimated_prompt_tokens,
+      completion_tokens: estimated_completion_tokens,
+      total_tokens: tokens_used,
     };
   } catch (error: any) {
     throw new Error(`Streaming error: ${error?.message || "Unknown error"}`);

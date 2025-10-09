@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { Button, Spin, Skeleton } from "antd";
-import { DownOutlined } from "@ant-design/icons";
+import { DownOutlined, UpOutlined } from "@ant-design/icons";
 import { Message } from "../types/chat.type";
 import MessageBubble from "./MessageBubble";
 import styles from "./MessageList.module.css";
@@ -14,6 +14,10 @@ interface MessageListProps {
   messages: Message[];
   isLoading?: boolean;
   showScrollButton?: boolean;
+  // Handler to load earlier messages (page will be managed by parent)
+  onLoadEarlier?: () => Promise<void> | void;
+  hasMore?: boolean;
+  onRetry?: (message: Message) => void;
 }
 
 /**
@@ -24,11 +28,16 @@ const MessageList: React.FC<MessageListProps> = ({
   messages,
   isLoading = false,
   showScrollButton = true,
+  onLoadEarlier,
+  hasMore = false,
+  onRetry,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [showLoadEarlierBtn, setShowLoadEarlierBtn] = useState(false);
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
+  const [isLoadingEarlier, setIsLoadingEarlier] = useState(false);
 
   /**
    * Scroll to bottom of message list
@@ -41,20 +50,25 @@ const MessageList: React.FC<MessageListProps> = ({
   };
 
   /**
-   * Handle scroll event to show/hide scroll button
+   * Handle scroll event to show/hide scroll buttons
    */
   const handleScroll = () => {
     if (!containerRef.current) return;
 
     const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    const distanceFromTop = scrollTop;
 
-    // Show scroll button if user scrolled up more than 100px from bottom
-    const shouldShowButton = distanceFromBottom > 100;
-    setShowScrollBtn(shouldShowButton);
+    // Show scroll-to-bottom button if user scrolled up more than 100px from bottom
+    const shouldShowScrollBtn = distanceFromBottom > 100;
+    setShowScrollBtn(shouldShowScrollBtn);
+
+    // Show load-earlier button if scrolled to top (within 50px) and has more messages
+    const shouldShowLoadEarlierBtn = distanceFromTop < 50 && hasMore;
+    setShowLoadEarlierBtn(shouldShowLoadEarlierBtn);
 
     // Disable auto-scroll if user manually scrolled up
-    if (shouldShowButton) {
+    if (shouldShowScrollBtn) {
       setIsAutoScrollEnabled(false);
     }
   };
@@ -65,6 +79,30 @@ const MessageList: React.FC<MessageListProps> = ({
   const handleScrollButtonClick = () => {
     scrollToBottom(true);
     setIsAutoScrollEnabled(true);
+  };
+
+  /**
+   * Handle load earlier messages
+   */
+  const handleLoadEarlier = async () => {
+    if (!onLoadEarlier || !containerRef.current || isLoadingEarlier) return;
+
+    setIsLoadingEarlier(true);
+    try {
+      // Preserve scroll position: measure height before
+      const prevScrollHeight = containerRef.current.scrollHeight;
+      await onLoadEarlier();
+
+      // After parent prepends messages and DOM updates, preserve scroll position
+      setTimeout(() => {
+        if (!containerRef.current) return;
+        const newHeight = containerRef.current.scrollHeight;
+        const delta = newHeight - prevScrollHeight;
+        containerRef.current.scrollTop = delta;
+      }, 100);
+    } finally {
+      setIsLoadingEarlier(false);
+    }
   };
 
   /**
@@ -103,6 +141,20 @@ const MessageList: React.FC<MessageListProps> = ({
 
   return (
     <div className={styles.messageListContainer}>
+      {/* Load earlier button at top when scrolled to top */}
+      {showLoadEarlierBtn && (
+        <div className={styles.loadEarlierTop}>
+          <Button
+            onClick={handleLoadEarlier}
+            loading={isLoadingEarlier}
+            icon={<UpOutlined />}
+            type="default"
+          >
+            Read More
+          </Button>
+        </div>
+      )}
+
       <div
         ref={containerRef}
         className={styles.messageList}
@@ -113,7 +165,7 @@ const MessageList: React.FC<MessageListProps> = ({
 
         {/* Render messages */}
         {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
+          <MessageBubble key={message.id} message={message} onRetry={onRetry} />
         ))}
 
         {/* Invisible div to scroll to */}

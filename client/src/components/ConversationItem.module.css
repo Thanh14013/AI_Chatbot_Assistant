@@ -67,6 +67,40 @@
   gap: 4px;
 }
 
+/* More button (3 dots) */
+.moreButton {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  opacity: 0;
+  transition: all 0.2s ease;
+  font-size: 16px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.conversationItem:hover .moreButton {
+  opacity: 1;
+}
+
+.moreButton:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.conversationItem.active .moreButton {
+  opacity: 1;
+}
+
+/* Rename input */
+.renameInput {
+  font-size: 14px;
+  font-weight: 600;
+}
+
 /* Title styling */
 .title {
   font-size: 14px;

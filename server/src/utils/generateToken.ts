@@ -2,13 +2,15 @@ import jwt, { JwtPayload } from "jsonwebtoken";
 
 // Token payload shape used in signed tokens
 type SignedTokenPayload = {
+  id?: string;
   name: string;
   email: string;
   type: "access" | "refresh";
 };
 
-// Input payload when creating tokens (only name and email required)
+// Input payload when creating tokens (id optional but recommended)
 type CreateTokenInput = {
+  id?: string;
   name: string;
   email: string;
 };
@@ -28,6 +30,7 @@ const REFRESH_EXPIRATION = process.env.JWT_REFRESH_EXPIRATION
 // Generate Access Token
 const generateAccessToken = (payload: CreateTokenInput): string => {
   const tokenPayload: SignedTokenPayload = {
+    id: payload.id,
     name: payload.name,
     email: payload.email,
     type: "access",
@@ -43,6 +46,7 @@ const generateAccessToken = (payload: CreateTokenInput): string => {
 // Generate Refresh Token
 const generateRefreshToken = (payload: CreateTokenInput): string => {
   const tokenPayload: SignedTokenPayload = {
+    id: payload.id,
     name: payload.name,
     email: payload.email,
     type: "refresh",

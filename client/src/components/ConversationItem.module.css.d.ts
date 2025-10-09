@@ -3,6 +3,8 @@ export const active: string;
 export const iconContainer: string;
 export const icon: string;
 export const details: string;
+export const moreButton: string;
+export const renameInput: string;
 export const title: string;
 export const preview: string;
 export const metadata: string;

@@ -53,3 +53,9 @@ export interface ApiError {
   message: string;
   error?: string;
 }
+
+// Get current user response
+export interface GetCurrentUserResponse {
+  success: boolean;
+  data: User;
+}

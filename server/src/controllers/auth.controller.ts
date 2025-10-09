@@ -5,6 +5,7 @@ import {
   refreshAccessToken,
   logoutUser,
 } from "../services/auth.service.js";
+import User from "../models/user.model.js";
 import type { RegisterInput, LoginInput } from "../types/user.type.js";
 
 /**
@@ -13,11 +14,9 @@ import type { RegisterInput, LoginInput } from "../types/user.type.js";
  */
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Extract registration data from request body
     const { name, email, password, confirmPassword }: RegisterInput & { confirmPassword?: string } =
       req.body;
 
-    // Validate required fields
     if (!name || !email || !password) {
       res.status(400).json({
         success: false,
@@ -26,7 +25,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       res.status(400).json({
@@ -36,7 +34,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Validate password length
     if (password.length < 6) {
       res.status(400).json({
         success: false,
@@ -45,7 +42,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Validate password confirmation (if provided)
     if (confirmPassword && password !== confirmPassword) {
       res.status(400).json({
         success: false,
@@ -54,33 +50,19 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Call service to register user
     await registerUser({ name, email, password });
 
-    // Send success response
     res.status(201).json({
       success: true,
       message: "User registered successfully",
     });
   } catch (error) {
-    // Handle errors
     const errorMessage = error instanceof Error ? error.message : "Registration failed";
-
-    // Check for specific error types
     if (errorMessage.includes("Email already registered")) {
-      res.status(409).json({
-        success: false,
-        message: errorMessage,
-      });
+      res.status(409).json({ success: false, message: errorMessage });
       return;
     }
-
-    // Generic server error
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: errorMessage,
-    });
+    res.status(500).json({ success: false, message: "Internal server error", error: errorMessage });
   }
 };
 
@@ -90,34 +72,24 @@ export const register = async (req: Request, res: Response): Promise<void> => {
  */
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Extract login credentials from request body
     const { email, password }: LoginInput = req.body;
-
-    // Validate required fields
     if (!email || !password) {
-      res.status(400).json({
-        success: false,
-        message: "Email and password are required",
-      });
+      res.status(400).json({ success: false, message: "Email and password are required" });
       return;
     }
 
-    // Call service to login user
     const result = await loginUser({ email, password });
 
-    // Set refresh token in HttpOnly cookie
-    // Cookie options: HttpOnly, Secure in production, SameSite lax
     const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax" as const,
       path: "/",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     };
 
     res.cookie("refreshToken", result.refreshToken, cookieOptions);
 
-    // Send success response without refresh token in body
     res.status(200).json({
       success: true,
       message: "Login successful",
@@ -127,25 +99,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       },
     });
   } catch (error) {
-    // Handle errors
     const errorMessage = error instanceof Error ? error.message : "Login failed";
-
-    // Check for specific error types (credential errors)
     if (errorMessage.includes("Account or password is incorrect")) {
-      // Return a standardized English message for wrong credentials
-      res.status(401).json({
-        success: false,
-        message: "Account or password is incorrect",
-      });
+      res.status(401).json({ success: false, message: "Account or password is incorrect" });
       return;
     }
-
-    // Generic server error
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: errorMessage,
-    });
+    res.status(500).json({ success: false, message: "Internal server error", error: errorMessage });
   }
 };
 
@@ -155,53 +114,33 @@ export const login = async (req: Request, res: Response): Promise<void> => {
  */
 export const refresh = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Extract refresh token from cookie or request body
     const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
-
-    // Validate refresh token presence
     if (!refreshToken) {
-      res.status(400).json({
-        success: false,
-        message: "Refresh token is required",
-      });
+      res.status(400).json({ success: false, message: "Refresh token is required" });
       return;
     }
 
-    // Call service to refresh token (returns only accessToken)
     const result = await refreshAccessToken(refreshToken);
 
-    // Send success response with the new access token only
-    res.status(200).json({
-      success: true,
-      message: "Token refreshed successfully",
-      data: {
-        accessToken: result.accessToken,
-      },
-    });
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: "Token refreshed successfully",
+        data: { accessToken: result.accessToken },
+      });
   } catch (error) {
-    // Handle errors
     const errorMessage = error instanceof Error ? error.message : "Token refresh failed";
-
-    // Check for specific error types
     if (
       errorMessage.includes("Invalid") ||
       errorMessage.includes("expired") ||
       errorMessage.includes("revoked") ||
       errorMessage.includes("not found")
     ) {
-      res.status(401).json({
-        success: false,
-        message: errorMessage,
-      });
+      res.status(401).json({ success: false, message: errorMessage });
       return;
     }
-
-    // Generic server error
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: errorMessage,
-    });
+    res.status(500).json({ success: false, message: "Internal server error", error: errorMessage });
   }
 };
 
@@ -211,71 +150,77 @@ export const refresh = async (req: Request, res: Response): Promise<void> => {
  */
 export const logout = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Prefer refresh token from cookie; fall back to body
-    const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
-
-    // If no token provided, still attempt to clear cookies but inform client
+    const refreshToken = req.cookies?.refreshToken;
     if (!refreshToken) {
-      // Clear refresh token cookie if present (use same path & secure flag as when set)
       res.clearCookie("refreshToken", {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         path: "/",
       });
-
-      res.status(200).json({
-        success: true,
-        message: "Logout successful",
-      });
+      res.status(200).json({ success: true, message: "Logout successful" });
       return;
     }
 
-    // Call service to logout user (revoke tokens in DB)
-    const result = await logoutUser(refreshToken);
+    await logoutUser(refreshToken);
 
-    // Clear refresh token cookie (use same path & secure flag as when set)
-    const cookieClearOptions = {
+    res.clearCookie("refreshToken", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-    } as const;
-
-    res.clearCookie("refreshToken", cookieClearOptions);
-    // Some browsers/proxies ignore clearCookie in certain cross-origin/proxy setups.
-    // Also explicitly expire the cookie by setting it with an immediate past expiry.
-    res.cookie("refreshToken", "", { ...cookieClearOptions, expires: new Date(0) });
-
-    // Debug log for server-side confirmation
-    console.debug(
-      "Cleared refreshToken cookie for logout (cookieClearOptions):",
-      cookieClearOptions
-    );
-
-    // Send success response
-    res.status(200).json({
-      success: true,
-      message: result.message,
     });
+    res.status(200).json({ success: true, message: "Logout successful" });
   } catch (error) {
-    // Handle errors
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    });
     const errorMessage = error instanceof Error ? error.message : "Logout failed";
+    res.status(500).json({ success: false, message: errorMessage });
+  }
+};
 
-    // Check for specific error types
-    if (errorMessage.includes("not found") || errorMessage.includes("already revoked")) {
-      res.status(404).json({
-        success: false,
-        message: errorMessage,
-      });
+/**
+ * Get current user
+ * GET /api/auth/me
+ */
+export const getCurrentUser = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const decoded = (req as any).user || (req as any).body?.user;
+
+    let userRecord = null;
+
+    if (decoded?.id) {
+      userRecord = await User.findByPk(decoded.id);
+    } else if (decoded?.email) {
+      userRecord = await User.findOne({ where: { email: decoded.email } });
+    } else {
+      res.status(401).json({ success: false, message: "User not authenticated" });
       return;
     }
 
-    // Generic server error
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: errorMessage,
-    });
+    if (!userRecord) {
+      res.status(404).json({ success: false, message: "User not found" });
+      return;
+    }
+
+    res
+      .status(200)
+      .json({
+        success: true,
+        data: {
+          id: userRecord.id,
+          name: userRecord.name,
+          email: userRecord.email,
+          createdAt: userRecord.createdAt,
+          updatedAt: userRecord.updatedAt,
+        },
+      });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Failed to get user";
+    res.status(500).json({ success: false, message: errorMessage });
   }
 };

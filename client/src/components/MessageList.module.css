@@ -9,6 +9,37 @@
   background-color: #fafafa;
 }
 
+/* Load earlier messages button at top */
+.loadEarlierTop {
+  padding: 12px 20px;
+  text-align: center;
+  background-color: #fafafa;
+  border-bottom: 1px solid #f0f0f0;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  animation: slideDown 0.3s ease-in-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Earlier messages loader button (deprecated - keeping for backward compatibility) */
+.earlierLoader {
+  padding: 12px 20px;
+  text-align: center;
+  background-color: #fafafa;
+  border-bottom: 1px solid #f0f0f0;
+}
+
 .messageList {
   flex: 1;
   overflow-y: auto;

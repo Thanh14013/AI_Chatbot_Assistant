@@ -11,3 +11,8 @@ export const codeBlock: string;
 export const messageFooter: string;
 export const timestamp: string;
 export const copyButton: string;
+export const retryButton: string;
+export const emptyAssistant: string;
+export const typingRow: string;
+export const typingPlaceholder: string;
+export const typingDot: string;

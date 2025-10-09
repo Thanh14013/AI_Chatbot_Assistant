@@ -10,6 +10,7 @@ import type {
   AuthResponse,
   RefreshTokenResponse,
   ApiResponse,
+  GetCurrentUserResponse,
 } from "../types";
 import { setTokens, clearTokens } from "../utils/token.util";
 
@@ -71,19 +72,16 @@ export const refreshAccessToken = async (): Promise<RefreshTokenResponse> => {
  */
 export const logout = async (): Promise<ApiResponse> => {
   try {
-    // Logout endpoint clears the refresh token cookie server-side. We still call it to revoke the token in DB.
     const response = await axiosInstance.post<ApiResponse>(
       "/auth/logout",
       {},
       { withCredentials: true }
     );
 
-    // Clear local access token
     clearTokens();
 
     return response.data;
   } catch (error) {
-    // Even if API call fails, clear local tokens
     clearTokens();
     throw error;
   }
@@ -97,4 +95,15 @@ export const isAuthenticated = (): boolean => {
   const accessToken =
     typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
   return !!accessToken;
+};
+
+/**
+ * Get current user
+ */
+export const getCurrentUser = async (): Promise<GetCurrentUserResponse> => {
+  const response = await axiosInstance.get<GetCurrentUserResponse>("/auth/me");
+  // Defensive logging to help debug unexpected response shapes
+  // (No debug logs)
+
+  return response.data;
 };

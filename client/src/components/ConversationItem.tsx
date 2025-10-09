@@ -3,18 +3,28 @@
  * List item for displaying individual conversations in sidebar
  */
 
-import React from "react";
-import { Typography } from "antd";
-import { MessageOutlined } from "@ant-design/icons";
+import React, { useState } from "react";
+import { Typography, Dropdown, Modal, Input, message } from "antd";
+import {
+  MessageOutlined,
+  MoreOutlined,
+  EditOutlined,
+  DeleteOutlined,
+} from "@ant-design/icons";
 import { ConversationListItem } from "../types/chat.type";
+import {
+  updateConversation,
+  deleteConversation,
+} from "../services/chat.service";
 import styles from "./ConversationItem.module.css";
 
-const { Text, Paragraph } = Typography;
+const { Text } = Typography;
 
 interface ConversationItemProps {
   conversation: ConversationListItem;
   isActive: boolean;
   onClick: (conversationId: string) => void;
+  onUpdate?: () => void; // Callback to refresh conversation list after rename/delete
 }
 
 /**
@@ -25,7 +35,12 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   conversation,
   isActive,
   onClick,
+  onUpdate,
 }) => {
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [newTitle, setNewTitle] = useState(conversation.title);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   /**
    * Format timestamp to relative time or date
    */
@@ -64,7 +79,9 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
    * Handle conversation item click
    */
   const handleClick = () => {
-    onClick(conversation.id);
+    if (!isRenaming) {
+      onClick(conversation.id);
+    }
   };
 
   /**
@@ -74,6 +91,89 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + "...";
   };
+
+  /**
+   * Handle rename conversation
+   */
+  const handleRename = async () => {
+    if (!newTitle.trim()) {
+      message.error("Title cannot be empty");
+      return;
+    }
+
+    if (newTitle.trim() === conversation.title) {
+      setIsRenaming(false);
+      return;
+    }
+
+    try {
+      await updateConversation(conversation.id, { title: newTitle.trim() });
+      message.success("Conversation renamed successfully");
+      setIsRenaming(false);
+      onUpdate?.();
+    } catch (error: any) {
+      message.error(
+        error?.response?.data?.message || "Failed to rename conversation"
+      );
+      setNewTitle(conversation.title); // Reset to original
+    }
+  };
+
+  /**
+   * Handle delete conversation with confirmation modal
+   */
+  const handleDelete = () => {
+    Modal.confirm({
+      title: "Delete Conversation",
+      content:
+        "Are you sure you want to delete this conversation? This action cannot be undone.",
+      okText: "Delete",
+      okType: "danger",
+      cancelText: "Cancel",
+      centered: true,
+      onOk: async () => {
+        setIsDeleting(true);
+        try {
+          // Call delete API - server will soft delete conversation and async delete messages
+          await deleteConversation(conversation.id);
+          message.success("Conversation deleted successfully");
+          // Trigger parent to refresh conversation list
+          onUpdate?.();
+        } catch (error: any) {
+          message.error(
+            error?.response?.data?.message || "Failed to delete conversation"
+          );
+        } finally {
+          setIsDeleting(false);
+        }
+      },
+    });
+  };
+
+  /**
+   * Dropdown menu items
+   */
+  const menuItems = [
+    {
+      key: "rename",
+      label: "Rename",
+      icon: <EditOutlined />,
+      onClick: (e: any) => {
+        e.domEvent.stopPropagation();
+        setIsRenaming(true);
+      },
+    },
+    {
+      key: "delete",
+      label: "Delete",
+      icon: <DeleteOutlined />,
+      danger: true,
+      onClick: (e: any) => {
+        e.domEvent.stopPropagation();
+        handleDelete();
+      },
+    },
+  ];
 
   return (
     <div
@@ -95,10 +195,23 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
 
       {/* Conversation details */}
       <div className={styles.details}>
-        {/* Title */}
-        <Text className={styles.title} strong>
-          {truncateText(conversation.title, 30)}
-        </Text>
+        {/* Title - editable when renaming */}
+        {isRenaming ? (
+          <Input
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            onPressEnter={handleRename}
+            onBlur={handleRename}
+            autoFocus
+            size="small"
+            onClick={(e) => e.stopPropagation()}
+            className={styles.renameInput}
+          />
+        ) : (
+          <Text className={styles.title} strong>
+            {truncateText(conversation.title, 30)}
+          </Text>
+        )}
 
         {/* Message count and timestamp */}
         <div className={styles.metadata}>
@@ -111,6 +224,17 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           </Text>
         </div>
       </div>
+
+      {/* More options dropdown */}
+      <Dropdown
+        menu={{ items: menuItems }}
+        trigger={["click"]}
+        placement="bottomRight"
+      >
+        <div className={styles.moreButton} onClick={(e) => e.stopPropagation()}>
+          <MoreOutlined />
+        </div>
+      </Dropdown>
 
       {/* Active indicator */}
       {isActive && <div className={styles.activeIndicator} />}

@@ -56,6 +56,8 @@ axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = getAccessToken();
 
+    // no debug logs
+
     // Attach token to Authorization header if available
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -75,6 +77,8 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   // Success response - pass through
   (response) => {
+    // no debug logs
+
     return response;
   },
 
@@ -96,7 +100,10 @@ axiosInstance.interceptors.response.use(
       if (url.includes("/auth/login") || url.includes("/auth/register")) {
         return Promise.reject(error);
       }
-      // If refresh endpoint fails, logout user
+
+      // If the 401 originated from /auth/me call, log a clear message for debugging
+      // no debug logs
+      // If refresh endpoint fails, logout user (token expired or invalid)
       if (originalRequest.url?.includes("/auth/refresh")) {
         clearTokens();
         window.location.href = "/login";
@@ -152,8 +159,18 @@ axiosInstance.interceptors.response.use(
         return axiosInstance(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        clearTokens();
-        window.location.href = "/login";
+
+        // Only clear tokens and redirect if it's a 401/403 (authentication failure)
+        if (axios.isAxiosError(refreshError)) {
+          if (
+            refreshError.response?.status === 401 ||
+            refreshError.response?.status === 403
+          ) {
+            clearTokens();
+            window.location.href = "/login";
+          }
+        }
+
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

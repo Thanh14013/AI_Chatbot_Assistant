@@ -1,5 +1,6 @@
 import Conversation from "../models/conversation.model.js";
 import Message from "../models/message.model.js";
+import { Op } from "sequelize";
 import type {
   CreateConversationInput,
   UpdateConversationInput,
@@ -47,17 +48,19 @@ export const createConversation = async (
 };
 
 /**
- * Get all conversations for a user with pagination
+ * Get all conversations for a user with pagination and optional search
  *
  * @param userId - User ID
  * @param page - Page number (default: 1)
  * @param limit - Items per page (default: 20)
+ * @param search - Optional search query to filter conversation titles
  * @returns Array of conversations with pagination info
  */
 export const getUserConversations = async (
   userId: string,
   page: number = 1,
-  limit: number = 20
+  limit: number = 20,
+  search?: string
 ): Promise<{
   conversations: ConversationResponse[];
   pagination: {
@@ -70,20 +73,27 @@ export const getUserConversations = async (
   // Calculate offset
   const offset = (page - 1) * limit;
 
+  // Build where clause with optional search filter
+  const whereClause: any = {
+    user_id: userId,
+    deleted_at: null,
+  };
+
+  // Add search filter if provided
+  if (search && search.trim()) {
+    whereClause.title = {
+      [Op.iLike]: `%${search.trim()}%`, // Case-insensitive search
+    };
+  }
+
   // Get total count for pagination
   const total = await Conversation.count({
-    where: {
-      user_id: userId,
-      deleted_at: null,
-    },
+    where: whereClause,
   });
 
   // Get conversations with pagination
   const conversations = await Conversation.findAll({
-    where: {
-      user_id: userId,
-      deleted_at: null,
-    },
+    where: whereClause,
     order: [["updatedAt", "DESC"]], // Most recently updated first
     limit,
     offset,
@@ -253,9 +263,24 @@ export const deleteConversation = async (
     throw new Error("Unauthorized access to conversation");
   }
 
-  // Soft delete (set deleted_at timestamp)
+  // Soft delete (set deleted_at timestamp) immediately so the conversation
+  // disappears from user lists. Message deletion will be performed
+  // asynchronously (fire-and-forget) to avoid blocking the request when
+  // conversations have many messages.
   conversation.deleted_at = new Date();
   await conversation.save();
+
+  // Fire-and-forget: delete messages in background and log any failures.
+  // We intentionally do NOT await this Promise so the HTTP response can
+  // return quickly. This keeps UX snappy when conversations contain many messages.
+  Message.deleteByConversation(conversationId)
+    .then(() => {
+      // Optionally: add more detailed logging or metrics here.
+    })
+    .catch((err) => {
+      // Log failures for investigation; do not interrupt user flow.
+      console.warn(`Failed to delete messages for conversation ${conversationId}:`, err);
+    });
 
   return {
     message: "Conversation deleted successfully",

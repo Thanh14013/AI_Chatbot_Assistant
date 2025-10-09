@@ -3,7 +3,7 @@
  * Displays individual chat messages with different styles for user and assistant
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Avatar, Typography, Button, message as antMessage } from "antd";
 import {
   UserOutlined,
@@ -18,17 +18,28 @@ const { Text } = Typography;
 
 interface MessageBubbleProps {
   message: Message;
+  // Optional retry handler for failed messages
+  onRetry?: (message: Message) => void;
 }
 
 /**
  * MessageBubble component
  * Renders a single message with avatar, content, timestamp, and copy button
  */
-const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }) => {
   const [isCopied, setIsCopied] = useState(false);
+  // Client-side streaming display (progressive reveal)
+  const [displayedContent, setDisplayedContent] = useState<string>(
+    message.content || ""
+  );
+  const lastStreamedMessageId = useRef<string | null>(null);
   // MessageRole is a string union ('user' | 'assistant' | 'system')
   // compare against the literal value
   const isUser = message.role === "user";
+
+  // Local status helpers
+  const isFailed = message.localStatus === "failed";
+  const isPending = message.localStatus === "pending";
 
   /**
    * Format timestamp to readable format
@@ -103,49 +114,130 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
     });
   };
 
+  // Client-side streaming: reveal assistant message token-by-token
+  useEffect(() => {
+    // Only stream assistant messages that are not typing
+    if (message.role !== "assistant" || message.isTyping) {
+      setDisplayedContent(message.content || "");
+      return;
+    }
+
+    const full = message.content || "";
+
+    // If there's no content, nothing to stream
+    if (!full) {
+      setDisplayedContent("");
+      return;
+    }
+
+    // Avoid re-streaming the same message repeatedly
+    if (lastStreamedMessageId.current === message.id) {
+      setDisplayedContent(full);
+      return;
+    }
+
+    lastStreamedMessageId.current = message.id;
+    setDisplayedContent("");
+
+    // Split into tokens while preserving whitespace so spacing stays correct
+    const tokens = full.match(/\s+|\S+/g) || [full];
+    let idx = 0;
+
+    // Delay per token (ms). Adjust for speed: lower -> faster.
+    const DELAY_MS = 40;
+
+    const timer = setInterval(() => {
+      idx += 1;
+      setDisplayedContent((prev) => prev + (tokens[idx - 1] || ""));
+      if (idx >= tokens.length) {
+        clearInterval(timer);
+      }
+    }, DELAY_MS);
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, [message.id, message.content, message.role, message.isTyping]);
+
   return (
     <div
       className={`${styles.messageContainer} ${
         isUser ? styles.userMessage : styles.assistantMessage
       }`}
     >
-      {/* Avatar - show on left for assistant, right for user */}
-      {!isUser && (
-        <Avatar
-          icon={<RobotOutlined />}
-          className={`${styles.avatar} ${styles.assistantAvatar}`}
-        />
-      )}
+      {!message.isTyping ? (
+        <>
+          {/* Avatar - show on left for assistant, right for user */}
+          {!isUser && (
+            <Avatar
+              icon={<RobotOutlined />}
+              className={`${styles.avatar} ${styles.assistantAvatar}`}
+            />
+          )}
 
-      {/* Message content bubble */}
-      <div className={styles.messageBubble}>
-        <div className={styles.messageContent}>
-          {renderContent(message.content)}
-        </div>
+          {/* Message content bubble */}
+          <div className={styles.messageBubble}>
+            <div className={styles.messageContent}>
+              {message.role === "assistant" &&
+              (!message.content || message.content.trim() === "") ? (
+                <em className={styles.emptyAssistant}>
+                  Assistant did not return content. Try retrying the message.
+                </em>
+              ) : (
+                renderContent(message.content)
+              )}
+            </div>
 
-        {/* Message footer with timestamp and copy button */}
-        <div className={styles.messageFooter}>
-          <Text className={styles.timestamp}>
-            {formatTimestamp(message.createdAt)}
-          </Text>
+            {/* Message footer with timestamp and copy button */}
+            <div className={styles.messageFooter}>
+              <Text className={styles.timestamp}>
+                {formatTimestamp(message.createdAt)}
+              </Text>
 
-          {/* Copy button */}
-          <Button
-            type="text"
-            size="small"
-            icon={isCopied ? <CheckOutlined /> : <CopyOutlined />}
-            onClick={handleCopy}
-            className={styles.copyButton}
+              {/* Show retry button if failed */}
+              {isFailed ? (
+                <Button
+                  type="link"
+                  onClick={() => onRetry && onRetry(message)}
+                  className={styles.retryButton}
+                >
+                  Retry
+                </Button>
+              ) : (
+                <Button
+                  type="text"
+                  size="small"
+                  icon={isCopied ? <CheckOutlined /> : <CopyOutlined />}
+                  onClick={handleCopy}
+                  className={styles.copyButton}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* User avatar on the right */}
+          {isUser && (
+            <Avatar
+              icon={<UserOutlined />}
+              className={`${styles.avatar} ${styles.userAvatar}`}
+            />
+          )}
+        </>
+      ) : (
+        // Typing placeholder (assistant)
+        <div className={styles.typingRow}>
+          <Avatar
+            icon={<RobotOutlined />}
+            className={`${styles.avatar} ${styles.assistantAvatar}`}
           />
+          <div className={styles.messageBubble}>
+            <div className={styles.typingPlaceholder}>
+              <span className={styles.typingDot} />
+              <span className={styles.typingDot} />
+              <span className={styles.typingDot} />
+            </div>
+          </div>
         </div>
-      </div>
-
-      {/* User avatar on the right */}
-      {isUser && (
-        <Avatar
-          icon={<UserOutlined />}
-          className={`${styles.avatar} ${styles.userAvatar}`}
-        />
       )}
     </div>
   );

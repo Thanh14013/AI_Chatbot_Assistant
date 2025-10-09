@@ -60,8 +60,8 @@ export const loginUser = async (loginData: LoginInput) => {
   }
 
   // Generate new tokens
-  const accessToken = generateAccessToken({ name: user.name, email: user.email });
-  const refreshToken = generateRefreshToken({ name: user.name, email: user.email });
+  const accessToken = generateAccessToken({ id: user.id, name: user.name, email: user.email });
+  const refreshToken = generateRefreshToken({ id: user.id, name: user.name, email: user.email });
 
   // Store refresh token in database
   const expiresAt = new Date();
@@ -120,14 +120,14 @@ export const refreshAccessToken = async (token: string) => {
     throw new Error("User not found");
   }
   // Generate new access token only
-  const newAccessToken = generateAccessToken({ name: user.name, email: user.email });
+  const newAccessToken = generateAccessToken({ id: user.id, name: user.name, email: user.email });
 
   return {
     accessToken: newAccessToken,
   };
 };
 
-// Logout user by revoking all refresh tokens for the user
+// Logout user by revoking the specific refresh token
 export const logoutUser = async (token: string) => {
   // Find token in database to identify the user
   const storedToken = await RefreshToken.findByToken(token);
@@ -135,11 +135,17 @@ export const logoutUser = async (token: string) => {
     throw new Error("Refresh token not found");
   }
 
-  // Revoke all tokens for this user (logout from all devices)
-  const revokedCount = await RefreshToken.revokeAllUserTokens(storedToken.user_id);
+  // Check if token is already revoked
+  if (storedToken.is_revoked) {
+    throw new Error("Refresh token already revoked");
+  }
+
+  // Revoke only this specific token (logout from current device)
+  storedToken.is_revoked = true;
+  await storedToken.save();
 
   return {
-    message: `Logout successful, revoked ${revokedCount} token(s)`,
+    message: "Logout successful",
   };
 };
 

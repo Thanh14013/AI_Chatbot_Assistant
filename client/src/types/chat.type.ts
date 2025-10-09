@@ -15,6 +15,11 @@ export interface Message {
   tokens_used: number;
   model: string;
   createdAt: string | Date;
+  // Optional client-only fields used by the UI (not persisted to server)
+  // localStatus: status for optimistic / retry flows
+  localStatus?: "pending" | "failed" | "sent";
+  // isTyping: mark an assistant typing placeholder
+  isTyping?: boolean;
 }
 
 // Payload to create a new message (client -> server)

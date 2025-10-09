@@ -5,7 +5,7 @@
 
 import React from "react";
 import { Routes, Route } from "react-router-dom";
-import { ConfigProvider, theme } from "antd";
+import { ConfigProvider } from "antd";
 import { AuthProvider } from "./hooks";
 import { ProtectedRoute } from "./components";
 import { ChatPage, LoginPage, RegisterPage, NotFoundPage } from "./pages";
@@ -15,7 +15,6 @@ const App: React.FC = () => {
     // Configure Ant Design with light theme
     <ConfigProvider
       theme={{
-        algorithm: theme.defaultAlgorithm, // Light theme
         token: {
           colorPrimary: "#1890ff", // Primary color
           borderRadius: 6,
@@ -33,6 +32,15 @@ const App: React.FC = () => {
           {/* Protected routes - require authentication */}
           <Route
             path="/"
+            element={
+              <ProtectedRoute>
+                <ChatPage />
+              </ProtectedRoute>
+            }
+          />
+          {/* Conversation-specific route */}
+          <Route
+            path="/conversations/:id"
             element={
               <ProtectedRoute>
                 <ChatPage />

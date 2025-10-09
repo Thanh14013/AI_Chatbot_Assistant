@@ -1,11 +1,7 @@
 import Message from "../models/message.model.js";
 import Conversation from "../models/conversation.model.js";
 import { getChatCompletion, buildContextArray, estimateTokenCount } from "./openai.service.js";
-import type {
-  CreateMessageInput,
-  MessageResponse,
-  SendMessageResponse,
-} from "../types/message.type.js";
+import type { CreateMessageInput, MessageResponse } from "../types/message.type.js";
 
 /**
  * Create a new message
@@ -36,6 +32,11 @@ export const createMessage = async (data: CreateMessageInput): Promise<MessageRe
     tokens_used,
     model: data.model || conversation.model,
   });
+
+  // Update conversation totals to include this message's tokens and count
+  conversation.total_tokens_used += tokens_used;
+  conversation.message_count += 1;
+  await conversation.save();
 
   // Return message response
   return {
@@ -146,33 +147,36 @@ export const getConversationMessages = async (
  * @param content - User message content
  * @returns User message and AI response
  */
-export const sendMessageAndGetResponse = async (
+// non-streaming sendMessageAndGetResponse removed in favor of streaming API
+
+/**
+ * Send a user message and stream AI response via onChunk callback.
+ * Persists the user message immediately and persists assistant response once complete.
+ *
+ * @param conversationId
+ * @param userId
+ * @param content
+ * @param onChunk - callback invoked with each partial text chunk
+ * @returns assistant message record
+ */
+export const sendMessageAndStreamResponse = async (
   conversationId: string,
   userId: string,
-  content: string
-): Promise<SendMessageResponse> => {
-  // Validate input
+  content: string,
+  onChunk: (chunk: string) => Promise<void> | void
+): Promise<any> => {
   if (!content || content.trim().length === 0) {
     throw new Error("Message content cannot be empty");
   }
 
-  // Get conversation and verify access
+  // Verify conversation and access
   const conversation = await Conversation.findOne({
-    where: {
-      id: conversationId,
-      deleted_at: null,
-    },
+    where: { id: conversationId, deleted_at: null },
   });
+  if (!conversation) throw new Error("Conversation not found");
+  if (conversation.user_id !== userId) throw new Error("Unauthorized access to conversation");
 
-  if (!conversation) {
-    throw new Error("Conversation not found");
-  }
-
-  if (conversation.user_id !== userId) {
-    throw new Error("Unauthorized access to conversation");
-  }
-
-  // Step 1: Save user message to database
+  // Step 1: persist user message
   const userTokens = estimateTokenCount(content);
   const userMessage = await Message.create({
     conversation_id: conversationId,
@@ -182,67 +186,81 @@ export const sendMessageAndGetResponse = async (
     model: conversation.model,
   });
 
-  try {
-    // Step 2: Build context from conversation history
-    // Get recent messages for context (including the one we just created)
+  conversation.total_tokens_used += userTokens;
+  conversation.message_count += 1;
+  await conversation.save();
+
+  // Build context
+  const systemPrompt =
+    "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.";
+  const disableContext = String(process.env.DISABLE_CONTEXT || "false").toLowerCase() === "true";
+  let contextMessages: Array<{ role: string; content: string }>;
+
+  if (disableContext) {
+    // Only include system prompt and the current user message
+    contextMessages = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: content.trim() },
+    ];
+  } else {
     const recentMessages = await Message.findAll({
       where: { conversation_id: conversationId },
       order: [["createdAt", "ASC"]],
       limit: conversation.context_window,
     });
-
-    // Convert to format for OpenAI API
-    const messagesForContext = recentMessages.map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    }));
-
-    // Build context array with system prompt
-    const systemPrompt =
-      "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.";
-    const contextMessages = buildContextArray(
+    const messagesForContext = recentMessages.map((m) => ({ role: m.role, content: m.content }));
+    contextMessages = buildContextArray(
       messagesForContext,
       conversation.context_window,
       systemPrompt,
-      4000 // Max tokens for context
+      4000
     );
+  }
 
-    // Step 3: Call OpenAI API
-    // Prepare chat params and only include temperature when supported
-    const modelSupportsTemperature = (modelName: string) => {
-      const notSupporting = ["gpt-5-nano"];
-      return !notSupporting.includes(modelName);
-    };
+  // Prepare payload for streaming
+  const payload: any = {
+    model: conversation.model,
+    messages: contextMessages,
+    stream: true,
+    max_completion_tokens: 2000,
+  };
 
-    const chatParams: any = {
-      messages: contextMessages,
-      model: conversation.model,
-      max_completion_tokens: 1000,
-      stream: false,
-    };
+  // Only include temperature if supported by model
+  if (!["gpt-5-nano"].includes(conversation.model)) {
+    payload.temperature = 0.7;
+  }
 
-    if (modelSupportsTemperature(conversation.model)) {
-      chatParams.temperature = 0.7;
+  // Call OpenAI streaming
+  const openai = (await import("./openai.service.js")).default;
+  const stream = await openai.chat.completions.create(payload);
+
+  let fullContent = "";
+  try {
+    for await (const chunk of stream) {
+      const delta = chunk.choices?.[0]?.delta;
+      if (delta?.content) {
+        const text = delta.content as string;
+        fullContent += text;
+        // invoke callback
+        await onChunk(text);
+      }
     }
 
-    const aiResponse = await getChatCompletion(chatParams);
-
-    // Step 4: Save AI response to database
+    // Estimate tokens
+    const estimated_completion_tokens = estimateTokenCount(fullContent);
     const assistantMessage = await Message.create({
       conversation_id: conversationId,
       role: "assistant",
-      content: aiResponse.content,
-      tokens_used: aiResponse.tokens_used,
+      content: fullContent,
+      tokens_used: estimated_completion_tokens,
       model: conversation.model,
     });
 
-    // Step 5: Update conversation stats
-    const totalTokensUsed = userTokens + aiResponse.tokens_used;
-    conversation.total_tokens_used += totalTokensUsed;
-    conversation.message_count += 2; // User message + AI response
-    await conversation.save(); // This will automatically update updatedAt timestamp
+    conversation.total_tokens_used += estimated_completion_tokens;
+    conversation.message_count += 1;
+    await conversation.save();
 
-    // Step 6: Return both messages
+    // Return userMessage, assistantMessage, and updated conversation for client sync
     return {
       userMessage: {
         id: userMessage.id,
@@ -264,14 +282,16 @@ export const sendMessageAndGetResponse = async (
       },
       conversation: {
         id: conversation.id,
+        title: conversation.title,
+        model: conversation.model,
         total_tokens_used: conversation.total_tokens_used,
         message_count: conversation.message_count,
+        updatedAt: conversation.updatedAt,
       },
     };
-  } catch (error: any) {
-    // If OpenAI API fails, we should still keep the user message
-    // But we need to inform the user about the error
-    throw new Error(`Failed to get AI response: ${error.message || "Unknown error"}`);
+  } catch (err: any) {
+    // If stream errors, rethrow
+    throw new Error(err?.message || "Streaming failed");
   }
 };
 
