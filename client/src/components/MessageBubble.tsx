@@ -10,6 +10,7 @@ import {
   RobotOutlined,
   CopyOutlined,
   CheckOutlined,
+  ReloadOutlined,
 } from "@ant-design/icons";
 import { Message, MessageRole } from "../types/chat.type";
 import styles from "./MessageBubble.module.css";
@@ -81,7 +82,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }) => {
         setIsCopied(false);
       }, 2000);
     } catch (error) {
-      console.error("Failed to copy message:", error);
       antMessage.error("Failed to copy message");
     }
   };
@@ -188,22 +188,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }) => {
               )}
             </div>
 
-            {/* Message footer with timestamp and copy button */}
+            {/* Message footer with timestamp and actions (copy + retry) */}
             <div className={styles.messageFooter}>
               <Text className={styles.timestamp}>
                 {formatTimestamp(message.createdAt)}
               </Text>
 
-              {/* Show retry button if failed */}
-              {isFailed ? (
-                <Button
-                  type="link"
-                  onClick={() => onRetry && onRetry(message)}
-                  className={styles.retryButton}
-                >
-                  Retry
-                </Button>
-              ) : (
+              <div className={styles.footerActions}>
+                {/* Copy button (always present) */}
                 <Button
                   type="text"
                   size="small"
@@ -211,7 +203,18 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }) => {
                   onClick={handleCopy}
                   className={styles.copyButton}
                 />
-              )}
+
+                {/* Retry button shown for failed messages, placed next to copy */}
+                {isFailed && (
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<ReloadOutlined />}
+                    onClick={() => onRetry && onRetry(message)}
+                    className={styles.retryButton}
+                  />
+                )}
+              </div>
             </div>
           </div>
 

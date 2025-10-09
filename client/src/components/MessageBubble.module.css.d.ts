@@ -12,6 +12,7 @@ export const messageFooter: string;
 export const timestamp: string;
 export const copyButton: string;
 export const retryButton: string;
+export const footerActions: string;
 export const emptyAssistant: string;
 export const typingRow: string;
 export const typingPlaceholder: string;

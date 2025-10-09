@@ -11,3 +11,4 @@ export const metadata: string;
 export const messageCount: string;
 export const timestamp: string;
 export const activeIndicator: string;
+export const deleteMenuItem: string;

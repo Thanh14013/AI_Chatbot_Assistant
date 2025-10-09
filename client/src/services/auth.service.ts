@@ -4,6 +4,7 @@
  */
 
 import axiosInstance from "./axios.service";
+import axios from "axios";
 import type {
   LoginRequest,
   RegisterRequest,
@@ -52,8 +53,12 @@ export const login = async (data: LoginRequest): Promise<AuthResponse> => {
  */
 export const refreshAccessToken = async (): Promise<RefreshTokenResponse> => {
   // Call refresh endpoint without body. Server reads refresh token from HttpOnly cookie and returns new access token.
-  const response = await axiosInstance.post<RefreshTokenResponse>(
-    "/auth/refresh",
+  // Use the plain axios client here to avoid triggering axiosInstance interceptors
+  // (which may attempt to refresh again and cause recursion). The plain axios
+  // call still sends cookies when withCredentials is true.
+  const refreshUrl = `/api/auth/refresh`;
+  const response = await axios.post<RefreshTokenResponse>(
+    refreshUrl,
     {},
     { withCredentials: true }
   );
@@ -102,8 +107,6 @@ export const isAuthenticated = (): boolean => {
  */
 export const getCurrentUser = async (): Promise<GetCurrentUserResponse> => {
   const response = await axiosInstance.get<GetCurrentUserResponse>("/auth/me");
-  // Defensive logging to help debug unexpected response shapes
-  // (No debug logs)
 
   return response.data;
 };

@@ -122,13 +122,11 @@ export const refresh = async (req: Request, res: Response): Promise<void> => {
 
     const result = await refreshAccessToken(refreshToken);
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Token refreshed successfully",
-        data: { accessToken: result.accessToken },
-      });
+    res.status(200).json({
+      success: true,
+      message: "Token refreshed successfully",
+      data: { accessToken: result.accessToken },
+    });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Token refresh failed";
     if (
@@ -150,26 +148,35 @@ export const refresh = async (req: Request, res: Response): Promise<void> => {
  */
 export const logout = async (req: Request, res: Response): Promise<void> => {
   try {
-    const refreshToken = req.cookies?.refreshToken;
+    // Accept refresh token from cookie or request body (body fallback helps debugging and some clients)
+    const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+
     if (!refreshToken) {
+      // No token present. Still clear cookie and return success (idempotent),
+      // but don't treat this as a failure — caller may have already cleared it client-side.
       res.clearCookie("refreshToken", {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         path: "/",
       });
+      console.log("No refresh token present");
       res.status(200).json({ success: true, message: "Logout successful" });
       return;
     }
 
+    // Attempt to revoke the token in DB. If it doesn't exist the service will throw;
+    // we catch below and still clear cookie to keep behavior idempotent.
     await logoutUser(refreshToken);
 
+    // Clear cookie and respond
     res.clearCookie("refreshToken", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
     });
+    console.log("User logged out successfully and token revoked");
     res.status(200).json({ success: true, message: "Logout successful" });
   } catch (error) {
     res.clearCookie("refreshToken", {
@@ -178,7 +185,10 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
       sameSite: "lax",
       path: "/",
     });
+    // Log the full error for debugging (server console)
+    console.error("Logout error:", error);
     const errorMessage = error instanceof Error ? error.message : "Logout failed";
+    // In development, include the message to help debugging; in production keep generic
     res.status(500).json({ success: false, message: errorMessage });
   }
 };
@@ -207,18 +217,16 @@ export const getCurrentUser = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        data: {
-          id: userRecord.id,
-          name: userRecord.name,
-          email: userRecord.email,
-          createdAt: userRecord.createdAt,
-          updatedAt: userRecord.updatedAt,
-        },
-      });
+    res.status(200).json({
+      success: true,
+      data: {
+        id: userRecord.id,
+        name: userRecord.name,
+        email: userRecord.email,
+        createdAt: userRecord.createdAt,
+        updatedAt: userRecord.updatedAt,
+      },
+    });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Failed to get user";
     res.status(500).json({ success: false, message: errorMessage });

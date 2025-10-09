@@ -139,13 +139,49 @@ export const sendMessageStream = async (
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    const resp = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ content }),
-      signal: controller.signal,
-      credentials: "include", // Include cookies for potential refresh token
-    });
+    // helper to perform fetch attempt
+    const doFetch = async () =>
+      fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ content }),
+        signal: controller.signal,
+        credentials: "include", // Include cookies for potential refresh token
+      });
+
+    let resp = await doFetch();
+
+    // If access token expired the server may return 401. Attempt one refresh+retry cycle.
+    if (resp.status === 401) {
+      try {
+        // Dynamically import auth service to avoid circular imports
+        const authSvc = await import("./auth.service");
+        // refreshAccessToken will call /auth/refresh and persist new access token
+        await authSvc.refreshAccessToken();
+
+        // get updated token and update headers for retry
+        const { getAccessToken } = await import("../utils/token.util");
+        const newToken = getAccessToken();
+        if (newToken) {
+          headers["Authorization"] = `Bearer ${newToken}`;
+        } else {
+          // no token available after refresh -> throw
+          const text = await resp.text().catch(() => "");
+          throw new Error(
+            text || `Stream request failed with status ${resp.status}`
+          );
+        }
+
+        // Retry the streaming request once
+        resp = await doFetch();
+      } catch {
+        // If refresh failed, surface original error
+        const text = await resp.text().catch(() => "");
+        throw new Error(
+          text || `Stream request failed with status ${resp.status}`
+        );
+      }
+    }
 
     if (!resp.ok || !resp.body) {
       const text = await resp.text();

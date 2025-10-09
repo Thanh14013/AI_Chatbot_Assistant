@@ -1,0 +1,174 @@
+/* ConversationList Styles */
+.conversationsList {
+  flex: 1;
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
+  scrollbar-width: thin;
+  scrollbar-color: #d9d9d9 transparent;
+}
+
+.conversationsList::-webkit-scrollbar {
+  width: 4px;
+}
+
+.conversationsList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.conversationsList::-webkit-scrollbar-thumb {
+  background-color: #d9d9d9;
+  border-radius: 2px;
+}
+
+.conversationsList::-webkit-scrollbar-thumb:hover {
+  background-color: #bfbfbf;
+}
+
+.listItem {
+  padding: 0 !important;
+  border-bottom: none !important;
+}
+
+.conversationItem {
+  padding: 12px 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  border-radius: 8px;
+  margin: 0 0 6px 0; /* full width, no horizontal margin */
+  transition: all 0.2s ease;
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.conversationItem:hover {
+  background-color: #f5f5f5;
+}
+
+.conversationItem.active {
+  background-color: #e6f7ff;
+  border: 1px solid #91d5ff;
+}
+
+.conversationItem.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 4px;
+  background-color: #1890ff;
+  border-radius: 3px;
+}
+
+.avatar {
+  background-color: #f0f0f0 !important;
+  color: #8c8c8c !important;
+  border: 1px solid #d9d9d9;
+  flex-shrink: 0;
+}
+
+.conversationMeta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.conversationTitle {
+  color: #262626;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 1.4;
+  flex: 1;
+  min-width: 0;
+}
+
+.timeText {
+  color: #8c8c8c;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.itemActions {
+  display: flex;
+  align-items: center;
+  margin-left: 8px;
+}
+
+.deleteMenuItem {
+  color: #ff4d4f; /* Ant Design red */
+}
+
+/* messageCount removed per request */
+
+.loadingState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  height: 200px;
+}
+
+.errorState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  height: 200px;
+  gap: 12px;
+}
+
+.retryButton {
+  padding: 0;
+}
+
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  height: 300px;
+}
+
+.emptyIcon {
+  font-size: 48px;
+  color: #d9d9d9;
+  margin-bottom: 16px;
+}
+
+.emptyText {
+  color: #595959;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.emptySubtext {
+  color: #8c8c8c;
+  font-size: 14px;
+}
+
+.conversationsScrollContainer {
+  height: 100%;
+  overflow-y: auto;
+  padding-right: 8px; /* prevent scroll overlaying content */
+}
+
+.loadMoreIndicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
+}

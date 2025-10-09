@@ -151,7 +151,14 @@ const ChatPage: React.FC = () => {
   // Auto-load conversation when params.id changes
   useEffect(() => {
     const id = params.id;
-    if (!id) return;
+    // If there's no id in params (navigated to '/'), clear current conversation and messages
+    if (!id) {
+      setCurrentConversation(null);
+      setMessages([]);
+      setMessagesPage(1);
+      setMessagesHasMore(false);
+      return;
+    }
     const loadConversation = async (convId: string) => {
       setIsLoadingMessages(true);
       try {
@@ -271,7 +278,10 @@ const ChatPage: React.FC = () => {
                 updatedAt: new Date().toISOString(),
               });
 
-              // Background fetch to sync with server (fire and forget for smooth UX)
+              // Notify sidebar and background fetch to sync with server (fire and forget for smooth UX)
+              try {
+                window.dispatchEvent(new Event("message:sent"));
+              } catch {}
               refreshConversations().catch(() => {});
             }
           },
@@ -382,7 +392,10 @@ const ChatPage: React.FC = () => {
               updatedAt: new Date().toISOString(),
             });
 
-            // Background sync
+            // Notify sidebar and background sync
+            try {
+              window.dispatchEvent(new Event("message:sent"));
+            } catch {}
             refreshConversations().catch(() => {});
           }
         },
@@ -412,15 +425,9 @@ const ChatPage: React.FC = () => {
       <Layout className={styles.mainLayout}>
         {/* Sidebar component */}
         <Sidebar
-          conversations={conversations as any}
-          currentConversation={currentConversation as any}
+          currentConversationId={currentConversation?.id || null}
           onSelectConversation={handleSelectConversation}
           onNewConversation={handleNewConversation}
-          searchQuery={searchQuery}
-          onSearchChange={handleSearchChange}
-          isLoading={isLoadingConversations}
-          loadMore={loadMoreConversations}
-          hasMore={conversationsHasMore}
         />
 
         {/* Main content area */}

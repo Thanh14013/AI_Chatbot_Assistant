@@ -50,7 +50,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        // initialization (no debug logs)
         const rawToken = getAccessToken();
 
         const authenticated = checkAuth();
@@ -77,7 +76,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               clearTokens();
             } else {
               setUser(null);
-              // Keep isAuthenticated = true
+              // Keep isAuthenticated = true for other errors (network, etc.)
             }
           }
         } else {

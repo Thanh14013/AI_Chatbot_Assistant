@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Typography, Dropdown, Modal, Input, message } from "antd";
 import {
   MessageOutlined,
@@ -40,6 +41,8 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   const [isRenaming, setIsRenaming] = useState(false);
   const [newTitle, setNewTitle] = useState(conversation.title);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const navigate = useNavigate();
 
   /**
    * Format timestamp to relative time or date
@@ -123,31 +126,43 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
    * Handle delete conversation with confirmation modal
    */
   const handleDelete = () => {
-    Modal.confirm({
-      title: "Delete Conversation",
-      content:
-        "Are you sure you want to delete this conversation? This action cannot be undone.",
-      okText: "Delete",
-      okType: "danger",
-      cancelText: "Cancel",
-      centered: true,
-      onOk: async () => {
-        setIsDeleting(true);
-        try {
-          // Call delete API - server will soft delete conversation and async delete messages
-          await deleteConversation(conversation.id);
-          message.success("Conversation deleted successfully");
-          // Trigger parent to refresh conversation list
-          onUpdate?.();
-        } catch (error: any) {
-          message.error(
-            error?.response?.data?.message || "Failed to delete conversation"
-          );
-        } finally {
-          setIsDeleting(false);
+    // Open controlled Modal instead of Modal.confirm to avoid AntD static modal warnings
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await deleteConversation(conversation.id);
+      message.success("Conversation deleted successfully");
+      try {
+        const maybe: any = onUpdate?.();
+        if (maybe && typeof maybe.then === "function") {
+          await maybe;
         }
-      },
-    });
+      } catch {}
+
+      // redirect to home after delete (replace history)
+      try {
+        navigate("/", { replace: true });
+        setTimeout(() => {
+          if (window.location.pathname !== "/") window.location.href = "/";
+        }, 120);
+      } catch {
+        setTimeout(() => (window.location.href = "/"), 120);
+      }
+    } catch (error: any) {
+      message.error(
+        error?.response?.data?.message || "Failed to delete conversation"
+      );
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+    }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
   };
 
   /**
@@ -235,6 +250,23 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           <MoreOutlined />
         </div>
       </Dropdown>
+
+      <Modal
+        title="Delete Conversation"
+        open={showDeleteModal}
+        onOk={confirmDelete}
+        onCancel={cancelDelete}
+        okText="Delete"
+        okType="danger"
+        cancelText="Cancel"
+        centered
+        okButtonProps={{ loading: isDeleting }}
+      >
+        <div>
+          Are you sure you want to delete this conversation? This action cannot
+          be undone.
+        </div>
+      </Modal>
 
       {/* Active indicator */}
       {isActive && <div className={styles.activeIndicator} />}

@@ -1,0 +1,93 @@
+/* UserSection Styles */
+.userSection {
+  padding: 6px 8px;
+  border-top: 1px solid #f0f0f0;
+  background: #fff;
+  width: 100%;
+}
+
+.dropdown {
+  width: 100%;
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+  width: 100%;
+}
+
+.userInfo:hover {
+  background-color: #f5f5f5;
+}
+
+.userInfo:focus {
+  outline: 2px solid #1890ff;
+  outline-offset: 2px;
+}
+
+.avatar {
+  background-color: #1890ff !important;
+  color: #fff !important;
+  font-weight: 600;
+  font-size: 13px;
+  flex-shrink: 0;
+  border: 1px solid #fff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
+}
+
+.userDetails {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.userName {
+  color: #262626;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.userEmail {
+  color: #8c8c8c;
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .userSection {
+    padding: 12px;
+  }
+
+  .userInfo {
+    padding: 6px;
+  }
+
+  .avatar {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 14px;
+  }
+
+  .userName {
+    font-size: 13px;
+  }
+
+  .userEmail {
+    font-size: 11px;
+  }
+}

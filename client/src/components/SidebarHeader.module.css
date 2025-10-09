@@ -1,0 +1,78 @@
+/* SidebarHeader Styles */
+.header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+}
+
+.headerTopRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  justify-content: flex-start; /* keep controls left-aligned */
+  min-height: 40px; /* align with search row height */
+}
+
+.inlineToggle {
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e6e6e6);
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  font-size: 16px;
+}
+
+.toggleIcon {
+  font-size: 16px;
+  color: #1890ff;
+}
+
+.newButton {
+  border-radius: 8px;
+  padding: 6px 16px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  min-width: 240px;
+}
+
+.newButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.2);
+}
+
+.searchInput {
+  width: 100%;
+  border-radius: 8px;
+}
+
+.searchInput .ant-input {
+  border-radius: 8px;
+  padding: 8px 12px;
+  height: 40px;
+}
+
+.searchInput .ant-input-prefix {
+  color: #8c8c8c;
+}
+
+.searchInput .ant-input:focus,
+.searchInput .ant-input-focused {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+/* small helper for accessibility or future use when hiding the New button */
+.collapsedTopPlaceholder {
+  width: 0;
+  height: 0;
+  display: inline-block;
+}

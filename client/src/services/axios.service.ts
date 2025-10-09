@@ -9,7 +9,6 @@ import {
   setAccessToken,
   clearTokens,
 } from "../utils/token.util";
-import { API_BASE_URL } from "../config/env.config";
 import type { ApiErrorResponse, RefreshTokenResponse } from "../types";
 
 // Create axios instance with base configuration
@@ -56,8 +55,6 @@ axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = getAccessToken();
 
-    // no debug logs
-
     // Attach token to Authorization header if available
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -101,8 +98,6 @@ axiosInstance.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      // If the 401 originated from /auth/me call, log a clear message for debugging
-      // no debug logs
       // If refresh endpoint fails, logout user (token expired or invalid)
       if (originalRequest.url?.includes("/auth/refresh")) {
         clearTokens();
@@ -135,7 +130,8 @@ axiosInstance.interceptors.response.use(
       try {
         // POST to refresh endpoint without body. Browser will send cookie automatically because
         // axiosInstance was created with withCredentials: true. Use plain axios to avoid interceptor recursion.
-        const refreshUrl = `${API_BASE_URL.replace(/\/$/, "")}/auth/refresh`;
+        // Use the same proxy path as axiosInstance baseURL to ensure consistency
+        const refreshUrl = "/api/auth/refresh";
         const response = await axios.post<RefreshTokenResponse>(
           refreshUrl,
           {},

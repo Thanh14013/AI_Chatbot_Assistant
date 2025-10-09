@@ -38,6 +38,11 @@ const MessageList: React.FC<MessageListProps> = ({
   const [showLoadEarlierBtn, setShowLoadEarlierBtn] = useState(false);
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
   const [isLoadingEarlier, setIsLoadingEarlier] = useState(false);
+  const prevMessagesLengthRef = useRef<number>(messages.length);
+  const prevLastMessageRef = useRef<{ id?: string; content?: string }>({
+    id: undefined,
+    content: undefined,
+  });
 
   /**
    * Scroll to bottom of message list
@@ -66,6 +71,12 @@ const MessageList: React.FC<MessageListProps> = ({
     // Show load-earlier button if scrolled to top (within 50px) and has more messages
     const shouldShowLoadEarlierBtn = distanceFromTop < 50 && hasMore;
     setShowLoadEarlierBtn(shouldShowLoadEarlierBtn);
+
+    // Auto-load earlier messages when user scrolls near top
+    if (distanceFromTop < 80 && hasMore && !isLoadingEarlier) {
+      // fire and forget
+      void handleLoadEarlier();
+    }
 
     // Disable auto-scroll if user manually scrolled up
     if (shouldShowScrollBtn) {
@@ -109,12 +120,56 @@ const MessageList: React.FC<MessageListProps> = ({
    * Auto-scroll to bottom when new messages arrive
    */
   useEffect(() => {
-    if (isAutoScrollEnabled && messages.length > 0) {
-      // Use timeout to ensure DOM is updated
-      setTimeout(() => {
-        scrollToBottom(false);
-      }, 100);
+    // If messages were appended and the last message is a user or assistant message
+    // (covers optimistic user sends and AI responses), force scroll to bottom.
+    // Also handle streaming updates where the assistant updates the content of
+    // the existing typing message (same id but content changes) — scroll then too.
+    const prevLen = prevMessagesLengthRef.current;
+    const currLen = messages.length;
+
+    const last = messages[currLen - 1];
+
+    if (currLen > prevLen) {
+      if (last && (last.role === "user" || last.role === "assistant")) {
+        // Force scroll to bottom (smooth)
+        setTimeout(() => {
+          scrollToBottom(true);
+        }, 50);
+
+        // Re-enable auto-scroll so subsequent messages also follow
+        setIsAutoScrollEnabled(true);
+      } else if (isAutoScrollEnabled) {
+        // fallback: preserve previous behavior for other message types
+        setTimeout(() => {
+          scrollToBottom(false);
+        }, 100);
+      }
+    } else {
+      // No new message appended — check for assistant streaming updates where
+      // the last message id stays the same but content changed. In that case
+      // we want to scroll to keep the user view on the streaming response.
+      if (
+        last &&
+        last.role === "assistant" &&
+        prevLastMessageRef.current.id === last.id &&
+        (prevLastMessageRef.current.content || "") !== (last.content || "")
+      ) {
+        setTimeout(() => {
+          scrollToBottom(true);
+        }, 50);
+      } else if (isAutoScrollEnabled && currLen > 0) {
+        // fallback: preserve previous behavior
+        setTimeout(() => {
+          scrollToBottom(false);
+        }, 100);
+      }
     }
+
+    prevMessagesLengthRef.current = currLen;
+    prevLastMessageRef.current = {
+      id: last?.id,
+      content: last?.content,
+    };
   }, [messages, isAutoScrollEnabled]);
 
   /**

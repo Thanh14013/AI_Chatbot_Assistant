@@ -86,8 +86,7 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
         }
 
         setHasMore(result.pagination.page < result.pagination.totalPages);
-      } catch (err) {
-        console.error("Failed to load conversations", err);
+      } catch {
         if (reset) {
           setConversations([]);
         }
@@ -119,8 +118,8 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
       setConversations((prev) => [...prev, ...result.conversations]);
       setPage((prev) => prev + 1);
       setHasMore(result.pagination.page < result.pagination.totalPages);
-    } catch (err) {
-      console.error("Failed to load more conversations", err);
+    } catch {
+      // ignore load more errors silently
     } finally {
       setIsLoadingMore(false);
       fetchingRef.current = false;
@@ -141,9 +140,7 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
       );
 
       // Background fetch to sync with server (don't await to keep UI responsive)
-      loadConversations(true).catch((err) =>
-        console.error("Background sync failed", err)
-      );
+      loadConversations(true).catch(() => {});
     },
     [loadConversations]
   );

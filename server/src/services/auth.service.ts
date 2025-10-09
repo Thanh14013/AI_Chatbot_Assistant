@@ -131,18 +131,23 @@ export const refreshAccessToken = async (token: string) => {
 export const logoutUser = async (token: string) => {
   // Find token in database to identify the user
   const storedToken = await RefreshToken.findByToken(token);
+
+  // If token not found, treat logout as idempotent success (token may have been removed already)
   if (!storedToken) {
-    throw new Error("Refresh token not found");
+    console.debug && console.debug(`logoutUser: token not found`);
+    return { message: "Logout successful" };
   }
 
-  // Check if token is already revoked
+  // If already revoked, nothing to do
   if (storedToken.is_revoked) {
-    throw new Error("Refresh token already revoked");
+    console.debug && console.debug(`logoutUser: token already revoked id=${storedToken.id}`);
+    return { message: "Logout successful" };
   }
 
   // Revoke only this specific token (logout from current device)
   storedToken.is_revoked = true;
   await storedToken.save();
+  console.log(`Refresh token for user ID ${storedToken.user_id} revoked`);
 
   return {
     message: "Logout successful",

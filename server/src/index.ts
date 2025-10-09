@@ -45,11 +45,34 @@ const PORT = process.env.PORT || 3000;
 // Test connection to PostgreSQL database
 connectToDatabase();
 
+// Import models to register associations
+// Note: importing `./models/index` runs the association definitions.
+import models from "./models/index.js";
+// Optionally synchronize models (non-destructive by default).
+// Only perform schema sync when DB_SYNC environment variable is explicitly set to 'true'.
+if (process.env.DB_SYNC === "true") {
+  (async () => {
+    try {
+      await models.syncDatabase(false);
+    } catch (err) {
+      // Log a short message only (avoid printing full error stack in startup output)
+      try {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn("Failed to sync database models:", msg);
+      } catch {
+        console.warn("Failed to sync database models");
+      }
+    }
+  })();
+} else {
+  console.log("DB sync skipped (set DB_SYNC='true' to enable schema synchronization)");
+}
+
 // Security Middleware Stack
 // Apply rate limiting, body size limits, and request timeouts
 app.use(
   securityStack({
-    maxRequests: 100, // 100 requests
+    maxRequests: 1000, // 1000 requests
     windowMs: 60 * 60 * 1000, // 1 hour
     maxBodySize: 2 * 1024 * 1024, // 2MB
     timeout: 30000, // 30 seconds
