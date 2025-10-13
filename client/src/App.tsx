@@ -5,9 +5,10 @@
 
 import React from "react";
 import { Routes, Route } from "react-router-dom";
-import { ConfigProvider } from "antd";
+import { ConfigProvider, App as AntApp } from "antd";
 import { AuthProvider } from "./hooks";
 import { ProtectedRoute } from "./components";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { ChatPage, LoginPage, RegisterPage, NotFoundPage } from "./pages";
 
 const App: React.FC = () => {
@@ -21,37 +22,42 @@ const App: React.FC = () => {
         },
       }}
     >
-      {/* Provide authentication context to entire app */}
-      <AuthProvider>
-        {/* Configure application routes */}
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+      {/* Ant Design App component for message context */}
+      <AntApp>
+        {/* Provide authentication context to entire app */}
+        <ErrorBoundary>
+          <AuthProvider>
+            {/* Configure application routes */}
+            <Routes>
+              {/* Public routes */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
 
-          {/* Protected routes - require authentication */}
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <ChatPage />
-              </ProtectedRoute>
-            }
-          />
-          {/* Conversation-specific route */}
-          <Route
-            path="/conversations/:id"
-            element={
-              <ProtectedRoute>
-                <ChatPage />
-              </ProtectedRoute>
-            }
-          />
+              {/* Protected routes - require authentication */}
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <ChatPage />
+                  </ProtectedRoute>
+                }
+              />
+              {/* Conversation-specific route */}
+              <Route
+                path="/conversations/:id"
+                element={
+                  <ProtectedRoute>
+                    <ChatPage />
+                  </ProtectedRoute>
+                }
+              />
 
-          {/* 404 Not Found route */}
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </AuthProvider>
+              {/* 404 Not Found route */}
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </AuthProvider>
+        </ErrorBoundary>
+      </AntApp>
     </ConfigProvider>
   );
 };

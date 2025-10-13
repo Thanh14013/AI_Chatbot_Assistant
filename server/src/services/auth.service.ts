@@ -147,7 +147,7 @@ export const logoutUser = async (token: string) => {
   // Revoke only this specific token (logout from current device)
   storedToken.is_revoked = true;
   await storedToken.save();
-  console.log(`Refresh token for user ID ${storedToken.user_id} revoked`);
+  // refresh token revoked log removed
 
   return {
     message: "Logout successful",

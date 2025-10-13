@@ -3,12 +3,14 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import bodyParser from "body-parser";
 import dotenv from "dotenv";
+import { createServer } from "http";
 import connectToDatabase from "./db/database.connection.js";
 import routes from "./routes/index.js";
 import { securityStack } from "./middlewares/generalMiddleware.js";
 import swaggerUi from "swagger-ui-express";
 import fs from "fs";
 import path from "path";
+import { initializeSocketIO } from "./services/socket.service.js";
 // Load swagger JSON at runtime to avoid import-assertion issues in some Node setups
 const swaggerPath = path.resolve(process.cwd(), "src", "swagger.json");
 const swaggerDocument = JSON.parse(fs.readFileSync(swaggerPath, "utf8"));
@@ -32,10 +34,32 @@ const PORT = process.env.PORT || 3000;
 // Initialize Database Connection
 // Test connection to PostgreSQL database
 connectToDatabase();
+// Import models to register associations
+// Note: importing `./models/index` runs the association definitions.
+import models from "./models/index.js";
+// Optionally synchronize models (non-destructive by default).
+// Only perform schema sync when DB_SYNC environment variable is explicitly set to 'true'.
+if (process.env.DB_SYNC === "true") {
+    (async () => {
+        try {
+            await models.syncDatabase(false);
+        }
+        catch (err) {
+            // Log a short message only (avoid printing full error stack in startup output)
+            try {
+                const msg = err instanceof Error ? err.message : String(err);
+                console.warn("Failed to sync database models:", msg);
+            }
+            catch {
+                console.warn("Failed to sync database models");
+            }
+        }
+    })();
+}
 // Security Middleware Stack
 // Apply rate limiting, body size limits, and request timeouts
 app.use(securityStack({
-    maxRequests: 100, // 100 requests
+    maxRequests: 1000, // 1000 requests
     windowMs: 60 * 60 * 1000, // 1 hour
     maxBodySize: 2 * 1024 * 1024, // 2MB
     timeout: 30000, // 30 seconds
@@ -49,13 +73,18 @@ app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 // Configure API Routes
 // All routes are prefixed with /api
 app.use("/api", routes);
+// Create HTTP server and initialize Socket.io
+const httpServer = createServer(app);
+const io = initializeSocketIO(httpServer);
+global.socketIO = io;
 // Start Server
 // Listen on configured port
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
     console.log("=".repeat(50));
     console.log(`🚀 Server is running on port ${PORT}`);
     console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
     console.log(`📡 API routes base: http://localhost:${PORT}/api`);
     console.log(`📘 Swagger UI: http://localhost:${PORT}/docs  (or /api/docs)`);
+    console.log(`🔌 WebSocket server initialized`);
     console.log("=".repeat(50));
 });

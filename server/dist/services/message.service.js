@@ -188,15 +188,18 @@ export const sendMessageAndStreamResponse = async (conversationId, userId, conte
     const stream = await openai.chat.completions.create(payload);
     let fullContent = "";
     try {
+        console.log("[Message Service] Starting streaming...");
         for await (const chunk of stream) {
             const delta = chunk.choices?.[0]?.delta;
             if (delta?.content) {
                 const text = delta.content;
                 fullContent += text;
+                console.log(`[Message Service] Chunk received: "${text}"`);
                 // invoke callback
                 await onChunk(text);
             }
         }
+        console.log(`[Message Service] Streaming complete. Total content length: ${fullContent.length}`);
         // Estimate tokens
         const estimated_completion_tokens = estimateTokenCount(fullContent);
         const assistantMessage = await Message.create({
@@ -209,7 +212,7 @@ export const sendMessageAndStreamResponse = async (conversationId, userId, conte
         conversation.total_tokens_used += estimated_completion_tokens;
         conversation.message_count += 1;
         await conversation.save();
-        // Return both userMessage and assistantMessage so controller/client can sync optimistic UI
+        // Return userMessage, assistantMessage, and updated conversation for client sync
         return {
             userMessage: {
                 id: userMessage.id,
@@ -228,6 +231,14 @@ export const sendMessageAndStreamResponse = async (conversationId, userId, conte
                 tokens_used: assistantMessage.tokens_used,
                 model: assistantMessage.model,
                 createdAt: assistantMessage.createdAt,
+            },
+            conversation: {
+                id: conversation.id,
+                title: conversation.title,
+                model: conversation.model,
+                total_tokens_used: conversation.total_tokens_used,
+                message_count: conversation.message_count,
+                updatedAt: conversation.updatedAt,
             },
         };
     }

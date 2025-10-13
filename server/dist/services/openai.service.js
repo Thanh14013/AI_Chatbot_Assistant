@@ -29,7 +29,7 @@ catch (e) {
 // Test connection function (safe: doesn't throw when API key is missing)
 export async function testOpenAIConnection() {
     if (!apiKey) {
-        console.warn("⚠️  OPENAI_API_KEY not set — skipping OpenAI connection test. Set OPENAI_API_KEY in your .env or environment to enable this test.");
+        // OPENAI_API_KEY not set — skip connection test in silent mode
         return;
     }
     try {
@@ -38,12 +38,11 @@ export async function testOpenAIConnection() {
             messages: [{ role: "user", content: "Hello, can you hear me?" }],
         });
         const text = response?.choices?.[0]?.message?.content;
-        console.log("✅ OpenAI connected successfully!");
-        console.log("Response:", text ?? JSON.stringify(response));
+        // Connection succeeded — intentionally silent (no console output)
     }
     catch (error) {
-        // Log the full error object (some SDK errors are objects, not plain Error)
-        console.error("❌ OpenAI connection failed:", error?.message ?? error);
+        // Re-throw the error so callers can handle/report it via configured logging
+        throw error;
     }
 }
 /**

@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from "react";
-import { Avatar, Typography, Button, message as antMessage } from "antd";
+import { Avatar, Typography, Button, App } from "antd";
 import {
   UserOutlined,
   RobotOutlined,
@@ -28,12 +28,18 @@ interface MessageBubbleProps {
  * Renders a single message with avatar, content, timestamp, and copy button
  */
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }) => {
+  const { message: antMessage } = App.useApp();
   const [isCopied, setIsCopied] = useState(false);
   // Client-side streaming display (progressive reveal)
   const [displayedContent, setDisplayedContent] = useState<string>(
     message.content || ""
   );
+  // Render-time debug log to help check whether the component re-renders
+  try {
+    // render debug logging removed
+  } catch {}
   const lastStreamedMessageId = useRef<string | null>(null);
+  const displayedContentRef = useRef<string>(displayedContent);
   // MessageRole is a string union ('user' | 'assistant' | 'system')
   // compare against the literal value
   const isUser = message.role === "user";
@@ -116,39 +122,62 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }) => {
 
   // Client-side streaming: reveal assistant message token-by-token
   useEffect(() => {
-    // Only stream assistant messages that are not typing
-    if (message.role !== "assistant" || message.isTyping) {
-      setDisplayedContent(message.content || "");
+    // If message isTyping (stream in progress), just reflect the accumulated
+    // content immediately on each chunk so the UI shows per-chunk updates.
+    const full = message.content || "";
+
+    if (message.isTyping) {
+      try {
+        // streaming chunk debug removed
+      } catch {}
+      setDisplayedContent(full);
+      // No token timer while streaming via chunks
       return;
     }
 
-    const full = message.content || "";
-
+    // Otherwise (message is finalized/not typing) run tokenized reveal
     // If there's no content, nothing to stream
     if (!full) {
       setDisplayedContent("");
       return;
     }
 
-    // Avoid re-streaming the same message repeatedly
-    if (lastStreamedMessageId.current === message.id) {
-      setDisplayedContent(full);
-      return;
-    }
-
-    lastStreamedMessageId.current = message.id;
-    setDisplayedContent("");
-
     // Split into tokens while preserving whitespace so spacing stays correct
     const tokens = full.match(/\s+|\S+/g) || [full];
-    let idx = 0;
 
-    // Delay per token (ms). Adjust for speed: lower -> faster.
+    // Determine starting index: if we're already streaming the same message id,
+    // resume from the number of tokens already displayed. Otherwise start from 0.
+    let startIndex = 0;
+    if (lastStreamedMessageId.current === message.id) {
+      const displayedTokens =
+        (displayedContentRef.current || "").match(/\s+|\S+/g) || [];
+      startIndex = displayedTokens.length;
+      if (startIndex >= tokens.length) {
+        // Nothing new to stream
+        setDisplayedContent(full);
+        return;
+      }
+    } else {
+      lastStreamedMessageId.current = message.id;
+      setDisplayedContent("");
+      startIndex = 0;
+    }
+
+    let idx = startIndex;
     const DELAY_MS = 40;
+
+    // Debug logging to help trace streaming behavior in browser console
+    try {
+      // streaming start debug removed
+    } catch {}
 
     const timer = setInterval(() => {
       idx += 1;
-      setDisplayedContent((prev) => prev + (tokens[idx - 1] || ""));
+      const token = tokens[idx - 1] || "";
+      setDisplayedContent((prev) => prev + token);
+      try {
+        // append token debug removed
+      } catch {}
       if (idx >= tokens.length) {
         clearInterval(timer);
       }
@@ -159,13 +188,22 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }) => {
     };
   }, [message.id, message.content, message.role, message.isTyping]);
 
+  // Keep a ref in sync with displayedContent so the streaming effect can
+  // compute how many tokens were already shown without adding displayedContent
+  // as a dependency (which would cause extra effect runs).
+  useEffect(() => {
+    displayedContentRef.current = displayedContent;
+  }, [displayedContent]);
+
   return (
     <div
       className={`${styles.messageContainer} ${
         isUser ? styles.userMessage : styles.assistantMessage
       }`}
     >
-      {!message.isTyping ? (
+      {/* Render content even while isTyping if content exists (shows streaming).
+          Only show typing dots when content is empty. */}
+      {!(message.isTyping && displayedContent.trim() === "") ? (
         <>
           {/* Avatar - show on left for assistant, right for user */}
           {!isUser && (
@@ -177,14 +215,15 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }) => {
 
           {/* Message content bubble */}
           <div className={styles.messageBubble}>
+            {/* debug badge removed per UX request */}
             <div className={styles.messageContent}>
               {message.role === "assistant" &&
-              (!message.content || message.content.trim() === "") ? (
+              (!displayedContent || displayedContent.trim() === "") ? (
                 <em className={styles.emptyAssistant}>
                   Assistant did not return content. Try retrying the message.
                 </em>
               ) : (
-                renderContent(message.content)
+                renderContent(displayedContent)
               )}
             </div>
 
@@ -227,7 +266,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }) => {
           )}
         </>
       ) : (
-        // Typing placeholder (assistant)
+        // Typing placeholder: when assistant is typing and there's no accumulated
+        // content yet, show the assistant avatar and a message bubble containing
+        // three animated dots.
         <div className={styles.typingRow}>
           <Avatar
             icon={<RobotOutlined />}

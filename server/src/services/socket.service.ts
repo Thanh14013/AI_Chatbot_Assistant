@@ -1,0 +1,538 @@
+import { Server as SocketIOServer } from "socket.io";
+import type { Server as HTTPServer } from "http";
+import type { Socket } from "socket.io";
+import { verifyAccessToken } from "../utils/generateToken.js";
+import type { JwtPayload } from "jsonwebtoken";
+import type {
+  ServerToClientEvents,
+  ClientToServerEvents,
+  InterServerEvents,
+  SocketData,
+  MessageSendData,
+} from "../types/socket.type.js";
+
+// Extended Socket interface with user information
+interface AuthenticatedSocket
+  extends Socket<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData> {
+  user?: string | JwtPayload;
+  userId?: string;
+}
+
+// Store user socket mappings for room management
+const userSockets = new Map<string, Set<string>>(); // userId -> Set<socketId>
+const socketUsers = new Map<string, string>(); // socketId -> userId
+
+/**
+ * Socket.io Authentication Middleware
+ * Verifies JWT token and attaches user info to socket
+ */
+const socketAuthMiddleware = (socket: AuthenticatedSocket, next: (err?: Error) => void) => {
+  try {
+    // Get token from auth header or query parameter
+    const token =
+      socket.handshake.auth?.token ||
+      socket.handshake.headers?.authorization?.replace("Bearer ", "") ||
+      (socket.handshake.query?.token as string);
+
+    if (!token) {
+      return next(new Error("Authentication token required"));
+    }
+
+    // Verify JWT token
+    const result = verifyAccessToken(token);
+
+    if (!result.valid) {
+      return next(new Error(`Authentication failed: ${result.error}`));
+    }
+
+    // Attach user info to socket
+    socket.user = result.decoded;
+
+    // Extract user ID from decoded token
+    if (typeof result.decoded === "object" && result.decoded.id) {
+      socket.userId = result.decoded.id;
+    } else {
+      return next(new Error("Invalid token: missing user ID"));
+    }
+
+    // Log successful authentication for observability (no sensitive data)
+    try {
+      console.log(`[socket] auth success userId=${socket.userId} socketId=${socket.id}`);
+    } catch {
+      // ignore logging errors
+    }
+
+    next();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Authentication error";
+    // Log authentication failure
+    try {
+      console.warn(`[socket] auth failed: ${message}`);
+    } catch {}
+
+    next(new Error(message));
+  }
+};
+
+/**
+ * Handle user connection management
+ */
+const handleUserConnection = (socket: AuthenticatedSocket) => {
+  const userId = socket.userId!;
+
+  // Add socket to user's socket set
+  if (!userSockets.has(userId)) {
+    userSockets.set(userId, new Set());
+  }
+  userSockets.get(userId)!.add(socket.id);
+  socketUsers.set(socket.id, userId);
+
+  // Log connection details
+  try {
+    const total = userSockets.get(userId)?.size ?? 0;
+    console.log(
+      `[socket] user connected userId=${userId} socketId=${socket.id} totalSockets=${total}`
+    );
+  } catch {}
+};
+
+/**
+ * Handle user disconnection cleanup
+ */
+const handleUserDisconnection = (socket: AuthenticatedSocket) => {
+  const userId = socket.userId;
+
+  if (userId) {
+    // Remove socket from user's socket set
+    const userSocketSet = userSockets.get(userId);
+    if (userSocketSet) {
+      userSocketSet.delete(socket.id);
+      if (userSocketSet.size === 0) {
+        userSockets.delete(userId);
+      }
+    }
+    socketUsers.delete(socket.id);
+
+    // Log disconnection details
+    try {
+      const remaining = userSockets.get(userId)?.size ?? 0;
+      console.log(
+        `[socket] user disconnected userId=${userId} socketId=${socket.id} remainingSockets=${remaining}`
+      );
+    } catch {}
+  }
+};
+
+/**
+ * Get all socket IDs for a user (for broadcasting)
+ */
+export const getUserSockets = (userId: string): string[] => {
+  return Array.from(userSockets.get(userId) || []);
+};
+
+/**
+ * Get user ID from socket ID
+ */
+export const getUserFromSocket = (socketId: string): string | undefined => {
+  return socketUsers.get(socketId);
+};
+
+/**
+ * Broadcast message to all sockets of a specific user (across all tabs/devices)
+ */
+export const broadcastToUser = (userId: string, event: string, data: any): void => {
+  const sockets = getUserSockets(userId);
+  sockets.forEach((socketId) => {
+    const socket = io?.sockets.sockets.get(socketId);
+    if (socket) {
+      (socket as any).emit(event, data);
+    }
+  });
+};
+
+/**
+ * Broadcast message to all users in a conversation
+ */
+export const broadcastToConversation = (conversationId: string, event: string, data: any): void => {
+  if (io) {
+    (io as any).to(`conversation:${conversationId}`).emit(event, data);
+  }
+};
+
+/**
+ * Get all users currently connected to a conversation
+ */
+export const getConversationUsers = (conversationId: string): string[] => {
+  if (!io) return [];
+
+  const room = io.sockets.adapter.rooms.get(`conversation:${conversationId}`);
+  if (!room) return [];
+
+  const users = new Set<string>();
+  room.forEach((socketId) => {
+    const userId = getUserFromSocket(socketId);
+    if (userId) {
+      users.add(userId);
+    }
+  });
+
+  return Array.from(users);
+};
+
+/**
+ * Check if a user is currently connected (has any active sockets)
+ */
+export const isUserOnline = (userId: string): boolean => {
+  return userSockets.has(userId) && (userSockets.get(userId)?.size || 0) > 0;
+};
+
+/**
+ * Get Socket.io server instance
+ */
+export const getSocketIOInstance = (): SocketIOServer<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  InterServerEvents,
+  SocketData
+> | null => {
+  return io || null;
+};
+
+// Store io instance for use in event handlers
+let io: SocketIOServer<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
+
+/**
+ * Initialize Socket.io server with authentication and event handlers
+ */
+export const initializeSocketIO = (
+  httpServer: HTTPServer
+): SocketIOServer<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData> => {
+  io = new SocketIOServer<
+    ClientToServerEvents,
+    ServerToClientEvents,
+    InterServerEvents,
+    SocketData
+  >(httpServer, {
+    cors: {
+      origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+      credentials: true,
+      methods: ["GET", "POST"],
+    },
+    // Connection options
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    transports: ["websocket", "polling"],
+  });
+
+  // Apply authentication middleware
+  io.use(socketAuthMiddleware);
+
+  // Handle socket connections
+  io.on("connection", (socket: AuthenticatedSocket) => {
+    // Log new connection
+    try {
+      console.log(`[socket] connection established socketId=${socket.id} userId=${socket.userId}`);
+    } catch {}
+
+    // Handle user connection
+    handleUserConnection(socket);
+
+    // Join user to their personal room (for user-specific broadcasts)
+    if (socket.userId) {
+      socket.join(`user:${socket.userId}`);
+    }
+
+    // Handle joining conversation rooms
+    socket.on("join:conversation", (conversationId: string) => {
+      if (!conversationId) {
+        socket.emit("error", { message: "Conversation ID is required" });
+        return;
+      }
+
+      socket.join(`conversation:${conversationId}`);
+      // Log join event
+      try {
+        const room = io.sockets.adapter.rooms.get(`conversation:${conversationId}`);
+        const roomSize = room ? room.size : 0;
+        console.log(
+          `[socket] join: userId=${socket.userId} socketId=${socket.id} conversation=${conversationId} roomSize=${roomSize}`
+        );
+      } catch {}
+
+      // Notify user they joined the conversation
+      socket.emit("conversation:joined", { conversationId });
+    });
+
+    // Handle leaving conversation rooms
+    socket.on("leave:conversation", (conversationId: string) => {
+      if (!conversationId) {
+        socket.emit("error", { message: "Conversation ID is required" });
+        return;
+      }
+
+      socket.leave(`conversation:${conversationId}`);
+      // Log leave event
+      try {
+        const room = io.sockets.adapter.rooms.get(`conversation:${conversationId}`);
+        const roomSize = room ? room.size : 0;
+        console.log(
+          `[socket] leave: userId=${socket.userId} socketId=${socket.id} conversation=${conversationId} roomSizeAfterLeave=${roomSize}`
+        );
+      } catch {}
+
+      // Notify user they left the conversation
+      socket.emit("conversation:left", { conversationId });
+    });
+
+    // Handle message sending with streaming AI response
+    socket.on("message:send", async (data) => {
+      try {
+        const { conversationId, content } = data;
+
+        if (!conversationId || !content) {
+          socket.emit("error", { message: "Conversation ID and content are required" });
+          return;
+        }
+
+        // Log incoming message request
+        try {
+          console.log(
+            `[socket] message:send userId=${socket.userId} socketId=${socket.id} conversation=${conversationId} contentLen=${String(content).length}`
+          );
+        } catch {}
+
+        // Import message service dynamically to avoid circular imports
+        const { sendMessageAndStreamResponse } = await import("./message.service.js");
+
+        // Stream AI response and broadcast user message early via onUserMessageCreated
+        let assistantContent = "";
+        const result = await sendMessageAndStreamResponse(
+          conversationId,
+          socket.userId!,
+          content,
+          // onChunk callback - stream to client
+          (chunk: string) => {
+            assistantContent += chunk;
+            // Log chunk broadcasting
+            try {
+              console.log(
+                `[socket] message:chunk conversation=${conversationId} chunkLen=${chunk.length} accumulatedLen=${assistantContent.length}`
+              );
+            } catch {}
+
+            // Broadcast chunk to conversation room (all users in conversation)
+            io.to(`conversation:${conversationId}`).emit("message:chunk", {
+              conversationId,
+              chunk,
+              content: assistantContent, // send accumulated content
+            });
+          },
+          // onUserMessageCreated - broadcast the persisted user message immediately so other tabs see it
+          (userMessage) => {
+            try {
+              // Broadcast user message to other participants in the conversation (exclude sender socket)
+              socket.to(`conversation:${conversationId}`).emit("message:new", {
+                conversationId,
+                message: userMessage,
+              });
+
+              // Also notify other sockets of the same user that are NOT in the conversation room.
+              // This avoids sending the same message twice to sockets that are already in the conversation room
+              // (those sockets have already received the event above).
+              try {
+                const room = io.sockets.adapter.rooms.get(`conversation:${conversationId}`);
+                const roomSockets = room ? new Set(Array.from(room)) : new Set<string>();
+
+                // getUserSockets is available in this module and returns all socket ids for the user
+                const userSocketIds = getUserSockets(socket.userId!);
+                for (const sid of userSocketIds) {
+                  // skip sender socket and any sockets already in the conversation room
+                  if (sid === socket.id) continue;
+                  if (roomSockets.has(sid)) continue;
+
+                  const target = io.sockets.sockets.get(sid);
+                  if (target) {
+                    (target as any).emit("message:new", {
+                      conversationId,
+                      message: userMessage,
+                    });
+                  }
+                }
+              } catch (e) {
+                // ignore per-socket notify failures
+              }
+
+              // After other clients have been notified about the user's message, start AI typing
+              // for everyone in the conversation room (including the sender) so the typing indicator
+              // appears after the user message in other tabs.
+              io.to(`conversation:${conversationId}`).emit("ai:typing:start", {
+                conversationId,
+              });
+            } catch (err) {
+              // ignore
+            }
+          }
+        );
+
+        // Stop typing indicator for ALL users in conversation room (including sender) for sync
+        io.to(`conversation:${conversationId}`).emit("ai:typing:stop", {
+          conversationId,
+        });
+
+        // Broadcast complete messages to conversation room
+        io.to(`conversation:${conversationId}`).emit("message:complete", {
+          userMessage: result.userMessage,
+          assistantMessage: result.assistantMessage,
+          conversation: result.conversation,
+        });
+
+        // Broadcast conversation update to user room for multi-tab conversation list sync
+        if (result.conversation) {
+          broadcastToUser(socket.userId!, "conversation:activity", {
+            conversationId,
+            lastActivity: new Date().toISOString(),
+            messageCount: result.conversation.message_count,
+            totalTokens: result.conversation.total_tokens_used,
+          });
+        }
+      } catch {}
+    });
+
+    socket.on("typing:stop", (conversationId: string) => {
+      if (!conversationId) return;
+
+      try {
+        console.log(
+          `[socket] typing:stop userId=${socket.userId} socketId=${socket.id} conversation=${conversationId}`
+        );
+      } catch {}
+      // Broadcast typing stop to other users in the conversation
+      socket.to(`conversation:${conversationId}`).emit("user:typing:stop", {
+        userId: socket.userId,
+        conversationId,
+      });
+    });
+
+    // Handle disconnection
+    socket.on("disconnect", (reason) => {
+      try {
+        console.log(
+          `[socket] disconnect socketId=${socket.id} userId=${socket.userId} reason=${reason}`
+        );
+      } catch {}
+      handleUserDisconnection(socket);
+    });
+
+    // Handle conversation updates (for real-time sync across tabs)
+    socket.on("conversation:update", (data) => {
+      const { conversationId, update } = data;
+
+      if (!conversationId) {
+        socket.emit("error", { message: "Conversation ID is required" });
+        return;
+      }
+
+      // Log conversation update request
+      try {
+        console.log(
+          `[socket] conversation:update userId=${socket.userId} socketId=${socket.id} conversation=${conversationId} updateKeys=${Object.keys(update).join(",")}`
+        );
+      } catch {}
+
+      // Broadcast update to ALL sockets of the same user (including sender) via user room for complete sync
+      broadcastToUser(socket.userId!, "conversation:updated", {
+        conversationId,
+        update,
+      });
+
+      // ALSO broadcast update to all participants in the conversation room
+      try {
+        io.to(`conversation:${conversationId}`).emit("conversation:updated", {
+          conversationId,
+          update,
+        });
+      } catch (e) {
+        // ignore
+      }
+    });
+
+    // Handle conversation creation (for real-time sync across tabs)
+    socket.on("conversation:create", (conversation) => {
+      if (!conversation) {
+        socket.emit("error", { message: "Conversation data is required" });
+        return;
+      }
+
+      // Log conversation creation
+      try {
+        console.log(
+          `[socket] conversation:create userId=${socket.userId} socketId=${socket.id} conversationId=${conversation?.id ?? "<unknown>"}`
+        );
+      } catch {}
+
+      // Broadcast creation to ALL sockets of the same user (including sender) via user room for complete sync
+      broadcastToUser(socket.userId!, "conversation:created", conversation);
+
+      // ALSO broadcast creation to the conversation room (if any sockets already joined)
+      try {
+        if (conversation?.id) {
+          io.to(`conversation:${conversation.id}`).emit("conversation:created", conversation);
+        }
+      } catch {}
+    });
+
+    // Handle conversation deletion (for real-time sync across tabs)
+    socket.on("conversation:delete", (conversationId) => {
+      if (!conversationId) {
+        socket.emit("error", { message: "Conversation ID is required" });
+        return;
+      }
+
+      // Log conversation deletion
+      try {
+        const usersInConversation = getConversationUsers(conversationId);
+        console.log(
+          `[socket] conversation:delete requested by userId=${socket.userId} conversation=${conversationId} usersInConversation=${usersInConversation.length}`
+        );
+      } catch {}
+
+      // Broadcast deletion to ALL sockets of the same user (including sender) via user room for complete sync
+      broadcastToUser(socket.userId!, "conversation:deleted", { conversationId });
+
+      // ALSO broadcast deletion to the conversation room (all participants)
+      try {
+        io.to(`conversation:${conversationId}`).emit("conversation:deleted", { conversationId });
+      } catch {}
+
+      // Remove all sockets from the conversation room
+      try {
+        const room = io.sockets.adapter.rooms.get(`conversation:${conversationId}`);
+        const count = room ? room.size : 0;
+        console.log(
+          `[socket] removing ${count} socket(s) from room conversation:${conversationId}`
+        );
+      } catch {}
+
+      io.in(`conversation:${conversationId}`).socketsLeave(`conversation:${conversationId}`);
+      try {
+        console.log(`[socket] conversation:${conversationId} room cleared`);
+      } catch {}
+    });
+
+    // Handle ping/pong for connection health
+    socket.on("ping", () => {
+      socket.emit("pong");
+    });
+
+    // Handle connection errors
+    socket.on("error", (/* error */) => {
+      try {
+        console.error(`[socket] error event on socketId=${socket.id} userId=${socket.userId}`);
+      } catch {}
+    });
+  });
+
+  return io;
+};
+
+export default initializeSocketIO;

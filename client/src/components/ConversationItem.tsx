@@ -3,9 +3,9 @@
  * List item for displaying individual conversations in sidebar
  */
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Typography, Dropdown, Modal, Input, message } from "antd";
+import { Typography, Dropdown, Modal, Input, App } from "antd";
 import {
   MessageOutlined,
   MoreOutlined,
@@ -17,6 +17,7 @@ import {
   updateConversation,
   deleteConversation,
 } from "../services/chat.service";
+import { websocketService } from "../services/websocket.service";
 import styles from "./ConversationItem.module.css";
 
 const { Text } = Typography;
@@ -38,6 +39,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   onClick,
   onUpdate,
 }) => {
+  const { message } = App.useApp();
   const [isRenaming, setIsRenaming] = useState(false);
   const [newTitle, setNewTitle] = useState(conversation.title);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -114,6 +116,16 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
       message.success("Conversation renamed successfully");
       setIsRenaming(false);
       onUpdate?.();
+
+      // Notify WebSocket for multi-tab sync
+      if (websocketService.isConnected()) {
+        try {
+          websocketService.notifyConversationUpdated(conversation.id, {
+            title: newTitle.trim(),
+            updatedAt: new Date().toISOString(),
+          });
+        } catch {}
+      }
     } catch (error: any) {
       message.error(
         error?.response?.data?.message || "Failed to rename conversation"
@@ -135,6 +147,14 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     try {
       await deleteConversation(conversation.id);
       message.success("Conversation deleted successfully");
+
+      // Notify WebSocket for multi-tab sync
+      if (websocketService.isConnected()) {
+        try {
+          websocketService.notifyConversationDeleted(conversation.id);
+        } catch {}
+      }
+
       try {
         const maybe: any = onUpdate?.();
         if (maybe && typeof maybe.then === "function") {
@@ -168,27 +188,31 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   /**
    * Dropdown menu items
    */
-  const menuItems = [
-    {
-      key: "rename",
-      label: "Rename",
-      icon: <EditOutlined />,
-      onClick: (e: any) => {
-        e.domEvent.stopPropagation();
-        setIsRenaming(true);
+  const menuItems = useMemo(() => {
+    return [
+      {
+        key: "rename",
+        label: "Rename",
+        icon: <EditOutlined />,
+        onClick: (e: any) => {
+          e.domEvent.stopPropagation();
+          setIsRenaming(true);
+        },
       },
-    },
-    {
-      key: "delete",
-      label: "Delete",
-      icon: <DeleteOutlined />,
-      danger: true,
-      onClick: (e: any) => {
-        e.domEvent.stopPropagation();
-        handleDelete();
+      {
+        key: "delete",
+        label: "Delete",
+        icon: <DeleteOutlined />,
+        danger: true,
+        onClick: (e: any) => {
+          e.domEvent.stopPropagation();
+          handleDelete();
+        },
       },
-    },
-  ];
+    ];
+    // conversation.id intentionally not included because handlers use state setters defined here
+    // and we only want to avoid recreating the items array each render
+  }, [handleDelete]);
 
   return (
     <div
@@ -223,20 +247,20 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
             className={styles.renameInput}
           />
         ) : (
-          <Text className={styles.title} strong>
+          <span className={styles.title}>
             {truncateText(conversation.title, 30)}
-          </Text>
+          </span>
         )}
 
         {/* Message count and timestamp */}
         <div className={styles.metadata}>
-          <Text className={styles.messageCount}>
+          <span className={styles.messageCount}>
             {conversation.message_count}{" "}
             {conversation.message_count === 1 ? "message" : "messages"}
-          </Text>
-          <Text className={styles.timestamp}>
+          </span>
+          <span className={styles.timestamp}>
             {formatTimestamp(conversation.updatedAt)}
-          </Text>
+          </span>
         </div>
       </div>
 

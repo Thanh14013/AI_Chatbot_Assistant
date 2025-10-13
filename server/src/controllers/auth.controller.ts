@@ -160,7 +160,6 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
         sameSite: "lax",
         path: "/",
       });
-      console.log("No refresh token present");
       res.status(200).json({ success: true, message: "Logout successful" });
       return;
     }
@@ -176,7 +175,7 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
       sameSite: "lax",
       path: "/",
     });
-    console.log("User logged out successfully and token revoked");
+    // logout success log suppressed
     res.status(200).json({ success: true, message: "Logout successful" });
   } catch (error) {
     res.clearCookie("refreshToken", {
@@ -185,8 +184,7 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
       sameSite: "lax",
       path: "/",
     });
-    // Log the full error for debugging (server console)
-    console.error("Logout error:", error);
+    // Error logging suppressed in server output
     const errorMessage = error instanceof Error ? error.message : "Logout failed";
     // In development, include the message to help debugging; in production keep generic
     res.status(500).json({ success: false, message: errorMessage });

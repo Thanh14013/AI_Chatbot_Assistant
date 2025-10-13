@@ -70,6 +70,23 @@
   flex-shrink: 0;
 }
 
+/* Reduce avatar box size so icons don't touch the sidebar edge */
+.avatar {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px; /* keep rounded square look */
+  padding: 4px; /* room for icon inside */
+  box-sizing: border-box;
+}
+
+/* Ensure Ant icons inside avatars scale down nicely */
+.avatar :global(.anticon) {
+  font-size: 16px;
+}
+
 .conversationMeta {
   flex: 1;
   min-width: 0;
@@ -92,6 +109,9 @@
   line-height: 1.4;
   flex: 1;
   min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .timeText {

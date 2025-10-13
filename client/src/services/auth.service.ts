@@ -14,6 +14,7 @@ import type {
   GetCurrentUserResponse,
 } from "../types";
 import { setTokens, clearTokens } from "../utils/token.util";
+import { websocketService } from "./websocket.service";
 
 /**
  * Register a new user
@@ -67,6 +68,13 @@ export const refreshAccessToken = async (): Promise<RefreshTokenResponse> => {
     const { accessToken } = response.data.data;
     // Persist new access token locally
     setTokens(accessToken);
+
+    // If a WebSocket connection exists, tell it to reconnect with the new token
+    try {
+      websocketService.updateToken();
+    } catch {
+      // Removed console.error logging for websocket updates
+    }
   }
 
   return response.data;

@@ -125,9 +125,10 @@ export const sendMessageStream = async (req, res) => {
             // Send SSE data event with chunk
             res.write(`data: ${JSON.stringify({ type: "chunk", text: chunk })}\n\n`);
         })
-            .then((assistantMessage) => {
-            // Send final event with full assistant message metadata
-            res.write(`data: ${JSON.stringify({ type: "done", assistantMessage })}\n\n`);
+            .then((result) => {
+            // Send final event with complete result (userMessage, assistantMessage, conversation)
+            const doneEvent = { type: "done", ...result };
+            res.write(`data: ${JSON.stringify(doneEvent)}\n\n`);
             // Close the stream
             res.end();
         })

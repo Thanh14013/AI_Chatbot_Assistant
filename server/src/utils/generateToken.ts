@@ -10,7 +10,7 @@ type SignedTokenPayload = {
 
 // Input payload when creating tokens (id optional but recommended)
 type CreateTokenInput = {
-  id?: string;
+  id: string;
   name: string;
   email: string;
 };

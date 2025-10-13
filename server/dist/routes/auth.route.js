@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { register, login, refresh, logout } from "../controllers/auth.controller.js";
+import { register, login, refresh, logout, getCurrentUser, } from "../controllers/auth.controller.js";
+import { authenticateAccessToken } from "../middlewares/authJwt.js";
 const router = Router();
 /**
  * POST /api/auth/register
@@ -25,4 +26,10 @@ router.post("/refresh", refresh);
  * Body: { refreshToken }
  */
 router.post("/logout", logout);
+/**
+ * GET /api/auth/me
+ * Get current authenticated user
+ * Requires: Access token in Authorization header
+ */
+router.get("/me", authenticateAccessToken, getCurrentUser);
 export default router;

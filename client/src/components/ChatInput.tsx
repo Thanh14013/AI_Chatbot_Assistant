@@ -14,6 +14,8 @@ interface ChatInputProps {
   onSendMessage: (message: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  onTypingStart?: () => void;
+  onTypingStop?: () => void;
 }
 
 /**
@@ -24,10 +26,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
   onSendMessage,
   disabled = false,
   placeholder = "Type your message here...",
+  onTypingStart,
+  onTypingStop,
 }) => {
   const [message, setMessage] = useState("");
   const [charCount, setCharCount] = useState(0);
+  const [isTyping, setIsTyping] = useState(false);
   const textAreaRef = useRef<any>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Maximum character limit (optional)
   const MAX_CHARS = 4000;
@@ -39,6 +45,23 @@ const ChatInput: React.FC<ChatInputProps> = ({
     const value = e.target.value;
     setMessage(value);
     setCharCount(value.length);
+
+    // Handle typing events
+    if (value.trim() && !isTyping) {
+      setIsTyping(true);
+      onTypingStart?.();
+    }
+
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Set timeout to stop typing after 3 seconds of inactivity
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false);
+      onTypingStop?.();
+    }, 3000);
   };
 
   /**
@@ -51,6 +74,18 @@ const ChatInput: React.FC<ChatInputProps> = ({
     // Don't send empty messages
     if (!trimmedMessage || disabled) {
       return;
+    }
+
+    // Stop typing indicator
+    if (isTyping) {
+      setIsTyping(false);
+      onTypingStop?.();
+    }
+
+    // Clear typing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
     }
 
     // Send message to parent component
@@ -82,6 +117,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
    */
   useEffect(() => {
     textAreaRef.current?.focus();
+
+    // Cleanup typing timeout on unmount
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
   }, []);
 
   return (

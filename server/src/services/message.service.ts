@@ -163,7 +163,9 @@ export const sendMessageAndStreamResponse = async (
   conversationId: string,
   userId: string,
   content: string,
-  onChunk: (chunk: string) => Promise<void> | void
+  onChunk: (chunk: string) => Promise<void> | void,
+  // optional callback invoked immediately after the user message is persisted
+  onUserMessageCreated?: (userMessage: any) => Promise<void> | void
 ): Promise<any> => {
   if (!content || content.trim().length === 0) {
     throw new Error("Message content cannot be empty");
@@ -186,6 +188,22 @@ export const sendMessageAndStreamResponse = async (
     model: conversation.model,
   });
 
+  // Invoke callback so callers (socket server) can broadcast the persisted user message
+  try {
+    if (onUserMessageCreated) {
+      await onUserMessageCreated({
+        id: userMessage.id,
+        conversation_id: userMessage.conversation_id,
+        role: userMessage.role,
+        content: userMessage.content,
+        tokens_used: userMessage.tokens_used,
+        model: userMessage.model,
+        createdAt: userMessage.createdAt,
+      });
+    }
+  } catch (err) {
+    // ignore errors from user callback to avoid breaking streaming
+  }
   conversation.total_tokens_used += userTokens;
   conversation.message_count += 1;
   await conversation.save();
@@ -236,15 +254,51 @@ export const sendMessageAndStreamResponse = async (
 
   let fullContent = "";
   try {
+    // streaming start
+    // Buffer incoming deltas and emit grouped chunks of words (e.g. 1-2 words)
+    const groupSize = 2; // emit every N words (tuneable)
+    let buffer = "";
+
     for await (const chunk of stream) {
       const delta = chunk.choices?.[0]?.delta;
       if (delta?.content) {
         const text = delta.content as string;
         fullContent += text;
-        // invoke callback
-        await onChunk(text);
+
+        // Append to buffer and try to extract groups of words
+        buffer += text;
+
+        // Build a regex to capture the first `groupSize` words including leading whitespace
+        const groupRegex = new RegExp(`^(\\s*\\S+(?:\\s+\\S+){${groupSize - 1}})`);
+        let match = buffer.match(groupRegex);
+
+        // Emit as many full groups as possible
+        while (match) {
+          const piece = match[1];
+          // invoke callback with grouped piece
+          try {
+            await onChunk(piece);
+          } catch (e) {
+            // ignore onChunk errors to keep streaming
+          }
+          // remove emitted piece from buffer
+          buffer = buffer.slice(match[0].length);
+          match = buffer.match(groupRegex);
+        }
       }
     }
+
+    // After stream finishes, flush any remaining buffer (may contain partial words)
+    if (buffer.length > 0) {
+      try {
+        await onChunk(buffer);
+      } catch (e) {
+        // ignore
+      }
+      buffer = "";
+    }
+
+    // streaming complete
 
     // Estimate tokens
     const estimated_completion_tokens = estimateTokenCount(fullContent);

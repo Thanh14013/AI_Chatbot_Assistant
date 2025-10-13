@@ -248,3 +248,17 @@
     opacity: 1;
   }
 }
+
+/* Dev-only debug badge shown in corner of bubble when present */
+.debugBadge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  z-index: 5;
+  pointer-events: none;
+}

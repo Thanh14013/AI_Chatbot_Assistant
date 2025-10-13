@@ -1,5 +1,5 @@
-import React from "react";
-import { Avatar, Typography, Dropdown, MenuProps } from "antd";
+import React, { useMemo } from "react";
+import { Avatar, Dropdown, MenuProps } from "antd";
 import {
   UserOutlined,
   SettingOutlined,
@@ -9,7 +9,7 @@ import { useAuth } from "../hooks";
 import type { User } from "../types/auth.type";
 import styles from "./UserSection.module.css";
 
-const { Text } = Typography;
+// Use native elements instead of AntD Typography.Text to avoid AntD EllipsisMeasure
 
 interface UserSectionProps {
   user: User | null;
@@ -36,30 +36,34 @@ const UserSection: React.FC<UserSectionProps> = ({ user }) => {
     }
   };
 
-  const menuItems: MenuProps["items"] = [
-    {
-      key: "profile",
-      label: "Profile",
-      icon: <UserOutlined />,
-      onClick: () => handleMenuClick("profile"),
-    },
-    {
-      key: "settings",
-      label: "Settings",
-      icon: <SettingOutlined />,
-      onClick: () => handleMenuClick("settings"),
-    },
-    {
-      type: "divider",
-    },
-    {
-      key: "logout",
-      label: "Logout",
-      icon: <LogoutOutlined />,
-      danger: true,
-      onClick: () => handleMenuClick("logout"),
-    },
-  ];
+  const menuItems: MenuProps["items"] = useMemo(
+    () => [
+      {
+        key: "profile",
+        label: "Profile",
+        icon: <UserOutlined />,
+        onClick: () => handleMenuClick("profile"),
+      },
+      {
+        key: "settings",
+        label: "Settings",
+        icon: <SettingOutlined />,
+        onClick: () => handleMenuClick("settings"),
+      },
+      {
+        type: "divider",
+      },
+      {
+        key: "logout",
+        label: "Logout",
+        icon: <LogoutOutlined />,
+        danger: true,
+        onClick: () => handleMenuClick("logout"),
+      },
+    ],
+    // menu items do not depend on props
+    []
+  );
 
   if (!user) {
     return (
@@ -67,7 +71,7 @@ const UserSection: React.FC<UserSectionProps> = ({ user }) => {
         <div className={styles.userInfo}>
           <Avatar size={40} icon={<UserOutlined />} className={styles.avatar} />
           <div className={styles.userDetails}>
-            <Text className={styles.userName}>Loading...</Text>
+            <span className={styles.userName}>Loading...</span>
           </div>
         </div>
       </div>
@@ -105,12 +109,11 @@ const UserSection: React.FC<UserSectionProps> = ({ user }) => {
           </Avatar>
 
           <div className={styles.userDetails}>
-            <Text className={styles.userName} ellipsis>
-              {user.name || user.email}
-            </Text>
-            <Text className={styles.userEmail} ellipsis>
+            {/* Use CSS-based ellipsis via styles to avoid AntD EllipsisMeasure render loops */}
+            <span className={styles.userName}>{user.name || user.email}</span>
+            <span className={styles.userEmail}>
               {user.name ? user.email : "Free Plan"}
-            </Text>
+            </span>
           </div>
         </div>
       </Dropdown>

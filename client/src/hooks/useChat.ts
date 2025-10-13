@@ -190,6 +190,164 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery]);
 
+  // Listen for cross-tab events to keep conversation list in sync
+  useEffect(() => {
+    const handleCreated = (e: Event) => {
+      try {
+        const conversation = (e as CustomEvent).detail as ConversationListItem;
+        if (!conversation) return;
+
+        setConversations((prev) => {
+          // If already exists, replace it; otherwise prepend
+          const exists = prev.some((c) => c.id === conversation.id);
+          if (exists) {
+            return prev.map((c) =>
+              c.id === conversation.id ? conversation : c
+            );
+          }
+          return [conversation, ...prev];
+        });
+
+        // Background refresh to ensure consistency with server
+        loadConversations(true).catch(() => {});
+      } catch (err) {
+        // ignore non-fatal errors during cross-tab sync handling
+        console.debug("useChat: conversation created handler error", err);
+      }
+    };
+
+    const handleUpdated = (e: Event) => {
+      try {
+        const data = (e as CustomEvent).detail as {
+          conversationId: string;
+          update: Partial<ConversationListItem>;
+        };
+        if (!data || !data.conversationId) return;
+
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === data.conversationId ? { ...c, ...data.update } : c
+          )
+        );
+
+        // Background refresh to ensure consistency
+        loadConversations(true).catch(() => {});
+      } catch (err) {
+        // ignore non-fatal errors during cross-tab sync handling
+        console.debug("useChat: conversation updated handler error", err);
+      }
+    };
+
+    const handleDeleted = (e: Event) => {
+      try {
+        const data = (e as CustomEvent).detail as { conversationId: string };
+        if (!data || !data.conversationId) return;
+
+        setConversations((prev) =>
+          prev.filter((c) => c.id !== data.conversationId)
+        );
+
+        // Background refresh to ensure consistency
+        loadConversations(true).catch(() => {});
+      } catch (err) {
+        // ignore non-fatal errors during cross-tab sync handling
+        console.debug("useChat: conversation deleted handler error", err);
+      }
+    };
+
+    const handleForceRefresh = () => {
+      loadConversations(true).catch(() => {});
+    };
+
+    const handleActivity = (e: Event) => {
+      try {
+        const data = (e as CustomEvent).detail as {
+          conversationId: string;
+          lastActivity: string;
+          messageCount: number;
+          totalTokens: number;
+        };
+        if (!data || !data.conversationId) return;
+
+        // Optimistically update conversation metadata and move to top
+        setConversations((prev) => {
+          const updated = prev.map((c) =>
+            c.id === data.conversationId
+              ? {
+                  ...c,
+                  message_count: data.messageCount,
+                  total_tokens_used: data.totalTokens,
+                  updatedAt: data.lastActivity,
+                }
+              : c
+          );
+
+          // Move the updated conversation to the top
+          const targetIndex = updated.findIndex(
+            (c) => c.id === data.conversationId
+          );
+          if (targetIndex > 0) {
+            const targetConv = updated[targetIndex];
+            updated.splice(targetIndex, 1);
+            updated.unshift(targetConv);
+          }
+
+          return updated;
+        });
+
+        // Background refresh to ensure consistency
+        loadConversations(true).catch(() => {});
+      } catch (err) {
+        console.debug("useChat: conversation activity handler error", err);
+      }
+    };
+
+    window.addEventListener(
+      "conversation:created",
+      handleCreated as EventListener
+    );
+    window.addEventListener(
+      "conversation:updated",
+      handleUpdated as EventListener
+    );
+    window.addEventListener(
+      "conversation:deleted",
+      handleDeleted as EventListener
+    );
+    window.addEventListener(
+      "conversation:activity",
+      handleActivity as EventListener
+    );
+    window.addEventListener(
+      "conversations:refresh",
+      handleForceRefresh as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "conversation:created",
+        handleCreated as EventListener
+      );
+      window.removeEventListener(
+        "conversation:updated",
+        handleUpdated as EventListener
+      );
+      window.removeEventListener(
+        "conversation:deleted",
+        handleDeleted as EventListener
+      );
+      window.removeEventListener(
+        "conversation:activity",
+        handleActivity as EventListener
+      );
+      window.removeEventListener(
+        "conversations:refresh",
+        handleForceRefresh as EventListener
+      );
+    };
+    // Depend on loadConversations to pick up latest function instance
+  }, [loadConversations]);
+
   return {
     conversations,
     isLoading,

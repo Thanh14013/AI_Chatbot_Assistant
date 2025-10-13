@@ -35,7 +35,7 @@ const MessageList: React.FC<MessageListProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
-  const [showLoadEarlierBtn, setShowLoadEarlierBtn] = useState(false);
+  // load earlier button removed; rely on auto-load when scrolling near top
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
   const [isLoadingEarlier, setIsLoadingEarlier] = useState(false);
   const prevMessagesLengthRef = useRef<number>(messages.length);
@@ -69,12 +69,11 @@ const MessageList: React.FC<MessageListProps> = ({
     setShowScrollBtn(shouldShowScrollBtn);
 
     // Show load-earlier button if scrolled to top (within 50px) and has more messages
-    const shouldShowLoadEarlierBtn = distanceFromTop < 50 && hasMore;
-    setShowLoadEarlierBtn(shouldShowLoadEarlierBtn);
+    // If user scrolls near top and hasMore, auto-load earlier messages
 
     // Auto-load earlier messages when user scrolls near top
     if (distanceFromTop < 80 && hasMore && !isLoadingEarlier) {
-      // fire and forget
+      // auto-load earlier messages when the user scrolls near the top
       void handleLoadEarlier();
     }
 
@@ -179,6 +178,14 @@ const MessageList: React.FC<MessageListProps> = ({
     scrollToBottom(false);
   }, []);
 
+  // Listen for external requests to scroll to bottom (e.g. when a conversation loads)
+  useEffect(() => {
+    const onScrollRequest = () => scrollToBottom(false);
+    window.addEventListener("messages:scrollToBottom", onScrollRequest);
+    return () =>
+      window.removeEventListener("messages:scrollToBottom", onScrollRequest);
+  }, []);
+
   /**
    * Render loading skeleton
    */
@@ -196,19 +203,7 @@ const MessageList: React.FC<MessageListProps> = ({
 
   return (
     <div className={styles.messageListContainer}>
-      {/* Load earlier button at top when scrolled to top */}
-      {showLoadEarlierBtn && (
-        <div className={styles.loadEarlierTop}>
-          <Button
-            onClick={handleLoadEarlier}
-            loading={isLoadingEarlier}
-            icon={<UpOutlined />}
-            type="default"
-          >
-            Read More
-          </Button>
-        </div>
-      )}
+      {/* Top auto-load is handled when the user scrolls near the top (no Read More button) */}
 
       <div
         ref={containerRef}
@@ -240,12 +235,7 @@ const MessageList: React.FC<MessageListProps> = ({
       )}
 
       {/* Loading indicator at bottom when sending message */}
-      {isLoading && messages.length > 0 && (
-        <div className={styles.loadingIndicator}>
-          <Spin size="small" />
-          <span className={styles.loadingText}>AI is typing...</span>
-        </div>
-      )}
+      {/* Loading indicator removed per UX request (no spinner/text) */}
     </div>
   );
 };

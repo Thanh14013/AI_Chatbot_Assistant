@@ -23,8 +23,40 @@ import {
   updateConversation,
   deleteConversation,
 } from "../services/chat.service";
+import { websocketService } from "../services/websocket.service";
 import type { ConversationListItem } from "../types/chat.type";
 import styles from "./ConversationList.module.css";
+
+// Memoized item actions to avoid recreating menu items on every render
+const ConversationItemActions: React.FC<{
+  conversation: any;
+  openRename: (c: any, e?: React.MouseEvent) => void;
+  openDelete: (c: any, e?: React.MouseEvent) => void;
+}> = React.memo(({ conversation, openRename, openDelete }) => {
+  const items = React.useMemo(
+    () => [
+      {
+        key: "rename",
+        label: "Rename",
+        onClick: () => openRename(conversation),
+      },
+      {
+        key: "delete",
+        label: "Delete",
+        onClick: () => openDelete(conversation),
+        danger: true,
+      },
+    ],
+    // conversation object reference may change, but the handlers are stable
+    [conversation, openRename, openDelete]
+  );
+
+  return (
+    <Dropdown trigger={["click"]} menu={{ items }} placement="bottomRight">
+      <Button type="text" icon={<MoreOutlined />} />
+    </Dropdown>
+  );
+});
 
 const { Text } = Typography;
 
@@ -98,6 +130,16 @@ const ConversationList: React.FC<ConversationListProps> = ({
       setRenameModal({ visible: false, id: null, value: "" });
       onRefresh();
       message.success("Conversation renamed");
+
+      // Notify WebSocket for multi-tab sync
+      if (websocketService.isConnected()) {
+        try {
+          websocketService.notifyConversationUpdated(id, {
+            title: trimmed,
+            updatedAt: new Date().toISOString(),
+          });
+        } catch {}
+      }
     } catch (err) {
       message.error("Failed to rename conversation");
     } finally {
@@ -130,6 +172,14 @@ const ConversationList: React.FC<ConversationListProps> = ({
     try {
       await deleteConversation(id);
       setDeleteModal({ visible: false, id: null, title: "" });
+
+      // Notify WebSocket for multi-tab sync
+      if (websocketService.isConnected()) {
+        try {
+          websocketService.notifyConversationDeleted(id);
+        } catch {}
+      }
+
       // Refresh conversations list (await if it returns a Promise)
       try {
         const maybe: any = onRefresh?.();
@@ -183,7 +233,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
   if (error) {
     return (
       <div className={styles.errorState}>
-        <Text type="danger">{error}</Text>
+        <span className={styles.emptyText}>{error}</span>
         <Button
           type="link"
           icon={<ReloadOutlined />}
@@ -214,17 +264,17 @@ const ConversationList: React.FC<ConversationListProps> = ({
           image={<MessageOutlined className={styles.emptyIcon} />}
           description={
             <div>
-              <Text className={styles.emptyText}>
+              <span className={styles.emptyText}>
                 {searchQuery
                   ? "No conversations found"
                   : "No conversations yet"}
-              </Text>
+              </span>
               <br />
-              <Text className={styles.emptySubtext}>
+              <span className={styles.emptySubtext}>
                 {searchQuery
                   ? "Try a different search term"
                   : "Start a new conversation to get started"}
-              </Text>
+              </span>
             </div>
           }
         />
@@ -277,12 +327,13 @@ const ConversationList: React.FC<ConversationListProps> = ({
 
                   <div className={styles.conversationMeta}>
                     <div className={styles.titleRow}>
-                      <Text className={styles.conversationTitle} ellipsis>
+                      {/* Use CSS-based ellipsis (avoid AntD EllipsisMeasure which can trigger layout-effect loops) */}
+                      <span className={styles.conversationTitle}>
                         {conversation.title || "Untitled"}
-                      </Text>
-                      <Text className={styles.timeText}>
+                      </span>
+                      <span className={styles.timeText}>
                         {formatTime(conversation.updatedAt)}
-                      </Text>
+                      </span>
                     </div>
                     {/* Removed message count as requested */}
                   </div>
@@ -292,27 +343,11 @@ const ConversationList: React.FC<ConversationListProps> = ({
                     className={styles.itemActions}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <Dropdown
-                      trigger={["click"]}
-                      menu={{
-                        items: [
-                          {
-                            key: "rename",
-                            label: "Rename",
-                            onClick: () => openRename(conversation),
-                          },
-                          {
-                            key: "delete",
-                            label: "Delete",
-                            onClick: () => openDelete(conversation),
-                            danger: true,
-                          },
-                        ],
-                      }}
-                      placement="bottomRight"
-                    >
-                      <Button type="text" icon={<MoreOutlined />} />
-                    </Dropdown>
+                    <ConversationItemActions
+                      conversation={conversation}
+                      openRename={openRename}
+                      openDelete={openDelete}
+                    />
                   </div>
                 </div>
               </List.Item>

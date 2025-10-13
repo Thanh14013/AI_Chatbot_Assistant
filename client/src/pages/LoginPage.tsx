@@ -5,7 +5,7 @@
 
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { Form, Input, Button, Card, Typography, message, Alert } from "antd";
+import { Form, Input, Button, Card, Typography, App, Alert } from "antd";
 import { UserOutlined, LockOutlined } from "@ant-design/icons";
 import { useAuth } from "../hooks";
 import type { LoginRequest } from "../types";
@@ -19,6 +19,7 @@ const { Title, Text } = Typography;
  * Renders login form with email and password fields
  */
 const LoginPage: React.FC = () => {
+  const { message } = App.useApp();
   const { login, isLoading } = useAuth();
   const [error, setError] = useState<string>("");
 

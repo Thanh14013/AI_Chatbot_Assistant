@@ -4,7 +4,7 @@
  */
 
 import React from "react";
-import { Empty, Button, Typography } from "antd";
+import { Empty, Button } from "antd";
 import {
   InboxOutlined,
   MessageOutlined,
@@ -13,7 +13,7 @@ import {
 } from "@ant-design/icons";
 import styles from "./EmptyState.module.css";
 
-const { Title, Paragraph, Text } = Typography;
+// Use native elements instead of AntD Typography to avoid EllipsisMeasure
 
 interface EmptyStateProps {
   type: "conversations" | "messages";
@@ -41,12 +41,12 @@ const EmptyState: React.FC<EmptyStateProps> = ({
           imageStyle={{ height: 80 }}
           description={
             <div className={styles.description}>
-              <Title level={4}>No Conversations Yet</Title>
-              <Paragraph>
+              <h4>No Conversations Yet</h4>
+              <p>
                 Start your first conversation with the AI assistant.
                 <br />
                 Click the button below to begin!
-              </Paragraph>
+              </p>
             </div>
           }
         >
@@ -110,13 +110,11 @@ const EmptyState: React.FC<EmptyStateProps> = ({
           <div className={styles.welcomeIcon}>
             <MessageOutlined />
           </div>
-          <Title level={3} className={styles.welcomeTitle}>
-            Start a Conversation
-          </Title>
-          <Paragraph className={styles.welcomeText}>
+          <h3 className={styles.welcomeTitle}>Start a Conversation</h3>
+          <p className={styles.welcomeText}>
             I'm your AI assistant. Ask me anything or try one of these
             suggestions:
-          </Paragraph>
+          </p>
         </div>
 
         {/* Prompt suggestions grid */}
@@ -136,12 +134,10 @@ const EmptyState: React.FC<EmptyStateProps> = ({
               }}
             >
               <div className={styles.suggestionIcon}>{suggestion.icon}</div>
-              <Text strong className={styles.suggestionTitle}>
+              <strong className={styles.suggestionTitle}>
                 {suggestion.title}
-              </Text>
-              <Paragraph className={styles.suggestionPrompt}>
-                "{suggestion.prompt}"
-              </Paragraph>
+              </strong>
+              <p className={styles.suggestionPrompt}>"{suggestion.prompt}"</p>
             </div>
           ))}
         </div>

@@ -14,6 +14,7 @@ const REFRESH_EXPIRATION = process.env.JWT_REFRESH_EXPIRATION
 // Generate Access Token
 const generateAccessToken = (payload) => {
     const tokenPayload = {
+        id: payload.id,
         name: payload.name,
         email: payload.email,
         type: "access",
@@ -23,6 +24,7 @@ const generateAccessToken = (payload) => {
 // Generate Refresh Token
 const generateRefreshToken = (payload) => {
     const tokenPayload = {
+        id: payload.id,
         name: payload.name,
         email: payload.email,
         type: "refresh",

@@ -38,8 +38,8 @@ export const loginUser = async (loginData) => {
         throw new Error("Account or password is incorrect");
     }
     // Generate new tokens
-    const accessToken = generateAccessToken({ name: user.name, email: user.email });
-    const refreshToken = generateRefreshToken({ name: user.name, email: user.email });
+    const accessToken = generateAccessToken({ id: user.id, name: user.name, email: user.email });
+    const refreshToken = generateRefreshToken({ id: user.id, name: user.name, email: user.email });
     // Store refresh token in database
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiration
@@ -89,7 +89,7 @@ export const refreshAccessToken = async (token) => {
         throw new Error("User not found");
     }
     // Generate new access token only
-    const newAccessToken = generateAccessToken({ name: user.name, email: user.email });
+    const newAccessToken = generateAccessToken({ id: user.id, name: user.name, email: user.email });
     return {
         accessToken: newAccessToken,
     };
@@ -98,16 +98,20 @@ export const refreshAccessToken = async (token) => {
 export const logoutUser = async (token) => {
     // Find token in database to identify the user
     const storedToken = await RefreshToken.findByToken(token);
+    // If token not found, treat logout as idempotent success (token may have been removed already)
     if (!storedToken) {
-        throw new Error("Refresh token not found");
+        console.debug && console.debug(`logoutUser: token not found`);
+        return { message: "Logout successful" };
     }
-    // Check if token is already revoked
+    // If already revoked, nothing to do
     if (storedToken.is_revoked) {
-        throw new Error("Refresh token already revoked");
+        console.debug && console.debug(`logoutUser: token already revoked id=${storedToken.id}`);
+        return { message: "Logout successful" };
     }
     // Revoke only this specific token (logout from current device)
     storedToken.is_revoked = true;
     await storedToken.save();
+    console.log(`Refresh token for user ID ${storedToken.user_id} revoked`);
     return {
         message: "Logout successful",
     };

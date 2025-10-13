@@ -9,6 +9,7 @@ import {
   setAccessToken,
   clearTokens,
 } from "../utils/token.util";
+import { websocketService } from "./websocket.service";
 import type { ApiErrorResponse, RefreshTokenResponse } from "../types";
 
 // Create axios instance with base configuration
@@ -142,6 +143,13 @@ axiosInstance.interceptors.response.use(
 
         // Persist new access token locally
         setAccessToken(accessToken);
+
+        // Tell WebSocket service to reconnect using the new token (if connected)
+        try {
+          websocketService.updateToken();
+        } catch {
+          // Non-fatal: websocket token update failed (log suppressed)
+        }
 
         // Update Authorization header for the original request
         if (originalRequest.headers) {

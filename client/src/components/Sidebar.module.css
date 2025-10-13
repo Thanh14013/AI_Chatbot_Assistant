@@ -3,6 +3,7 @@
   height: 100vh;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   background-color: #ffffff;
   border-right: 1px solid #e8e8e8;
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.06);
@@ -18,11 +19,11 @@
 /* Middle Section - Scrollable conversations */
 .middleSection {
   flex: 1;
-  overflow: hidden;
+  min-height: 550px;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: #fff;
   position: relative;
-  /* leave space so the last conversation isn't hidden behind the bottom section */
-  padding-bottom: -20px;
 }
 
 /* Bottom Section - Fixed at bottom */
@@ -46,6 +47,7 @@
   position: absolute;
   right: 8px;
   top: 12px;
+  z-index: 11;
 }
 
 .collapseToggle {
@@ -61,10 +63,16 @@
   align-items: center;
   justify-content: center;
   font-weight: 600;
+  transition: all 0.2s ease;
 }
 
 .collapseToggle:hover {
   background: #e6f7ff;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+}
+
+.collapseToggle:active {
+  transform: scale(0.95);
 }
 
 /* Responsive Design */
