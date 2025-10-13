@@ -30,10 +30,12 @@ const socketAuthMiddleware = (socket, next) => {
         else {
             return next(new Error("Invalid token: missing user ID"));
         }
+        // authentication succeeded; no logging
         next();
     }
     catch (error) {
         const message = error instanceof Error ? error.message : "Authentication error";
+        // authentication failed; no logging
         next(new Error(message));
     }
 };
@@ -48,8 +50,7 @@ const handleUserConnection = (socket) => {
     }
     userSockets.get(userId).add(socket.id);
     socketUsers.set(socket.id, userId);
-    console.log(`User ${userId} connected with socket ${socket.id}`);
-    console.log(`Total sockets for user ${userId}: ${userSockets.get(userId)?.size}`);
+    // user connection handled
 };
 /**
  * Handle user disconnection cleanup
@@ -66,8 +67,7 @@ const handleUserDisconnection = (socket) => {
             }
         }
         socketUsers.delete(socket.id);
-        console.log(`User ${userId} disconnected with socket ${socket.id}`);
-        console.log(`Remaining sockets for user ${userId}: ${userSocketSet?.size || 0}`);
+        // user disconnection handled
     }
 };
 /**
@@ -153,7 +153,7 @@ export const initializeSocketIO = (httpServer) => {
     io.use(socketAuthMiddleware);
     // Handle socket connections
     io.on("connection", (socket) => {
-        console.log(`Socket connected: ${socket.id}`);
+        // connection established
         // Handle user connection
         handleUserConnection(socket);
         // Join user to their personal room (for user-specific broadcasts)
@@ -167,7 +167,7 @@ export const initializeSocketIO = (httpServer) => {
                 return;
             }
             socket.join(`conversation:${conversationId}`);
-            console.log(`Socket ${socket.id} joined conversation ${conversationId}`);
+            // user joined conversation room
             // Notify user they joined the conversation
             socket.emit("conversation:joined", { conversationId });
         });
@@ -178,7 +178,7 @@ export const initializeSocketIO = (httpServer) => {
                 return;
             }
             socket.leave(`conversation:${conversationId}`);
-            console.log(`Socket ${socket.id} left conversation ${conversationId}`);
+            // user left conversation room
             // Notify user they left the conversation
             socket.emit("conversation:left", { conversationId });
         });
@@ -190,29 +190,70 @@ export const initializeSocketIO = (httpServer) => {
                     socket.emit("error", { message: "Conversation ID and content are required" });
                     return;
                 }
-                console.log(`Message received from ${socket.id} for conversation ${conversationId}`);
+                // incoming message received
                 // Import message service dynamically to avoid circular imports
                 const { sendMessageAndStreamResponse } = await import("./message.service.js");
-                // Emit typing indicator to show AI is processing
-                socket.to(`conversation:${conversationId}`).emit("ai:typing:start", {
-                    conversationId,
-                });
-                // Stream AI response
+                // Stream AI response and broadcast user message early via onUserMessageCreated
                 let assistantContent = "";
                 const result = await sendMessageAndStreamResponse(conversationId, socket.userId, content, 
                 // onChunk callback - stream to client
                 (chunk) => {
                     assistantContent += chunk;
-                    console.log(`[Socket Service] Broadcasting chunk: "${chunk}" to conversation ${conversationId}`);
+                    // chunk received and will be broadcast
                     // Broadcast chunk to conversation room (all users in conversation)
                     io.to(`conversation:${conversationId}`).emit("message:chunk", {
                         conversationId,
                         chunk,
                         content: assistantContent, // send accumulated content
                     });
+                }, 
+                // onUserMessageCreated - broadcast the persisted user message immediately so other tabs see it
+                (userMessage) => {
+                    try {
+                        // Broadcast user message to other participants in the conversation (exclude sender socket)
+                        socket.to(`conversation:${conversationId}`).emit("message:new", {
+                            conversationId,
+                            message: userMessage,
+                        });
+                        // Also notify other sockets of the same user that are NOT in the conversation room.
+                        // This avoids sending the same message twice to sockets that are already in the conversation room
+                        // (those sockets have already received the event above).
+                        try {
+                            const room = io.sockets.adapter.rooms.get(`conversation:${conversationId}`);
+                            const roomSockets = room ? new Set(Array.from(room)) : new Set();
+                            // getUserSockets is available in this module and returns all socket ids for the user
+                            const userSocketIds = getUserSockets(socket.userId);
+                            for (const sid of userSocketIds) {
+                                // skip sender socket and any sockets already in the conversation room
+                                if (sid === socket.id)
+                                    continue;
+                                if (roomSockets.has(sid))
+                                    continue;
+                                const target = io.sockets.sockets.get(sid);
+                                if (target) {
+                                    target.emit("message:new", {
+                                        conversationId,
+                                        message: userMessage,
+                                    });
+                                }
+                            }
+                        }
+                        catch (e) {
+                            // ignore per-socket notify failures
+                        }
+                        // After other clients have been notified about the user's message, start AI typing
+                        // for everyone in the conversation room (including the sender) so the typing indicator
+                        // appears after the user message in other tabs.
+                        io.to(`conversation:${conversationId}`).emit("ai:typing:start", {
+                            conversationId,
+                        });
+                    }
+                    catch (err) {
+                        // ignore
+                    }
                 });
-                // Stop typing indicator
-                socket.to(`conversation:${conversationId}`).emit("ai:typing:stop", {
+                // Stop typing indicator for ALL users in conversation room (including sender) for sync
+                io.to(`conversation:${conversationId}`).emit("ai:typing:stop", {
                     conversationId,
                 });
                 // Broadcast complete messages to conversation room
@@ -221,36 +262,22 @@ export const initializeSocketIO = (httpServer) => {
                     assistantMessage: result.assistantMessage,
                     conversation: result.conversation,
                 });
-                console.log(`Message processed for conversation ${conversationId}`);
-            }
-            catch (error) {
-                console.error(`Error processing message from ${socket.id}:`, error);
-                const errorMessage = error instanceof Error ? error.message : "Failed to process message";
-                socket.emit("error", {
-                    message: errorMessage,
-                    type: "message_error",
-                });
-                // Stop typing indicator on error
-                if (data.conversationId) {
-                    socket.to(`conversation:${data.conversationId}`).emit("ai:typing:stop", {
-                        conversationId: data.conversationId,
+                // Broadcast conversation update to user room for multi-tab conversation list sync
+                if (result.conversation) {
+                    broadcastToUser(socket.userId, "conversation:activity", {
+                        conversationId,
+                        lastActivity: new Date().toISOString(),
+                        messageCount: result.conversation.message_count,
+                        totalTokens: result.conversation.total_tokens_used,
                     });
                 }
             }
-        });
-        // Handle typing indicators
-        socket.on("typing:start", (conversationId) => {
-            if (!conversationId)
-                return;
-            // Broadcast typing start to other users in the conversation
-            socket.to(`conversation:${conversationId}`).emit("user:typing:start", {
-                userId: socket.userId,
-                conversationId,
-            });
+            catch { }
         });
         socket.on("typing:stop", (conversationId) => {
             if (!conversationId)
                 return;
+            // typing stop received
             // Broadcast typing stop to other users in the conversation
             socket.to(`conversation:${conversationId}`).emit("user:typing:stop", {
                 userId: socket.userId,
@@ -259,7 +286,7 @@ export const initializeSocketIO = (httpServer) => {
         });
         // Handle disconnection
         socket.on("disconnect", (reason) => {
-            console.log(`Socket ${socket.id} disconnected: ${reason}`);
+            // socket disconnected
             handleUserDisconnection(socket);
         });
         // Handle conversation updates (for real-time sync across tabs)
@@ -269,15 +296,22 @@ export const initializeSocketIO = (httpServer) => {
                 socket.emit("error", { message: "Conversation ID is required" });
                 return;
             }
-            // Broadcast update to all user's sockets
-            getUserSockets(socket.userId).forEach((socketId) => {
-                if (io.sockets.sockets.get(socketId) && socketId !== socket.id) {
-                    io.to(socketId).emit("conversation:updated", {
-                        conversationId,
-                        update,
-                    });
-                }
+            // conversation update received
+            // Broadcast update to ALL sockets of the same user (including sender) via user room for complete sync
+            broadcastToUser(socket.userId, "conversation:updated", {
+                conversationId,
+                update,
             });
+            // ALSO broadcast update to all participants in the conversation room
+            try {
+                io.to(`conversation:${conversationId}`).emit("conversation:updated", {
+                    conversationId,
+                    update,
+                });
+            }
+            catch (e) {
+                // ignore
+            }
         });
         // Handle conversation creation (for real-time sync across tabs)
         socket.on("conversation:create", (conversation) => {
@@ -285,12 +319,16 @@ export const initializeSocketIO = (httpServer) => {
                 socket.emit("error", { message: "Conversation data is required" });
                 return;
             }
-            // Broadcast new conversation to all user's other sockets
-            getUserSockets(socket.userId).forEach((socketId) => {
-                if (io.sockets.sockets.get(socketId) && socketId !== socket.id) {
-                    io.to(socketId).emit("conversation:created", conversation);
+            // conversation creation received
+            // Broadcast creation to ALL sockets of the same user (including sender) via user room for complete sync
+            broadcastToUser(socket.userId, "conversation:created", conversation);
+            // ALSO broadcast creation to the conversation room (if any sockets already joined)
+            try {
+                if (conversation?.id) {
+                    io.to(`conversation:${conversation.id}`).emit("conversation:created", conversation);
                 }
-            });
+            }
+            catch { }
         });
         // Handle conversation deletion (for real-time sync across tabs)
         socket.on("conversation:delete", (conversationId) => {
@@ -298,22 +336,26 @@ export const initializeSocketIO = (httpServer) => {
                 socket.emit("error", { message: "Conversation ID is required" });
                 return;
             }
-            // Broadcast deletion to all user's sockets
-            getUserSockets(socket.userId).forEach((socketId) => {
-                if (io.sockets.sockets.get(socketId)) {
-                    io.to(socketId).emit("conversation:deleted", { conversationId });
-                }
-            });
+            // conversation deletion requested
+            // Broadcast deletion to ALL sockets of the same user (including sender) via user room for complete sync
+            broadcastToUser(socket.userId, "conversation:deleted", { conversationId });
+            // ALSO broadcast deletion to the conversation room (all participants)
+            try {
+                io.to(`conversation:${conversationId}`).emit("conversation:deleted", { conversationId });
+            }
+            catch { }
             // Remove all sockets from the conversation room
+            // removing sockets from conversation room
             io.in(`conversation:${conversationId}`).socketsLeave(`conversation:${conversationId}`);
+            // conversation room cleared
         });
         // Handle ping/pong for connection health
         socket.on("ping", () => {
             socket.emit("pong");
         });
         // Handle connection errors
-        socket.on("error", (error) => {
-            console.error(`Socket ${socket.id} error:`, error);
+        socket.on("error", ( /* error */) => {
+            // socket error event
         });
     });
     return io;

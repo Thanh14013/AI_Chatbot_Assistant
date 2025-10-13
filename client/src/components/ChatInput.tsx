@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef, useEffect } from "react";
-import { Input, Button, Space } from "antd";
+import { Input, Button } from "antd";
 import { SendOutlined } from "@ant-design/icons";
 import styles from "./ChatInput.module.css";
 
@@ -30,7 +30,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   onTypingStop,
 }) => {
   const [message, setMessage] = useState("");
-  const [charCount, setCharCount] = useState(0);
+  const [isMultiline, setIsMultiline] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const textAreaRef = useRef<any>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -44,7 +44,12 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setMessage(value);
-    setCharCount(value.length);
+
+    // Detect if textarea has multiple lines (contains newlines or is tall)
+    const hasNewlines = value.includes("\n");
+    const lineCount = value.split("\n").length;
+    const isTall = textAreaRef.current?.scrollHeight > 40; // 40px is single line height
+    setIsMultiline(hasNewlines || lineCount > 1 || isTall);
 
     // Handle typing events
     if (value.trim() && !isTyping) {
@@ -93,7 +98,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
     // Clear input after sending
     setMessage("");
-    setCharCount(0);
+    setIsMultiline(false);
 
     // Focus back to textarea
     textAreaRef.current?.focus();
@@ -128,7 +133,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
   return (
     <div className={styles.chatInputContainer}>
-      <Space.Compact className={styles.inputWrapper}>
+      <div
+        className={`${styles.inputWrapper} ${
+          isMultiline ? styles.multiline : ""
+        }`}
+      >
         {/* Textarea with auto-resize */}
         <TextArea
           ref={textAreaRef}
@@ -137,7 +146,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          autoSize={{ minRows: 1, maxRows: 6 }}
+          autoSize={{ minRows: 1, maxRows: 4 }}
           maxLength={MAX_CHARS}
           className={styles.textarea}
         />
@@ -150,19 +159,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
           disabled={disabled || !message.trim()}
           loading={disabled}
           className={styles.sendButton}
-        >
-          Send
-        </Button>
-      </Space.Compact>
-
-      {/* Character counter (optional) */}
-      {charCount > 0 && (
-        <div className={styles.charCounter}>
-          <span className={charCount > MAX_CHARS * 0.9 ? styles.warning : ""}>
-            {charCount} / {MAX_CHARS}
-          </span>
-        </div>
-      )}
+        ></Button>
+      </div>
 
       {/* Hint text */}
       <div className={styles.hintText}>

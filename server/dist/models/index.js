@@ -70,7 +70,7 @@ export const syncDatabase = async (force = false) => {
         // force: true will drop tables and recreate them (DANGEROUS - data loss!)
         // force: false will create tables only if they don't exist
         await sequelize.sync({ force, alter: !force });
-        console.log("Database synchronized successfully");
+        // Database synchronized (log suppressed)
     }
     catch (error) {
         // Log only a concise message to avoid verbose stack traces in normal dev output

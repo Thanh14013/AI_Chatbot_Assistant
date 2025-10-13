@@ -4,22 +4,16 @@
  */
 
 import React, { useState, useEffect, useRef } from "react";
-import {
-  Layout,
-  Button,
-  Typography,
-  Modal,
-  Form,
-  Input,
-  Select,
-  App,
-} from "antd";
+import { Layout, Typography, App } from "antd";
 import { createConversation as apiCreateConversation } from "../services/chat.service";
 import { useNavigate, useParams } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import MessageList from "../components/MessageList";
 import ChatInput from "../components/ChatInput";
 import EmptyState from "../components/EmptyState";
+import ConversationForm, {
+  ConversationFormValues,
+} from "../components/ConversationForm";
 import { useChat, useWebSocket, useRealTimeChat } from "../hooks";
 import {
   Conversation,
@@ -90,7 +84,6 @@ const ChatPage: React.FC = () => {
   // Modal/form state for creating conversation
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [form] = Form.useForm();
   const navigate = useNavigate();
   const params = useParams();
 
@@ -132,7 +125,7 @@ const ChatPage: React.FC = () => {
     openNewConversationModal();
   };
 
-  const handleCreateSubmit = async (values: any) => {
+  const handleCreateSubmit = async (values: ConversationFormValues) => {
     const payload = {
       title: values.title,
       model: values.model || "gpt-5-nano",
@@ -146,7 +139,6 @@ const ChatPage: React.FC = () => {
 
       // Close modal and reset
       setIsModalVisible(false);
-      form.resetFields();
 
       // Navigate to conversation URL
       navigate(`/conversations/${conversation.id}`);
@@ -841,60 +833,12 @@ const ChatPage: React.FC = () => {
       </Layout>
 
       {/* New Conversation Modal */}
-      <Modal
-        title="Create New Conversation"
+      <ConversationForm
         open={isModalVisible}
         onCancel={() => setIsModalVisible(false)}
-        footer={null}
-        destroyOnHidden
-      >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleCreateSubmit}
-          initialValues={{ model: "gpt-5-nano", context_window: 10 }}
-        >
-          <Form.Item
-            label="Conversation Title"
-            name="title"
-            rules={[{ required: true, message: "Please enter a title" }]}
-          >
-            <Input placeholder="E.g. Project brainstorming" />
-          </Form.Item>
-
-          <Form.Item label="Model" name="model">
-            <Select>
-              <Select.Option value="gpt-5-nano">
-                gpt-5-nano (default)
-              </Select.Option>
-              <Select.Option value="gpt-4.1-nano">gpt-4.1-nano</Select.Option>
-              <Select.Option value="gpt-4.1-mini">gpt-4.1-mini</Select.Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item label="Context Window" name="context_window">
-            <Select>
-              <Select.Option value={5}>5</Select.Option>
-              <Select.Option value={10}>10</Select.Option>
-              <Select.Option value={20}>20</Select.Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item>
-            <div className={styles.modalFooter}>
-              <Button
-                onClick={() => setIsModalVisible(false)}
-                className={styles.modalCancel}
-              >
-                Cancel
-              </Button>
-              <Button type="primary" htmlType="submit" loading={isCreating}>
-                Create
-              </Button>
-            </div>
-          </Form.Item>
-        </Form>
-      </Modal>
+        onSubmit={handleCreateSubmit}
+        loading={isCreating}
+      />
     </Layout>
   );
 };

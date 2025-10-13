@@ -55,20 +55,12 @@ const socketAuthMiddleware = (socket: AuthenticatedSocket, next: (err?: Error) =
       return next(new Error("Invalid token: missing user ID"));
     }
 
-    // Log successful authentication for observability (no sensitive data)
-    try {
-      console.log(`[socket] auth success userId=${socket.userId} socketId=${socket.id}`);
-    } catch {
-      // ignore logging errors
-    }
+    // authentication succeeded; no logging
 
     next();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Authentication error";
-    // Log authentication failure
-    try {
-      console.warn(`[socket] auth failed: ${message}`);
-    } catch {}
+    // authentication failed; no logging
 
     next(new Error(message));
   }
@@ -87,13 +79,7 @@ const handleUserConnection = (socket: AuthenticatedSocket) => {
   userSockets.get(userId)!.add(socket.id);
   socketUsers.set(socket.id, userId);
 
-  // Log connection details
-  try {
-    const total = userSockets.get(userId)?.size ?? 0;
-    console.log(
-      `[socket] user connected userId=${userId} socketId=${socket.id} totalSockets=${total}`
-    );
-  } catch {}
+  // user connection handled
 };
 
 /**
@@ -113,13 +99,7 @@ const handleUserDisconnection = (socket: AuthenticatedSocket) => {
     }
     socketUsers.delete(socket.id);
 
-    // Log disconnection details
-    try {
-      const remaining = userSockets.get(userId)?.size ?? 0;
-      console.log(
-        `[socket] user disconnected userId=${userId} socketId=${socket.id} remainingSockets=${remaining}`
-      );
-    } catch {}
+    // user disconnection handled
   }
 };
 
@@ -229,10 +209,7 @@ export const initializeSocketIO = (
 
   // Handle socket connections
   io.on("connection", (socket: AuthenticatedSocket) => {
-    // Log new connection
-    try {
-      console.log(`[socket] connection established socketId=${socket.id} userId=${socket.userId}`);
-    } catch {}
+    // connection established
 
     // Handle user connection
     handleUserConnection(socket);
@@ -250,14 +227,7 @@ export const initializeSocketIO = (
       }
 
       socket.join(`conversation:${conversationId}`);
-      // Log join event
-      try {
-        const room = io.sockets.adapter.rooms.get(`conversation:${conversationId}`);
-        const roomSize = room ? room.size : 0;
-        console.log(
-          `[socket] join: userId=${socket.userId} socketId=${socket.id} conversation=${conversationId} roomSize=${roomSize}`
-        );
-      } catch {}
+      // user joined conversation room
 
       // Notify user they joined the conversation
       socket.emit("conversation:joined", { conversationId });
@@ -271,14 +241,7 @@ export const initializeSocketIO = (
       }
 
       socket.leave(`conversation:${conversationId}`);
-      // Log leave event
-      try {
-        const room = io.sockets.adapter.rooms.get(`conversation:${conversationId}`);
-        const roomSize = room ? room.size : 0;
-        console.log(
-          `[socket] leave: userId=${socket.userId} socketId=${socket.id} conversation=${conversationId} roomSizeAfterLeave=${roomSize}`
-        );
-      } catch {}
+      // user left conversation room
 
       // Notify user they left the conversation
       socket.emit("conversation:left", { conversationId });
@@ -294,12 +257,7 @@ export const initializeSocketIO = (
           return;
         }
 
-        // Log incoming message request
-        try {
-          console.log(
-            `[socket] message:send userId=${socket.userId} socketId=${socket.id} conversation=${conversationId} contentLen=${String(content).length}`
-          );
-        } catch {}
+        // incoming message received
 
         // Import message service dynamically to avoid circular imports
         const { sendMessageAndStreamResponse } = await import("./message.service.js");
@@ -313,12 +271,7 @@ export const initializeSocketIO = (
           // onChunk callback - stream to client
           (chunk: string) => {
             assistantContent += chunk;
-            // Log chunk broadcasting
-            try {
-              console.log(
-                `[socket] message:chunk conversation=${conversationId} chunkLen=${chunk.length} accumulatedLen=${assistantContent.length}`
-              );
-            } catch {}
+            // chunk received and will be broadcast
 
             // Broadcast chunk to conversation room (all users in conversation)
             io.to(`conversation:${conversationId}`).emit("message:chunk", {
@@ -401,11 +354,7 @@ export const initializeSocketIO = (
     socket.on("typing:stop", (conversationId: string) => {
       if (!conversationId) return;
 
-      try {
-        console.log(
-          `[socket] typing:stop userId=${socket.userId} socketId=${socket.id} conversation=${conversationId}`
-        );
-      } catch {}
+      // typing stop received
       // Broadcast typing stop to other users in the conversation
       socket.to(`conversation:${conversationId}`).emit("user:typing:stop", {
         userId: socket.userId,
@@ -415,11 +364,7 @@ export const initializeSocketIO = (
 
     // Handle disconnection
     socket.on("disconnect", (reason) => {
-      try {
-        console.log(
-          `[socket] disconnect socketId=${socket.id} userId=${socket.userId} reason=${reason}`
-        );
-      } catch {}
+      // socket disconnected
       handleUserDisconnection(socket);
     });
 
@@ -432,12 +377,7 @@ export const initializeSocketIO = (
         return;
       }
 
-      // Log conversation update request
-      try {
-        console.log(
-          `[socket] conversation:update userId=${socket.userId} socketId=${socket.id} conversation=${conversationId} updateKeys=${Object.keys(update).join(",")}`
-        );
-      } catch {}
+      // conversation update received
 
       // Broadcast update to ALL sockets of the same user (including sender) via user room for complete sync
       broadcastToUser(socket.userId!, "conversation:updated", {
@@ -463,12 +403,7 @@ export const initializeSocketIO = (
         return;
       }
 
-      // Log conversation creation
-      try {
-        console.log(
-          `[socket] conversation:create userId=${socket.userId} socketId=${socket.id} conversationId=${conversation?.id ?? "<unknown>"}`
-        );
-      } catch {}
+      // conversation creation received
 
       // Broadcast creation to ALL sockets of the same user (including sender) via user room for complete sync
       broadcastToUser(socket.userId!, "conversation:created", conversation);
@@ -488,13 +423,7 @@ export const initializeSocketIO = (
         return;
       }
 
-      // Log conversation deletion
-      try {
-        const usersInConversation = getConversationUsers(conversationId);
-        console.log(
-          `[socket] conversation:delete requested by userId=${socket.userId} conversation=${conversationId} usersInConversation=${usersInConversation.length}`
-        );
-      } catch {}
+      // conversation deletion requested
 
       // Broadcast deletion to ALL sockets of the same user (including sender) via user room for complete sync
       broadcastToUser(socket.userId!, "conversation:deleted", { conversationId });
@@ -505,18 +434,10 @@ export const initializeSocketIO = (
       } catch {}
 
       // Remove all sockets from the conversation room
-      try {
-        const room = io.sockets.adapter.rooms.get(`conversation:${conversationId}`);
-        const count = room ? room.size : 0;
-        console.log(
-          `[socket] removing ${count} socket(s) from room conversation:${conversationId}`
-        );
-      } catch {}
+      // removing sockets from conversation room
 
       io.in(`conversation:${conversationId}`).socketsLeave(`conversation:${conversationId}`);
-      try {
-        console.log(`[socket] conversation:${conversationId} room cleared`);
-      } catch {}
+      // conversation room cleared
     });
 
     // Handle ping/pong for connection health
@@ -526,9 +447,7 @@ export const initializeSocketIO = (
 
     // Handle connection errors
     socket.on("error", (/* error */) => {
-      try {
-        console.error(`[socket] error event on socketId=${socket.id} userId=${socket.userId}`);
-      } catch {}
+      // socket error event
     });
   });
 

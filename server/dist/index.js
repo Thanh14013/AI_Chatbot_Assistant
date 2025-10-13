@@ -77,14 +77,34 @@ app.use("/api", routes);
 const httpServer = createServer(app);
 const io = initializeSocketIO(httpServer);
 global.socketIO = io;
-// Start Server
-// Listen on configured port
-httpServer.listen(PORT, () => {
-    console.log("=".repeat(50));
-    console.log(`🚀 Server is running on port ${PORT}`);
-    console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
-    console.log(`📡 API routes base: http://localhost:${PORT}/api`);
-    console.log(`📘 Swagger UI: http://localhost:${PORT}/docs  (or /api/docs)`);
-    console.log(`🔌 WebSocket server initialized`);
-    console.log("=".repeat(50));
-});
+// Start Server with graceful EADDRINUSE handling
+// Try to bind to the configured port; if it's in use, try the next ports up to a limit.
+const START_PORT = Number(process.env.PORT || PORT) || 3000;
+const MAX_PORT_ATTEMPTS = 10;
+function tryListen(port, attemptsLeft) {
+    httpServer.once("error", (err) => {
+        if (err && err.code === "EADDRINUSE") {
+            console.warn(`Port ${port} is already in use.`);
+            if (attemptsLeft > 0) {
+                const nextPort = port + 1;
+                // Retry on next port
+                tryListen(nextPort, attemptsLeft - 1);
+            }
+            else {
+                // Minimal error output for fatal condition
+                console.warn(`All port retry attempts failed. Please free port ${port} or set PORT environment variable to a free port.`);
+                process.exit(1);
+            }
+        }
+        else {
+            // Unexpected error - surface minimal error info then exit
+            console.error(err?.message ?? "Server failed to start");
+            process.exit(1);
+        }
+    });
+    httpServer.listen(port, () => {
+        // Minimal startup info
+        console.warn(`Server listening on port ${port}`);
+    });
+}
+tryListen(START_PORT, MAX_PORT_ATTEMPTS);

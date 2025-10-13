@@ -37,7 +37,7 @@ export const authenticateAccessToken = (req, res, next) => {
     }
     catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        console.error("[authenticateAccessToken] Middleware error:", message);
+        // error logging suppressed
         res.status(500).json({
             success: false,
             message: "Access token verification failed",

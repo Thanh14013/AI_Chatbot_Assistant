@@ -1,6 +1,7 @@
 import Message from "../models/message.model.js";
 import Conversation from "../models/conversation.model.js";
 import { getChatCompletion, buildContextArray, estimateTokenCount } from "./openai.service.js";
+import { Op } from "sequelize";
 import type { CreateMessageInput, MessageResponse } from "../types/message.type.js";
 
 /**
@@ -178,7 +179,7 @@ export const sendMessageAndStreamResponse = async (
   if (!conversation) throw new Error("Conversation not found");
   if (conversation.user_id !== userId) throw new Error("Unauthorized access to conversation");
 
-  // Step 1: persist user message
+  // Step 1: persist user message FIRST
   const userTokens = estimateTokenCount(content);
   const userMessage = await Message.create({
     conversation_id: conversationId,
@@ -212,6 +213,7 @@ export const sendMessageAndStreamResponse = async (
   const systemPrompt =
     "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.";
   const disableContext = String(process.env.DISABLE_CONTEXT || "false").toLowerCase() === "true";
+
   let contextMessages: Array<{ role: string; content: string }>;
 
   if (disableContext) {
@@ -221,17 +223,30 @@ export const sendMessageAndStreamResponse = async (
       { role: "user", content: content.trim() },
     ];
   } else {
+    // Fetch the N most recent messages from the conversation (including the user message we just created)
+    // This gives us the complete conversation context up to this point
     const recentMessages = await Message.findAll({
       where: { conversation_id: conversationId },
-      order: [["createdAt", "ASC"]],
-      limit: conversation.context_window,
+      order: [["createdAt", "DESC"]], // newest-first for limiting
+      limit: conversation.context_window, // Use the conversation's context window setting
     });
-    const messagesForContext = recentMessages.map((m) => ({ role: m.role, content: m.content }));
-    contextMessages = buildContextArray(
-      messagesForContext,
-      conversation.context_window,
-      systemPrompt,
-      4000
+
+    // Reverse to chronological order (oldest -> newest)
+    const recentMessagesChron = recentMessages.reverse();
+
+    // Build context array: system prompt + N most recent messages (including current user message)
+    contextMessages = [];
+    if (systemPrompt) {
+      contextMessages.push({ role: "system", content: systemPrompt });
+    }
+
+    // Add all N recent messages in chronological order
+    // This includes the user message we just created, so no need to append it separately
+    contextMessages.push(
+      ...recentMessagesChron.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }))
     );
   }
 

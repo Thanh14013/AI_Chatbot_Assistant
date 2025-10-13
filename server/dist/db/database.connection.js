@@ -4,13 +4,18 @@ const connectToDatabase = async () => {
     try {
         // Attempt to authenticate with the database
         await sequelize.authenticate();
-        // Log success message
-        console.log("✓ Database connection established successfully.");
+        // Database connected successfully (log suppressed)
     }
     catch (error) {
-        // Log error if connection fails
-        console.error("✗ Unable to connect to the database:", error);
-        // Exit process with failure
+        // Connection error - print minimal message and exit
+        try {
+            const msg = error instanceof Error ? error.message : String(error);
+            // Use console.warn to emit minimal info without stack
+            console.warn("Unable to connect to the database:", msg);
+        }
+        catch {
+            console.warn("Unable to connect to the database");
+        }
         process.exit(1);
     }
 };

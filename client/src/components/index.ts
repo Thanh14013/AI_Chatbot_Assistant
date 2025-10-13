@@ -5,6 +5,7 @@ export { default as MessageStatus } from "./MessageStatus";
 export { default as ChatInput } from "./ChatInput";
 export { default as ConversationItem } from "./ConversationItem";
 export { default as ConversationList } from "./ConversationList";
+export { default as ConversationForm } from "./ConversationForm";
 export { default as MessageList } from "./MessageList";
 export { default as EmptyState } from "./EmptyState";
 export { default as NetworkStatus } from "./NetworkStatus";

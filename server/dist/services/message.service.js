@@ -128,7 +128,9 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
  * @param onChunk - callback invoked with each partial text chunk
  * @returns assistant message record
  */
-export const sendMessageAndStreamResponse = async (conversationId, userId, content, onChunk) => {
+export const sendMessageAndStreamResponse = async (conversationId, userId, content, onChunk, 
+// optional callback invoked immediately after the user message is persisted
+onUserMessageCreated) => {
     if (!content || content.trim().length === 0) {
         throw new Error("Message content cannot be empty");
     }
@@ -149,6 +151,23 @@ export const sendMessageAndStreamResponse = async (conversationId, userId, conte
         tokens_used: userTokens,
         model: conversation.model,
     });
+    // Invoke callback so callers (socket server) can broadcast the persisted user message
+    try {
+        if (onUserMessageCreated) {
+            await onUserMessageCreated({
+                id: userMessage.id,
+                conversation_id: userMessage.conversation_id,
+                role: userMessage.role,
+                content: userMessage.content,
+                tokens_used: userMessage.tokens_used,
+                model: userMessage.model,
+                createdAt: userMessage.createdAt,
+            });
+        }
+    }
+    catch (err) {
+        // ignore errors from user callback to avoid breaking streaming
+    }
     conversation.total_tokens_used += userTokens;
     conversation.message_count += 1;
     await conversation.save();
@@ -164,11 +183,8 @@ export const sendMessageAndStreamResponse = async (conversationId, userId, conte
         ];
     }
     else {
-        const recentMessages = await Message.findAll({
-            where: { conversation_id: conversationId },
-            order: [["createdAt", "ASC"]],
-            limit: conversation.context_window,
-        });
+        // Use the findRecentMessages method to get the most recent messages
+        const recentMessages = await Message.findRecentMessages(conversationId, conversation.context_window);
         const messagesForContext = recentMessages.map((m) => ({ role: m.role, content: m.content }));
         contextMessages = buildContextArray(messagesForContext, conversation.context_window, systemPrompt, 4000);
     }
@@ -183,23 +199,67 @@ export const sendMessageAndStreamResponse = async (conversationId, userId, conte
     if (!["gpt-5-nano"].includes(conversation.model)) {
         payload.temperature = 0.7;
     }
+    // TEMP DEBUG: Log the context messages payload to help debug missing context
+    // (Keep this temporary; remove after diagnosis)
+    try {
+        const safeMessagesPreview = contextMessages.map((m) => ({ role: m.role, content: (m.content || "").slice(0, 2000) }));
+        // Use console.debug to keep noise lower in normal logs; some environments may still show it
+        // This will print the system prompt and the most recent N messages being sent to OpenAI
+        // Note: don't log full production data for privacy-sensitive deployments
+        // eslint-disable-next-line no-console
+        console.debug("DEBUG: OpenAI payload messages preview:", JSON.stringify(safeMessagesPreview, null, 2));
+        // eslint-disable-next-line no-console
+        console.debug("DEBUG: context_messages_count:", contextMessages.length, "context_window:", conversation.context_window);
+    }
+    catch (e) {
+        // ignore logging errors
+    }
     // Call OpenAI streaming
     const openai = (await import("./openai.service.js")).default;
     const stream = await openai.chat.completions.create(payload);
     let fullContent = "";
     try {
-        console.log("[Message Service] Starting streaming...");
+        // streaming start
+        // Buffer incoming deltas and emit grouped chunks of words (e.g. 1-2 words)
+        const groupSize = 2; // emit every N words (tuneable)
+        let buffer = "";
         for await (const chunk of stream) {
             const delta = chunk.choices?.[0]?.delta;
             if (delta?.content) {
                 const text = delta.content;
                 fullContent += text;
-                console.log(`[Message Service] Chunk received: "${text}"`);
-                // invoke callback
-                await onChunk(text);
+                // Append to buffer and try to extract groups of words
+                buffer += text;
+                // Build a regex to capture the first `groupSize` words including leading whitespace
+                const groupRegex = new RegExp(`^(\\s*\\S+(?:\\s+\\S+){${groupSize - 1}})`);
+                let match = buffer.match(groupRegex);
+                // Emit as many full groups as possible
+                while (match) {
+                    const piece = match[1];
+                    // invoke callback with grouped piece
+                    try {
+                        await onChunk(piece);
+                    }
+                    catch (e) {
+                        // ignore onChunk errors to keep streaming
+                    }
+                    // remove emitted piece from buffer
+                    buffer = buffer.slice(match[0].length);
+                    match = buffer.match(groupRegex);
+                }
             }
         }
-        console.log(`[Message Service] Streaming complete. Total content length: ${fullContent.length}`);
+        // After stream finishes, flush any remaining buffer (may contain partial words)
+        if (buffer.length > 0) {
+            try {
+                await onChunk(buffer);
+            }
+            catch (e) {
+                // ignore
+            }
+            buffer = "";
+        }
+        // streaming complete
         // Estimate tokens
         const estimated_completion_tokens = estimateTokenCount(fullContent);
         const assistantMessage = await Message.create({

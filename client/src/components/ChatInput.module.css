@@ -10,16 +10,40 @@
 .inputWrapper {
   width: 100%;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+  align-items: flex-start;
+}
+
+/* Multiline layout - send button goes below textarea */
+.inputWrapper.multiline {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.inputWrapper.multiline .sendButton {
+  align-self: flex-end;
+  margin-top: 8px;
 }
 
 /* Textarea styling */
 .textarea {
   flex: 1;
+  min-width: 200px;
   font-size: 14px;
   border-radius: 8px !important;
   resize: none;
   transition: all 0.3s ease;
+  /* Show vertical scroll bar when content exceeds height */
+  overflow-y: auto;
+  /* Hide scrollbar but keep scrolling functionality */
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+/* Hide scrollbar for webkit browsers */
+.textarea::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Edge */
 }
 
 .textarea:focus {
@@ -34,8 +58,10 @@
 
 /* Send button styling */
 .sendButton {
-  height: auto;
+  height: 32px;
   min-height: 32px;
+  width: 80px;
+  flex-shrink: 0;
   padding: 4px 16px;
   border-radius: 8px !important;
   font-weight: 500;
@@ -84,7 +110,8 @@
   }
 
   .sendButton {
-    padding: 4px 12px;
+    width: 60px;
+    padding: 4px 8px;
   }
 
   .sendButton span:not(.anticon) {
