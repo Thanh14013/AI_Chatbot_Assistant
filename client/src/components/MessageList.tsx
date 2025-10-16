@@ -18,6 +18,9 @@ interface MessageListProps {
   onLoadEarlier?: () => Promise<void> | void;
   hasMore?: boolean;
   onRetry?: (message: Message) => void;
+  // For semantic search: ref to store message elements and highlighted message ID
+  messageRefs?: React.MutableRefObject<Map<string, HTMLElement>>;
+  highlightedMessageId?: string | null;
 }
 
 /**
@@ -31,6 +34,8 @@ const MessageList: React.FC<MessageListProps> = ({
   onLoadEarlier,
   hasMore = false,
   onRetry,
+  messageRefs,
+  highlightedMessageId,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -43,6 +48,9 @@ const MessageList: React.FC<MessageListProps> = ({
     id: undefined,
     content: undefined,
   });
+  // rAF refs to throttle scroll handling and wait for DOM updates
+  const scrollRafRef = useRef<number | null>(null);
+  const waitHeightRafRef = useRef<number | null>(null);
 
   /**
    * Scroll to bottom of message list
@@ -55,32 +63,71 @@ const MessageList: React.FC<MessageListProps> = ({
   };
 
   /**
+   * Robust scroll-to-bottom which retries until the container is actually
+   * scrolled to the bottom (handles timing/DOM update races).
+   */
+  const scrollToBottomWithRetry = (
+    smooth = true,
+    attempt = 0,
+    maxAttempts = 20
+  ) => {
+    // perform the immediate scroll
+    scrollToBottom(smooth);
+
+    // Quick guard: if we don't have container ref, nothing to do
+    const el = containerRef.current;
+    if (!el) return;
+
+    const check = () => {
+      if (!el) return;
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+
+      // If close enough to bottom, we're done
+      if (distanceFromBottom <= 20) return;
+
+      // Otherwise, retry a few times (use rAF for smoother timing)
+      if (attempt < maxAttempts) {
+        requestAnimationFrame(() =>
+          scrollToBottomWithRetry(smooth, attempt + 1, maxAttempts)
+        );
+      }
+    };
+
+    // Run the check on the next paint to let layout settle
+    requestAnimationFrame(check);
+  };
+
+  /**
    * Handle scroll event to show/hide scroll buttons
    */
   const handleScroll = () => {
     if (!containerRef.current) return;
 
-    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    const distanceFromTop = scrollTop;
+    // Throttle heavy work using requestAnimationFrame to avoid many setState calls
+    if (scrollRafRef.current) return;
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      const el = containerRef.current;
+      if (!el) return;
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+      const distanceFromTop = scrollTop;
 
-    // Show scroll-to-bottom button if user scrolled up more than 100px from bottom
-    const shouldShowScrollBtn = distanceFromBottom > 100;
-    setShowScrollBtn(shouldShowScrollBtn);
+      // Show scroll-to-bottom button if user scrolled up more than 100px from bottom
+      const shouldShowScrollBtn = distanceFromBottom > 100;
+      setShowScrollBtn(shouldShowScrollBtn);
 
-    // Show load-earlier button if scrolled to top (within 50px) and has more messages
-    // If user scrolls near top and hasMore, auto-load earlier messages
+      // Auto-load earlier messages when user scrolls near top
+      if (distanceFromTop < 80 && hasMore && !isLoadingEarlier) {
+        void handleLoadEarlier();
+      }
 
-    // Auto-load earlier messages when user scrolls near top
-    if (distanceFromTop < 80 && hasMore && !isLoadingEarlier) {
-      // auto-load earlier messages when the user scrolls near the top
-      void handleLoadEarlier();
-    }
-
-    // Disable auto-scroll if user manually scrolled up
-    if (shouldShowScrollBtn) {
-      setIsAutoScrollEnabled(false);
-    }
+      // Disable auto-scroll if user manually scrolled up
+      if (shouldShowScrollBtn) {
+        setIsAutoScrollEnabled(false);
+      }
+    });
   };
 
   /**
@@ -99,19 +146,46 @@ const MessageList: React.FC<MessageListProps> = ({
 
     setIsLoadingEarlier(true);
     try {
-      // Preserve scroll position: measure height before
-      const prevScrollHeight = containerRef.current.scrollHeight;
+      // Preserve scroll position: measure height and scrollTop before
+      const el = containerRef.current;
+      const prevScrollHeight = el.scrollHeight;
+      const prevScrollTop = el.scrollTop;
+
       await onLoadEarlier();
 
-      // After parent prepends messages and DOM updates, preserve scroll position
-      setTimeout(() => {
-        if (!containerRef.current) return;
-        const newHeight = containerRef.current.scrollHeight;
-        const delta = newHeight - prevScrollHeight;
-        containerRef.current.scrollTop = delta;
-      }, 100);
+      // Wait for DOM updates: poll via rAF until scrollHeight changes or timeout
+      let attempts = 0;
+      const maxAttempts = 60; // ~1s at 60fps
+
+      const waitForHeightChange = () => {
+        if (!containerRef.current) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          const step = () => {
+            attempts += 1;
+            const elNow = containerRef.current;
+            if (!elNow) return resolve();
+            const newHeight = elNow.scrollHeight;
+            if (newHeight !== prevScrollHeight || attempts >= maxAttempts) {
+              // Restore scrollTop so the content the user was looking at remains visible
+              elNow.scrollTop = Math.max(
+                0,
+                prevScrollTop + (newHeight - prevScrollHeight)
+              );
+              return resolve();
+            }
+            waitHeightRafRef.current = requestAnimationFrame(step);
+          };
+          step();
+        });
+      };
+
+      await waitForHeightChange();
     } finally {
       setIsLoadingEarlier(false);
+      if (waitHeightRafRef.current) {
+        cancelAnimationFrame(waitHeightRafRef.current);
+        waitHeightRafRef.current = null;
+      }
     }
   };
 
@@ -129,10 +203,21 @@ const MessageList: React.FC<MessageListProps> = ({
     const last = messages[currLen - 1];
 
     if (currLen > prevLen) {
+      // Detect prepend: if the last message id didn't change but length increased,
+      // it's likely older messages were prepended. In that case we should NOT
+      // auto-scroll to bottom (the load earlier handler already preserves scroll).
+      const prevLastId = prevLastMessageRef.current.id;
+      if (prevLastId && last && prevLastId === last.id) {
+        // Messages were prepended; skip auto-scroll and keep current scroll position
+        prevMessagesLengthRef.current = currLen;
+        prevLastMessageRef.current = { id: last?.id, content: last?.content };
+        return;
+      }
+
       if (last && (last.role === "user" || last.role === "assistant")) {
         // Force scroll to bottom (smooth)
         setTimeout(() => {
-          scrollToBottom(true);
+          scrollToBottomWithRetry(true);
         }, 50);
 
         // Re-enable auto-scroll so subsequent messages also follow
@@ -140,7 +225,7 @@ const MessageList: React.FC<MessageListProps> = ({
       } else if (isAutoScrollEnabled) {
         // fallback: preserve previous behavior for other message types
         setTimeout(() => {
-          scrollToBottom(false);
+          scrollToBottomWithRetry(false);
         }, 100);
       }
     } else {
@@ -154,12 +239,12 @@ const MessageList: React.FC<MessageListProps> = ({
         (prevLastMessageRef.current.content || "") !== (last.content || "")
       ) {
         setTimeout(() => {
-          scrollToBottom(true);
+          scrollToBottomWithRetry(true);
         }, 50);
       } else if (isAutoScrollEnabled && currLen > 0) {
         // fallback: preserve previous behavior
         setTimeout(() => {
-          scrollToBottom(false);
+          scrollToBottomWithRetry(false);
         }, 100);
       }
     }
@@ -172,15 +257,15 @@ const MessageList: React.FC<MessageListProps> = ({
   }, [messages, isAutoScrollEnabled]);
 
   /**
-   * Scroll to bottom on initial load
+   * Scroll to bottom on initial load (use retry to handle async DOM updates)
    */
   useEffect(() => {
-    scrollToBottom(false);
+    scrollToBottomWithRetry(false);
   }, []);
 
   // Listen for external requests to scroll to bottom (e.g. when a conversation loads)
   useEffect(() => {
-    const onScrollRequest = () => scrollToBottom(false);
+    const onScrollRequest = () => scrollToBottomWithRetry(false);
     window.addEventListener("messages:scrollToBottom", onScrollRequest);
     return () =>
       window.removeEventListener("messages:scrollToBottom", onScrollRequest);
@@ -215,7 +300,19 @@ const MessageList: React.FC<MessageListProps> = ({
 
         {/* Render messages */}
         {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} onRetry={onRetry} />
+          <div
+            key={message.id}
+            ref={(el) => {
+              if (el && messageRefs) {
+                messageRefs.current.set(message.id, el);
+              }
+            }}
+            className={
+              highlightedMessageId === message.id ? styles.highlighted : ""
+            }
+          >
+            <MessageBubble message={message} onRetry={onRetry} />
+          </div>
         ))}
 
         {/* Invisible div to scroll to */}

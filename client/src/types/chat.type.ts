@@ -49,6 +49,8 @@ export interface Conversation {
 export interface ConversationListItem {
   id: string;
   title: string;
+  model?: string; // Added for edit functionality
+  context_window?: number; // Added for edit functionality
   message_count: number;
   updatedAt: string | Date;
 }

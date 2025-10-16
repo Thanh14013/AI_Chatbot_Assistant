@@ -2,6 +2,7 @@ import { Router } from "express";
 import { authenticateAccessToken } from "../middlewares/authJwt.js";
 import { create, getAll, getOne, update, remove } from "../controllers/conversation.controller.js";
 import { getMessages, sendMessageStream } from "../controllers/message.controller.js";
+import { semanticSearch } from "../controllers/semantic-search.controller.js";
 
 const router = Router();
 
@@ -43,5 +44,14 @@ router.get("/:id/messages", getMessages);
 // Send a user message and stream AI response via Server-Sent Events (SSE)
 // POST /api/conversations/:id/messages/stream
 router.post("/:id/messages/stream", sendMessageStream);
+
+/**
+ * Semantic Search Route
+ */
+
+// Semantic search within a conversation
+// POST /api/conversations/:id/search
+// Body: { query: string, limit?: number, similarity_threshold?: number }
+router.post("/:id/search", semanticSearch);
 
 export default router;

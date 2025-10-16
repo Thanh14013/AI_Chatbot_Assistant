@@ -11,6 +11,7 @@ import {
   Modal,
   Input,
   message,
+  Tooltip,
 } from "antd";
 import { useNavigate } from "react-router-dom";
 import {
@@ -24,21 +25,22 @@ import {
   deleteConversation,
 } from "../services/chat.service";
 import { websocketService } from "../services/websocket.service";
+import ConversationForm, { ConversationFormValues } from "./ConversationForm";
 import type { ConversationListItem } from "../types/chat.type";
 import styles from "./ConversationList.module.css";
 
 // Memoized item actions to avoid recreating menu items on every render
 const ConversationItemActions: React.FC<{
   conversation: any;
-  openRename: (c: any, e?: React.MouseEvent) => void;
+  openEdit: (c: any, e?: React.MouseEvent) => void;
   openDelete: (c: any, e?: React.MouseEvent) => void;
-}> = React.memo(({ conversation, openRename, openDelete }) => {
+}> = React.memo(({ conversation, openEdit, openDelete }) => {
   const items = React.useMemo(
     () => [
       {
-        key: "rename",
-        label: "Rename",
-        onClick: () => openRename(conversation),
+        key: "edit",
+        label: "Edit",
+        onClick: () => openEdit(conversation),
       },
       {
         key: "delete",
@@ -48,7 +50,7 @@ const ConversationItemActions: React.FC<{
       },
     ],
     // conversation object reference may change, but the handlers are stable
-    [conversation, openRename, openDelete]
+    [conversation, openEdit, openDelete]
   );
 
   return (
@@ -71,6 +73,7 @@ interface ConversationListProps {
   onLoadMore?: () => Promise<void> | void;
   hasMore?: boolean;
   isLoadingMore?: boolean;
+  collapsed?: boolean;
 }
 
 const ConversationList: React.FC<ConversationListProps> = ({
@@ -84,14 +87,14 @@ const ConversationList: React.FC<ConversationListProps> = ({
   onLoadMore,
   hasMore = false,
   isLoadingMore = false,
+  collapsed = false,
 }) => {
   const navigate = useNavigate();
-  // State for rename modal (single shared modal)
-  const [renameModal, setRenameModal] = React.useState<{
+  // State for edit modal (single shared modal)
+  const [editModal, setEditModal] = React.useState<{
     visible: boolean;
-    id: string | null;
-    value: string;
-  }>({ visible: false, id: null, value: "" });
+    conversation: ConversationListItem | null;
+  }>({ visible: false, conversation: null });
 
   // State for delete confirmation modal (controlled, avoid Modal.confirm static API)
   const [deleteModal, setDeleteModal] = React.useState<{
@@ -100,56 +103,50 @@ const ConversationList: React.FC<ConversationListProps> = ({
     title: string;
   }>({ visible: false, id: null, title: "" });
 
-  // Track which conversation is currently processing an action (rename/delete)
+  // Track which conversation is currently processing an action (edit/delete)
   const [processingId, setProcessingId] = React.useState<string | null>(null);
 
-  const openRename = (
+  const openEdit = (
     conversation: ConversationListItem,
     e?: React.MouseEvent
   ) => {
     e?.stopPropagation();
-    setRenameModal({
+    setEditModal({
       visible: true,
-      id: conversation.id,
-      value: conversation.title || "",
+      conversation,
     });
   };
 
-  const handleRenameOk = async () => {
-    const id = renameModal.id;
-    const trimmed = (renameModal.value || "").trim();
-    if (!id) return;
-    if (!trimmed) {
-      message.error("Title cannot be empty");
-      return;
-    }
+  const handleEditSubmit = async (values: ConversationFormValues) => {
+    const conversation = editModal.conversation;
+    if (!conversation) return;
 
-    setProcessingId(id);
+    setProcessingId(conversation.id);
     try {
-      await updateConversation(id, { title: trimmed });
-      setRenameModal({ visible: false, id: null, value: "" });
+      await updateConversation(conversation.id, values);
+      setEditModal({ visible: false, conversation: null });
       onRefresh();
-      message.success("Conversation renamed");
+      message.success("Conversation updated");
 
       // Notify WebSocket for multi-tab sync
       if (websocketService.isConnected()) {
         try {
-          websocketService.notifyConversationUpdated(id, {
-            title: trimmed,
+          websocketService.notifyConversationUpdated(conversation.id, {
+            ...values,
             updatedAt: new Date().toISOString(),
           });
         } catch {}
       }
     } catch (err) {
-      message.error("Failed to rename conversation");
+      message.error("Failed to update conversation");
     } finally {
       setProcessingId(null);
     }
   };
 
-  const handleRenameCancel = (e?: React.MouseEvent) => {
+  const handleEditCancel = (e?: React.MouseEvent) => {
     e?.stopPropagation();
-    setRenameModal({ visible: false, id: null, value: "" });
+    setEditModal({ visible: false, conversation: null });
   };
 
   const openDelete = (
@@ -283,7 +280,11 @@ const ConversationList: React.FC<ConversationListProps> = ({
   }
 
   return (
-    <div className={styles.conversationsList}>
+    <div
+      className={`${styles.conversationsList} ${
+        collapsed ? styles.collapsed : ""
+      }`}
+    >
       <div
         className={styles.conversationsScrollContainer}
         onScroll={(e) => {
@@ -302,54 +303,71 @@ const ConversationList: React.FC<ConversationListProps> = ({
           dataSource={conversations}
           renderItem={(conversation) => {
             const isActive = currentConversationId === conversation.id;
+            const conversationContent = (
+              <div
+                className={`${styles.conversationItem} ${
+                  isActive ? styles.active : ""
+                } ${collapsed ? styles.collapsed : ""}`}
+                onClick={() => onSelectConversation(conversation.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSelectConversation(conversation.id);
+                  }
+                }}
+              >
+                <Avatar
+                  shape="square"
+                  size={collapsed ? 32 : 40}
+                  className={styles.avatar}
+                  icon={<MessageOutlined />}
+                />
+
+                {!collapsed && (
+                  <>
+                    <div className={styles.conversationMeta}>
+                      <div className={styles.titleRow}>
+                        {/* Use CSS-based ellipsis (avoid AntD EllipsisMeasure which can trigger layout-effect loops) */}
+                        <span className={styles.conversationTitle}>
+                          {conversation.title || "Untitled"}
+                        </span>
+                        <span className={styles.timeText}>
+                          {formatTime(conversation.updatedAt)}
+                        </span>
+                      </div>
+                      {/* Removed message count as requested */}
+                    </div>
+
+                    {/* three-dot menu */}
+                    <div
+                      className={styles.itemActions}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <ConversationItemActions
+                        conversation={conversation}
+                        openEdit={openEdit}
+                        openDelete={openDelete}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+
             return (
               <List.Item className={styles.listItem}>
-                <div
-                  className={`${styles.conversationItem} ${
-                    isActive ? styles.active : ""
-                  }`}
-                  onClick={() => onSelectConversation(conversation.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onSelectConversation(conversation.id);
-                    }
-                  }}
-                >
-                  <Avatar
-                    shape="square"
-                    size={40}
-                    className={styles.avatar}
-                    icon={<MessageOutlined />}
-                  />
-
-                  <div className={styles.conversationMeta}>
-                    <div className={styles.titleRow}>
-                      {/* Use CSS-based ellipsis (avoid AntD EllipsisMeasure which can trigger layout-effect loops) */}
-                      <span className={styles.conversationTitle}>
-                        {conversation.title || "Untitled"}
-                      </span>
-                      <span className={styles.timeText}>
-                        {formatTime(conversation.updatedAt)}
-                      </span>
-                    </div>
-                    {/* Removed message count as requested */}
-                  </div>
-
-                  {/* three-dot menu */}
-                  <div
-                    className={styles.itemActions}
-                    onClick={(e) => e.stopPropagation()}
+                {collapsed ? (
+                  <Tooltip
+                    title={conversation.title || "Untitled"}
+                    placement="right"
                   >
-                    <ConversationItemActions
-                      conversation={conversation}
-                      openRename={openRename}
-                      openDelete={openDelete}
-                    />
-                  </div>
-                </div>
+                    {conversationContent}
+                  </Tooltip>
+                ) : (
+                  conversationContent
+                )}
               </List.Item>
             );
           }}
@@ -361,25 +379,25 @@ const ConversationList: React.FC<ConversationListProps> = ({
           </div>
         )}
       </div>
-      {/* Shared Rename Modal */}
-      <Modal
-        title="Rename conversation"
-        open={renameModal.visible}
-        onOk={handleRenameOk}
-        onCancel={handleRenameCancel}
-        okButtonProps={{
-          loading: Boolean(processingId && processingId === renameModal.id),
-        }}
-      >
-        <Input
-          value={renameModal.value}
-          onChange={(e) =>
-            setRenameModal((s) => ({ ...s, value: e.target.value }))
-          }
-          onPressEnter={handleRenameOk}
-          placeholder="Conversation title"
-        />
-      </Modal>
+      {/* Shared Edit Modal */}
+      <ConversationForm
+        open={editModal.visible}
+        onCancel={handleEditCancel}
+        onSubmit={handleEditSubmit}
+        loading={Boolean(
+          processingId && processingId === editModal.conversation?.id
+        )}
+        mode="edit"
+        initialValues={
+          editModal.conversation
+            ? {
+                title: editModal.conversation.title,
+                model: editModal.conversation.model || "gpt-5-nano",
+                context_window: editModal.conversation.context_window || 10,
+              }
+            : undefined
+        }
+      />
 
       {/* Controlled Delete Modal (replaces Modal.confirm to be compatible with AntD v5 + React 19) */}
       <Modal

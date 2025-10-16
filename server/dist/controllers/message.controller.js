@@ -38,6 +38,8 @@ export const getMessages = async (req, res) => {
         // Extract pagination params
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 30;
+        // Optional: load messages before a specific message id (infinite scroll)
+        const before = req.query.before;
         // Validate pagination params
         if (page < 1 || limit < 1 || limit > 100) {
             res.status(400).json({
@@ -47,7 +49,7 @@ export const getMessages = async (req, res) => {
             return;
         }
         // Get messages
-        const result = await getConversationMessages(conversationId, userId, page, limit);
+        const result = await getConversationMessages(conversationId, userId, page, limit, before);
         // Send success response
         res.status(200).json({
             success: true,

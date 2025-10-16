@@ -6,6 +6,7 @@ import type { ConversationListItem } from "../types/chat.type";
 import SidebarHeader from "./SidebarHeader";
 import ConversationList from "./ConversationList";
 import UserSection from "./UserSection";
+import { SearchBar } from "./SearchBar";
 import styles from "./Sidebar.module.css";
 
 const { Sider } = Layout;
@@ -14,12 +15,14 @@ interface SidebarProps {
   currentConversationId?: string | null;
   onSelectConversation?: (id: string) => void;
   onNewConversation?: () => void;
+  onHighlightMessage?: (messageId: string) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
   currentConversationId,
   onSelectConversation,
   onNewConversation,
+  onHighlightMessage,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const { user } = useAuth();
@@ -30,6 +33,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     ConversationListItem[]
   >([]);
   const [searchQuery, setSearchQuery] = useState("");
+  // semantic search results returned from header (optional)
+  const [semanticResults, setSemanticResults] = useState<
+    import("../services/searchService").ConversationSearchResult[] | null
+  >(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
@@ -95,17 +102,25 @@ const Sidebar: React.FC<SidebarProps> = ({
     await loadConversations({ page: page + 1 });
   }, [hasMore, isLoadingMore, loadConversations, page]);
 
-  // Filter conversations based on search query
+  // Determine which conversations to show in the sidebar.
+  // Only use semantic search results provided by the header. Do NOT
+  // perform any client-side filtering by conversation title here — the
+  // global search is semantic-only per product decision.
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredConversations(conversations);
-    } else {
-      const filtered = conversations.filter((conv) =>
-        conv.title.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredConversations(filtered);
+    if (semanticResults && semanticResults.length > 0) {
+      const mapped = semanticResults.map((r) => ({
+        id: r.conversation_id,
+        title: r.conversation_title,
+        message_count: r.message_count,
+        updatedAt: r.updated_at,
+      })) as ConversationListItem[];
+      setFilteredConversations(mapped);
+      return;
     }
-  }, [searchQuery, conversations]);
+
+    // Otherwise show the full conversations list (no local title filtering)
+    setFilteredConversations(conversations);
+  }, [conversations, semanticResults]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -159,6 +174,10 @@ const Sidebar: React.FC<SidebarProps> = ({
           onSearchChange={handleSearchChange}
           collapsed={collapsed}
           onToggle={() => setCollapsed((c) => !c)}
+          // receive semantic search results from header
+          onSemanticResults={(results) => setSemanticResults(results)}
+          onHighlightMessage={onHighlightMessage}
+          currentConversationId={currentConversationId}
         />
       </div>
 
@@ -175,12 +194,13 @@ const Sidebar: React.FC<SidebarProps> = ({
           onLoadMore={loadMoreConversations}
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}
+          collapsed={collapsed}
         />
       </div>
 
       {/* Bottom Section - User Info */}
       <div className={styles.bottomSection}>
-        <UserSection user={user} />
+        <UserSection user={user} collapsed={collapsed} />
       </div>
     </Sider>
   );

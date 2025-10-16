@@ -6,11 +6,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Layout, Typography, App } from "antd";
 import { createConversation as apiCreateConversation } from "../services/chat.service";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import MessageList from "../components/MessageList";
 import ChatInput from "../components/ChatInput";
 import EmptyState from "../components/EmptyState";
+import { ConversationSearch } from "../components/ConversationSearch";
 import ConversationForm, {
   ConversationFormValues,
 } from "../components/ConversationForm";
@@ -22,6 +23,7 @@ import {
 } from "../types/chat.type";
 import { websocketService } from "../services/websocket.service";
 import { NetworkStatus, TypingIndicator } from "../components";
+import { searchConversation } from "../services/searchService";
 import styles from "./ChatPage.module.css";
 
 const { Content } = Layout;
@@ -35,6 +37,12 @@ const ChatPage: React.FC = () => {
   const { message: antdMessage } = App.useApp();
   // Search state
   const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // Ref to store message DOM elements for scroll-to functionality
+  const messageRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const [highlightedMessageId, setHighlightedMessageId] = useState<
+    string | null
+  >(null);
 
   const {
     conversations,
@@ -86,6 +94,7 @@ const ChatPage: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   const navigate = useNavigate();
   const params = useParams();
+  const location = useLocation();
 
   /**
    * Handle search input change
@@ -101,7 +110,10 @@ const ChatPage: React.FC = () => {
       const svc = await import("../services/chat.service");
       const result = await svc.getMessages(conversationId, page, 20);
       if (page === 1) {
-        // prepend older messages
+        // initial load: replace messages with the most recent page
+        setMessages(result.messages);
+      } else {
+        // older pages (page > 1): prepend older messages before existing list
         setMessages((prev) => [...result.messages, ...prev]);
       }
       setMessagesPage(result.pagination.page);
@@ -111,6 +123,28 @@ const ChatPage: React.FC = () => {
       setMessages([]);
     } finally {
       setIsLoadingMessages(false);
+    }
+  };
+
+  /**
+   * Handle search result click - scroll to message and highlight
+   */
+  const handleSearchResultClick = (messageId: string) => {
+    const messageElement = messageRefs.current.get(messageId);
+    if (messageElement) {
+      // Scroll to message
+      messageElement.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+
+      // Add highlight
+      setHighlightedMessageId(messageId);
+
+      // Remove highlight after 3 seconds
+      setTimeout(() => {
+        setHighlightedMessageId(null);
+      }, 3000);
     }
   };
 
@@ -218,18 +252,95 @@ const ChatPage: React.FC = () => {
         setMessagesHasMore(
           result.pagination.page < result.pagination.totalPages
         );
-        // Ensure message list scrolls to bottom when conversation loads.
-        // Dispatch immediately and again after a short delay to cover rendering timing.
-        try {
-          window.dispatchEvent(new Event("messages:scrollToBottom"));
-        } catch {}
-        try {
-          setTimeout(() => {
-            try {
-              window.dispatchEvent(new Event("messages:scrollToBottom"));
-            } catch {}
-          }, 120);
-        } catch {}
+        // If navigation included a highlight param, try to scroll to that message
+        const searchParams = new URLSearchParams(location.search);
+        const highlightParam = searchParams.get("highlight");
+        if (highlightParam) {
+          // Try to find and scroll to the highlighted message. If not present in
+          // the initial page, attempt to load older pages (pagination) up to a limit.
+          const tryScroll = async (
+            pageToTry = result.pagination.page,
+            attemptsLeft = 6
+          ) => {
+            // Give React a moment to render refs
+            await new Promise((r) => setTimeout(r, 120));
+            const el = messageRefs.current.get(highlightParam);
+            if (el) {
+              handleSearchResultClick(highlightParam);
+              // Remove highlight param from URL to avoid repeated actions
+              try {
+                const url = new URL(window.location.href);
+                url.searchParams.delete("highlight");
+                window.history.replaceState({}, "", url.toString());
+              } catch {}
+              return true;
+            }
+
+            // If not found and there are more pages, load next (older) page and retry
+            if (attemptsLeft > 0 && pageToTry < result.pagination.totalPages) {
+              try {
+                await loadMessages(convId, pageToTry + 1);
+                return tryScroll(pageToTry + 1, attemptsLeft - 1);
+              } catch {
+                return false;
+              }
+            }
+
+            return false;
+          };
+
+          void tryScroll();
+        }
+        // If navigation included a q param (from global search), and highlight not found,
+        // call the conversation-local search API to find the bestMatch and highlight it.
+        const qParam = searchParams.get("q");
+        if (qParam && !highlightParam) {
+          // Only proceed if no highlight param (to avoid double processing)
+          console.log("[ChatPage] Processing ?q param:", qParam);
+          try {
+            const convSearch = await searchConversation(convId, {
+              query: qParam,
+              limit: 1,
+              contextMessages: 2,
+            });
+            const bestMatch = convSearch.bestMatch;
+            console.log("[ChatPage] Conversation search result:", bestMatch);
+            if (bestMatch && bestMatch.message_id) {
+              // Wait a bit for refs to be set, then try to highlight
+              setTimeout(() => {
+                console.log(
+                  "[ChatPage] Calling handleSearchResultClick for",
+                  bestMatch.message_id
+                );
+                handleSearchResultClick(bestMatch.message_id);
+              }, 200);
+              // Remove q param from URL to avoid repeated actions
+              try {
+                const url = new URL(window.location.href);
+                url.searchParams.delete("q");
+                window.history.replaceState({}, "", url.toString());
+              } catch {}
+            }
+          } catch (err) {
+            // Non-fatal: conversation-local search failed, no highlight
+            console.debug("ChatPage: conversation-local search failed", err);
+          }
+        }
+        // Ensure message list scrolls to bottom when conversation loads,
+        // but skip if we have a highlight or q param (to avoid conflict with highlight scroll).
+        const hasHighlightIntent = highlightParam || qParam;
+        if (!hasHighlightIntent) {
+          try {
+            window.dispatchEvent(new Event("messages:scrollToBottom"));
+          } catch {}
+          try {
+            setTimeout(() => {
+              try {
+                window.dispatchEvent(new Event("messages:scrollToBottom"));
+              } catch {}
+            }, 120);
+          } catch {}
+        }
       } catch (err) {
         antdMessage.error("Failed to load conversation");
         setCurrentConversation(null);
@@ -504,6 +615,13 @@ const ChatPage: React.FC = () => {
           localStatus: "pending",
         };
         setMessages((prev) => [...prev, userMsg]);
+        // scroll to show optimistic user message
+        try {
+          setTimeout(
+            () => window.dispatchEvent(new Event("messages:scrollToBottom")),
+            40
+          );
+        } catch {}
 
         // Don't add typing indicator here - server will broadcast ai:typing:start to all clients
         await sendRealtimeMessage(content);
@@ -532,6 +650,15 @@ const ChatPage: React.FC = () => {
           )
         );
         setMessages((prev) => prev.filter((msg) => !msg.isTyping));
+
+        // Dispatch ai:typing:stop to reset isAITyping state if WebSocket failed
+        try {
+          window.dispatchEvent(
+            new CustomEvent("ai:typing:stop", {
+              detail: { conversationId: currentConversation.id },
+            })
+          );
+        } catch {}
       }
     }
 
@@ -566,6 +693,13 @@ const ChatPage: React.FC = () => {
       isTyping: true,
     };
     setMessages((prev) => [...prev, typingMsg]);
+    // scroll so typing placeholder is visible
+    try {
+      setTimeout(
+        () => window.dispatchEvent(new Event("messages:scrollToBottom")),
+        60
+      );
+    } catch {}
 
     (async () => {
       try {
@@ -610,6 +744,15 @@ const ChatPage: React.FC = () => {
               return replacedList;
             });
 
+            // ensure final messages are visible after server completes
+            try {
+              setTimeout(
+                () =>
+                  window.dispatchEvent(new Event("messages:scrollToBottom")),
+                40
+              );
+            } catch {}
+
             // refresh conversation metadata if present and force reload of conversation list
             if ((result as any)?.conversation) {
               const conv = (result as any).conversation;
@@ -644,6 +787,15 @@ const ChatPage: React.FC = () => {
                 console.debug("move/update conversation failed:", err);
               }
             }
+
+            // Dispatch ai:typing:stop to reset isAITyping state (for HTTP fallback)
+            try {
+              window.dispatchEvent(
+                new CustomEvent("ai:typing:stop", {
+                  detail: { conversationId: currentConversation.id },
+                })
+              );
+            } catch {}
           },
           (err) => {
             antdMessage.error("Failed to stream AI response");
@@ -655,6 +807,15 @@ const ChatPage: React.FC = () => {
             );
             // remove typing placeholder
             setMessages((prev) => prev.filter((m) => m.id !== typingId));
+
+            // Dispatch ai:typing:stop to reset isAITyping state (for HTTP fallback error)
+            try {
+              window.dispatchEvent(
+                new CustomEvent("ai:typing:stop", {
+                  detail: { conversationId: currentConversation.id },
+                })
+              );
+            } catch {}
           }
         );
       } catch (err) {
@@ -665,6 +826,15 @@ const ChatPage: React.FC = () => {
           )
         );
         setMessages((prev) => prev.filter((m) => m.id !== typingId));
+
+        // Dispatch ai:typing:stop to reset isAITyping state (for HTTP fallback error)
+        try {
+          window.dispatchEvent(
+            new CustomEvent("ai:typing:stop", {
+              detail: { conversationId: currentConversation.id },
+            })
+          );
+        } catch {}
       } finally {
         setIsSendingMessage(false);
       }
@@ -758,6 +928,15 @@ const ChatPage: React.FC = () => {
             } catch {}
             refreshConversations().catch(() => {});
           }
+
+          // Dispatch ai:typing:stop to reset isAITyping state (for retry success)
+          try {
+            window.dispatchEvent(
+              new CustomEvent("ai:typing:stop", {
+                detail: { conversationId: currentConversation.id },
+              })
+            );
+          } catch {}
         },
         (err) => {
           antdMessage.error("Retry failed");
@@ -766,6 +945,15 @@ const ChatPage: React.FC = () => {
               m.id === failedMessage.id ? { ...m, localStatus: "failed" } : m
             )
           );
+
+          // Dispatch ai:typing:stop to reset isAITyping state (for retry error)
+          try {
+            window.dispatchEvent(
+              new CustomEvent("ai:typing:stop", {
+                detail: { conversationId: currentConversation.id },
+              })
+            );
+          } catch {}
         }
       );
     } catch (err) {
@@ -775,6 +963,15 @@ const ChatPage: React.FC = () => {
           m.id === failedMessage.id ? { ...m, localStatus: "failed" } : m
         )
       );
+
+      // Dispatch ai:typing:stop to reset isAITyping state (for retry catch error)
+      try {
+        window.dispatchEvent(
+          new CustomEvent("ai:typing:stop", {
+            detail: { conversationId: currentConversation.id },
+          })
+        );
+      } catch {}
     } finally {
       setIsSendingMessage(false);
     }
@@ -788,6 +985,7 @@ const ChatPage: React.FC = () => {
           currentConversationId={currentConversation?.id || null}
           onSelectConversation={handleSelectConversation}
           onNewConversation={handleNewConversation}
+          onHighlightMessage={handleSearchResultClick}
         />
 
         {/* Main content area */}
@@ -801,10 +999,20 @@ const ChatPage: React.FC = () => {
             <>
               {/* Conversation header */}
               <div className={styles.conversationHeader}>
-                <Title level={4} className={styles.conversationTitle}>
-                  {currentConversation.title}
-                </Title>
-                <NetworkStatus position="inline" />
+                <div className={styles.conversationHeaderLeft}>
+                  <Title level={4} className={styles.conversationTitle}>
+                    {currentConversation.title}
+                  </Title>
+                  <NetworkStatus position="inline" />
+                </div>
+
+                {/* Semantic Search within conversation */}
+                <div className={styles.conversationSearchContainer}>
+                  <ConversationSearch
+                    conversationId={currentConversation.id}
+                    onResultClick={handleSearchResultClick}
+                  />
+                </div>
               </div>
 
               {/* Messages list */}
@@ -815,6 +1023,8 @@ const ChatPage: React.FC = () => {
                 onLoadEarlier={loadEarlier}
                 hasMore={messagesHasMore}
                 onRetry={handleRetryMessage}
+                messageRefs={messageRefs}
+                highlightedMessageId={highlightedMessageId}
               />
 
               {/* Chat input - disable while AI is typing to mirror sender tab behaviour */}

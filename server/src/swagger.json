@@ -3,12 +3,16 @@
   "info": {
     "title": "AI Chatbot Assistant API",
     "version": "1.0.0",
-    "description": "API documentation for authentication, conversations, and messaging endpoints (Chat API)"
+    "description": "API documentation for authentication, conversations, messaging endpoints (HTTP REST API) and WebSocket real-time events"
   },
   "servers": [
     {
       "url": "http://localhost:3000/api",
-      "description": "Local development server"
+      "description": "Local development server (HTTP API)"
+    },
+    {
+      "url": "ws://localhost:3000",
+      "description": "Local development server (WebSocket)"
     }
   ],
   "paths": {
@@ -413,6 +417,318 @@
           }
         }
       }
+    }
+  },
+  "x-socket-events": {
+    "description": "WebSocket/Socket.IO Real-time Events Documentation",
+    "authentication": {
+      "description": "All WebSocket connections require JWT authentication via token in auth header, query parameter, or handshake auth",
+      "token": "Bearer <access-token>",
+      "example": "socket.auth({ token: 'your-jwt-token' })"
+    },
+    "connection": {
+      "url": "ws://localhost:3000",
+      "description": "WebSocket connection endpoint with Socket.IO",
+      "authentication_required": true,
+      "events": {
+        "connection": {
+          "description": "Client connects to WebSocket server",
+          "direction": "client->server",
+          "authentication": "Required"
+        },
+        "disconnect": {
+          "description": "Client disconnects from WebSocket server",
+          "direction": "client->server"
+        }
+      }
+    },
+    "client-to-server-events": {
+      "join:conversation": {
+        "summary": "Join a conversation room for real-time updates",
+        "description": "Client joins a conversation room to receive real-time messages and updates",
+        "parameters": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Conversation ID to join",
+            "required": true
+          }
+        },
+        "responses": {
+          "conversation:joined": {
+            "description": "Confirmation that client joined the conversation",
+            "data": {
+              "conversationId": "string"
+            }
+          }
+        }
+      },
+      "leave:conversation": {
+        "summary": "Leave a conversation room",
+        "description": "Client leaves a conversation room",
+        "parameters": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Conversation ID to leave",
+            "required": true
+          }
+        },
+        "responses": {
+          "conversation:left": {
+            "description": "Confirmation that client left the conversation",
+            "data": {
+              "conversationId": "string"
+            }
+          }
+        }
+      },
+      "message:send": {
+        "summary": "Send a message and stream AI response",
+        "description": "Send a user message and receive streaming AI response in real-time",
+        "parameters": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Conversation ID",
+            "required": true
+          },
+          "content": {
+            "type": "string",
+            "description": "Message content",
+            "required": true
+          }
+        },
+        "responses": {
+          "message:chunk": {
+            "description": "Streaming AI response chunks",
+            "data": {
+              "conversationId": "string",
+              "chunk": "string",
+              "content": "string (accumulated)"
+            }
+          },
+          "message:complete": {
+            "description": "Complete message data after streaming finishes",
+            "data": {
+              "userMessage": "Message object",
+              "assistantMessage": "Message object",
+              "conversation": "Conversation object"
+            }
+          }
+        }
+      },
+      "conversation:create": {
+        "summary": "Broadcast conversation creation",
+        "description": "Notify other client instances about new conversation creation",
+        "parameters": {
+          "conversation": {
+            "type": "object",
+            "description": "Complete conversation object",
+            "required": true
+          }
+        }
+      },
+      "conversation:update": {
+        "summary": "Broadcast conversation updates",
+        "description": "Notify other client instances about conversation updates",
+        "parameters": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid",
+            "required": true
+          },
+          "update": {
+            "type": "object",
+            "description": "Update data (title, model, etc.)",
+            "required": true
+          }
+        }
+      },
+      "conversation:delete": {
+        "summary": "Broadcast conversation deletion",
+        "description": "Notify other client instances about conversation deletion",
+        "parameters": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid",
+            "required": true
+          }
+        }
+      },
+      "typing:start": {
+        "summary": "Start typing indicator",
+        "description": "Notify other users that this user is typing",
+        "parameters": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid",
+            "required": true
+          }
+        }
+      },
+      "typing:stop": {
+        "summary": "Stop typing indicator",
+        "description": "Notify other users that this user stopped typing",
+        "parameters": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid",
+            "required": true
+          }
+        }
+      },
+      "ping": {
+        "summary": "Connection health check",
+        "description": "Send ping to check connection health",
+        "responses": {
+          "pong": {
+            "description": "Server responds with pong"
+          }
+        }
+      }
+    },
+    "server-to-client-events": {
+      "message:chunk": {
+        "summary": "AI response streaming chunks",
+        "description": "Real-time streaming of AI response chunks",
+        "data": {
+          "conversationId": "string",
+          "chunk": "string",
+          "content": "string (accumulated content)"
+        }
+      },
+      "message:new": {
+        "summary": "New message notification",
+        "description": "Notify about new messages from other users/devices",
+        "data": {
+          "conversationId": "string",
+          "message": "Message object"
+        }
+      },
+      "message:complete": {
+        "summary": "Complete message data",
+        "description": "Final message data after streaming completes",
+        "data": {
+          "userMessage": "Message object",
+          "assistantMessage": "Message object",
+          "conversation": "Conversation object"
+        }
+      },
+      "conversation:joined": {
+        "summary": "Conversation join confirmation",
+        "description": "Confirm client successfully joined conversation room",
+        "data": {
+          "conversationId": "string"
+        }
+      },
+      "conversation:left": {
+        "summary": "Conversation leave confirmation",
+        "description": "Confirm client successfully left conversation room",
+        "data": {
+          "conversationId": "string"
+        }
+      },
+      "conversation:created": {
+        "summary": "Conversation creation notification",
+        "description": "Notify about new conversation creation",
+        "data": "Conversation object"
+      },
+      "conversation:updated": {
+        "summary": "Conversation update notification",
+        "description": "Notify about conversation updates",
+        "data": {
+          "conversationId": "string",
+          "update": "object"
+        }
+      },
+      "conversation:deleted": {
+        "summary": "Conversation deletion notification",
+        "description": "Notify about conversation deletion",
+        "data": {
+          "conversationId": "string"
+        }
+      },
+      "conversation:activity": {
+        "summary": "Conversation activity update",
+        "description": "Update conversation activity for list refresh",
+        "data": {
+          "conversationId": "string",
+          "lastActivity": "string",
+          "messageCount": "number",
+          "totalTokens": "number"
+        }
+      },
+      "user:typing:start": {
+        "summary": "User typing indicator start",
+        "description": "Show typing indicator for other users",
+        "data": {
+          "userId": "string",
+          "conversationId": "string"
+        }
+      },
+      "user:typing:stop": {
+        "summary": "User typing indicator stop",
+        "description": "Hide typing indicator for other users",
+        "data": {
+          "userId": "string",
+          "conversationId": "string"
+        }
+      },
+      "ai:typing:start": {
+        "summary": "AI typing indicator start",
+        "description": "Show AI is generating response",
+        "data": {
+          "conversationId": "string"
+        }
+      },
+      "ai:typing:stop": {
+        "summary": "AI typing indicator stop",
+        "description": "Hide AI typing indicator",
+        "data": {
+          "conversationId": "string"
+        }
+      },
+      "error": {
+        "summary": "Error notification",
+        "description": "Server error notifications",
+        "data": {
+          "message": "string",
+          "type": "string (optional)"
+        }
+      },
+      "pong": {
+        "summary": "Connection health response",
+        "description": "Response to ping for connection health check"
+      }
+    },
+    "rooms": {
+      "description": "Socket.IO rooms for organizing connections",
+      "user-rooms": {
+        "pattern": "user:{userId}",
+        "description": "Personal room for each user (for cross-tab synchronization)"
+      },
+      "conversation-rooms": {
+        "pattern": "conversation:{conversationId}",
+        "description": "Room for all participants in a conversation"
+      }
+    },
+    "websocket-auth": {
+      "description": "WebSocket authentication methods",
+      "methods": [
+        {
+          "method": "auth header",
+          "example": "socket.handshake.headers.authorization = 'Bearer <token>'"
+        },
+        {
+          "method": "query parameter",
+          "example": "ws://localhost:3000?token=<token>"
+        },
+        {
+          "method": "handshake auth",
+          "example": "socket.auth({ token: '<token>' })"
+        }
+      ]
     }
   }
 }

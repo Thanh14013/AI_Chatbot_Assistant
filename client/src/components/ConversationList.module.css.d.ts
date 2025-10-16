@@ -1,5 +1,7 @@
 declare const styles: {
   readonly conversationsList: string;
+  readonly collapsed: string;
+  readonly conversationsScrollContainer: string;
   readonly listItem: string;
   readonly conversationItem: string;
   readonly active: string;
@@ -8,7 +10,6 @@ declare const styles: {
   readonly titleRow: string;
   readonly conversationTitle: string;
   readonly timeText: string;
-  readonly messageCount: string;
   readonly itemActions: string;
   readonly deleteMenuItem: string;
   readonly loadingState: string;
@@ -18,7 +19,6 @@ declare const styles: {
   readonly emptyIcon: string;
   readonly emptyText: string;
   readonly emptySubtext: string;
-  readonly conversationsScrollContainer: string;
   readonly loadMoreIndicator: string;
 };
 

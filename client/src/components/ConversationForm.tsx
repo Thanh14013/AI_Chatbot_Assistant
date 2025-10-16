@@ -25,6 +25,8 @@ interface ConversationFormProps {
   onCancel: () => void;
   onSubmit: (values: ConversationFormValues) => void;
   loading?: boolean;
+  mode?: "create" | "edit"; // Add mode prop
+  initialValues?: ConversationFormValues; // Add initial values for edit mode
 }
 
 export interface ConversationFormValues {
@@ -59,16 +61,28 @@ const AI_MODELS = [
 
 /**
  * ConversationForm component
- * Allows users to create a new conversation with custom settings
+ * Allows users to create a new conversation or edit an existing one with custom settings
  */
 const ConversationForm: React.FC<ConversationFormProps> = ({
   open,
   onCancel,
   onSubmit,
   loading = false,
+  mode = "create",
+  initialValues,
 }) => {
   const [form] = Form.useForm<ConversationFormValues>();
-  const [contextWindow, setContextWindow] = useState(10);
+  const [contextWindow, setContextWindow] = useState(
+    initialValues?.context_window || 10
+  );
+
+  // Update form and state when initialValues change (for edit mode)
+  React.useEffect(() => {
+    if (mode === "edit" && initialValues) {
+      form.setFieldsValue(initialValues);
+      setContextWindow(initialValues.context_window);
+    }
+  }, [mode, initialValues, form]);
 
   /**
    * Handle form submission
@@ -78,8 +92,10 @@ const ConversationForm: React.FC<ConversationFormProps> = ({
       .validateFields()
       .then((values) => {
         onSubmit(values);
-        form.resetFields();
-        setContextWindow(10); // Reset to default
+        if (mode === "create") {
+          form.resetFields();
+          setContextWindow(10); // Reset to default only for create mode
+        }
       })
       .catch((info) => {
         console.log("Validate Failed:", info);
@@ -90,8 +106,10 @@ const ConversationForm: React.FC<ConversationFormProps> = ({
    * Handle modal cancel
    */
   const handleCancel = () => {
-    form.resetFields();
-    setContextWindow(10);
+    if (mode === "create") {
+      form.resetFields();
+      setContextWindow(10);
+    }
     onCancel();
   };
 
@@ -111,13 +129,15 @@ const ConversationForm: React.FC<ConversationFormProps> = ({
       title={
         <Space>
           <MessageOutlined />
-          <span>New Conversation</span>
+          <span>
+            {mode === "create" ? "New Conversation" : "Edit Conversation"}
+          </span>
         </Space>
       }
       open={open}
       onOk={handleSubmit}
       onCancel={handleCancel}
-      okText="Create Conversation"
+      okText={mode === "create" ? "Create Conversation" : "Save Changes"}
       cancelText="Cancel"
       confirmLoading={loading}
       width={600}

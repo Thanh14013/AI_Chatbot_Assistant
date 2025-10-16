@@ -105,6 +105,27 @@
   color: rgba(0, 0, 0, 0.65);
 }
 
+/* Highlighted message for semantic search */
+.highlighted {
+  animation: highlight 0.5s ease-in-out;
+}
+
+@keyframes highlight {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+.highlighted > div {
+  background-color: #fff3cd !important;
+  border-left: 4px solid #ffc107 !important;
+  box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3) !important;
+}
+
 /* Responsive design for mobile */
 @media (max-width: 768px) {
   .messageList {

@@ -70,7 +70,11 @@ interface ClientToServerEvents {
   ping: () => void;
 
   // Message events
-  "message:send": (data: { conversationId: string; content: string }) => void;
+  "message:send": (data: {
+    conversationId: string;
+    content: string;
+    messageId?: string;
+  }) => void;
 
   // Typing events
   "typing:start": (conversationId: string) => void;
@@ -401,6 +405,17 @@ class WebSocketService {
 
     // console.log(`[WebSocket] Sending message to conversation: ${conversationId}`);
     this.socket.emit("message:send", { conversationId, content });
+  }
+
+  sendMessageWithId(
+    conversationId: string,
+    content: string,
+    messageId?: string
+  ): void {
+    if (!this.socket?.connected) {
+      throw new Error("WebSocket not connected");
+    }
+    this.socket.emit("message:send", { conversationId, content, messageId });
   }
 
   /**

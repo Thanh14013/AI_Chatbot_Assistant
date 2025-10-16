@@ -3,6 +3,7 @@ import User from "./user.model.js";
 import RefreshToken from "./refresh-token.model.js";
 import Conversation from "./conversation.model.js";
 import Message from "./message.model.js";
+import MessageEmbedding from "./message-embedding.model.js";
 // ============================================================================
 // Define Model Relationships
 // ============================================================================
@@ -57,6 +58,23 @@ Message.belongsTo(Conversation, {
     onDelete: "CASCADE",
     onUpdate: "CASCADE",
 });
+// ----------------------------------------------------------------------------
+// Message <-> MessageEmbedding Relationships
+// ----------------------------------------------------------------------------
+// Message has one MessageEmbedding (one-to-one relationship)
+Message.hasOne(MessageEmbedding, {
+    foreignKey: "message_id",
+    as: "embedding", // Alias for accessing embedding from message instance
+    onDelete: "CASCADE", // Delete embedding when message is deleted
+    onUpdate: "CASCADE",
+});
+// MessageEmbedding belongs to Message (one-to-one relationship)
+MessageEmbedding.belongsTo(Message, {
+    foreignKey: "message_id",
+    as: "message", // Alias for accessing message from embedding instance
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
+});
 // ============================================================================
 // Database Synchronization
 // ============================================================================
@@ -94,5 +112,6 @@ export default {
     RefreshToken,
     Conversation,
     Message,
+    MessageEmbedding,
     syncDatabase,
 };

@@ -4,6 +4,15 @@
   border-top: 1px solid #f0f0f0;
   background: #fff;
   width: 100%;
+  transition: all 0.3s ease;
+}
+
+/* Collapsed state - center avatar */
+.userSection.collapsed {
+  padding: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .dropdown {
@@ -19,6 +28,12 @@
   cursor: pointer;
   transition: background 0.12s ease;
   width: 100%;
+}
+
+/* Collapsed userInfo - center avatar */
+.userInfo.collapsed {
+  justify-content: center;
+  padding: 4px;
 }
 
 .userInfo:hover {
@@ -38,6 +53,7 @@
   flex-shrink: 0;
   border: 1px solid #fff;
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s ease;
 }
 
 .userDetails {
@@ -90,4 +106,14 @@
   .userEmail {
     font-size: 11px;
   }
+}
+
+/* Tooltip content styles */
+.tooltipTitle {
+  font-weight: 500;
+}
+
+.tooltipSubtitle {
+  font-size: 12px;
+  opacity: 0.85;
 }

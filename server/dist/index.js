@@ -11,6 +11,7 @@ import swaggerUi from "swagger-ui-express";
 import fs from "fs";
 import path from "path";
 import { initializeSocketIO } from "./services/socket.service.js";
+import models from "./models/index.js";
 // Load swagger JSON at runtime to avoid import-assertion issues in some Node setups
 const swaggerPath = path.resolve(process.cwd(), "src", "swagger.json");
 const swaggerDocument = JSON.parse(fs.readFileSync(swaggerPath, "utf8"));
@@ -32,11 +33,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Server Configuration
 const PORT = process.env.PORT || 3000;
 // Initialize Database Connection
-// Test connection to PostgreSQL database
 connectToDatabase();
-// Import models to register associations
-// Note: importing `./models/index` runs the association definitions.
-import models from "./models/index.js";
 // Optionally synchronize models (non-destructive by default).
 // Only perform schema sync when DB_SYNC environment variable is explicitly set to 'true'.
 if (process.env.DB_SYNC === "true") {

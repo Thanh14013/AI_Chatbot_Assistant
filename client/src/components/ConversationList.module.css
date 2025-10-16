@@ -5,6 +5,12 @@
   max-height: calc(100vh - 200px);
   scrollbar-width: thin;
   scrollbar-color: #d9d9d9 transparent;
+  transition: all 0.3s ease;
+}
+
+/* Collapsed state */
+.conversationsList.collapsed {
+  padding: 0 4px;
 }
 
 .conversationsList::-webkit-scrollbar {
@@ -43,6 +49,14 @@
   box-sizing: border-box;
 }
 
+/* Collapsed conversation item - center icon */
+.conversationItem.collapsed {
+  padding: 8px;
+  justify-content: center;
+  align-items: center;
+  margin: 0 0 8px 0;
+}
+
 .conversationItem:hover {
   background-color: #f5f5f5;
 }
@@ -63,6 +77,11 @@
   border-radius: 3px;
 }
 
+/* Hide active indicator when collapsed */
+.conversationItem.collapsed.active::before {
+  display: none;
+}
+
 .avatar {
   background-color: #f0f0f0 !important;
   color: #8c8c8c !important;
@@ -80,6 +99,7 @@
   border-radius: 8px; /* keep rounded square look */
   padding: 4px; /* room for icon inside */
   box-sizing: border-box;
+  transition: all 0.2s ease;
 }
 
 /* Ensure Ant icons inside avatars scale down nicely */

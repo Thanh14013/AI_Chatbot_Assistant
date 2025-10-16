@@ -7,12 +7,14 @@ export interface SocketAuthData {
 export interface MessageSendData {
   conversationId: string;
   content: string;
+  messageId?: string;
 }
 
 export interface MessageChunkData {
   conversationId: string;
   chunk: string;
   content: string;
+  messageId?: string;
 }
 
 export interface MessageCompleteData {
@@ -42,11 +44,13 @@ export interface MessageCompleteData {
     message_count: number;
     updatedAt: Date;
   };
+  messageId?: string;
 }
 
 export interface TypingData {
   userId?: string;
   conversationId: string;
+  messageId?: string;
 }
 
 export interface ConversationJoinData {
@@ -73,7 +77,7 @@ export interface ServerToClientEvents {
   "message:chunk": (data: MessageChunkData) => void;
   "message:complete": (data: MessageCompleteData) => void;
   // New message notification (for other sockets to render immediate UX)
-  "message:new": (data: { conversationId: string; message: any }) => void;
+  "message:new": (data: { conversationId: string; message: any; messageId?: string }) => void;
 
   // Conversation events
   "conversation:joined": (data: { conversationId: string }) => void;
@@ -92,8 +96,8 @@ export interface ServerToClientEvents {
   // Typing events
   "user:typing:start": (data: TypingData) => void;
   "user:typing:stop": (data: TypingData) => void;
-  "ai:typing:start": (data: { conversationId: string }) => void;
-  "ai:typing:stop": (data: { conversationId: string }) => void;
+  "ai:typing:start": (data: TypingData) => void;
+  "ai:typing:stop": (data: TypingData) => void;
 
   // Connection events
   pong: () => void;

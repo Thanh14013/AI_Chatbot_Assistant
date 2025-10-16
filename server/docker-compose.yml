@@ -1,0 +1,34 @@
+version: "3.8"
+
+services:
+  db:
+    # Postgres image with pgvector preinstalled
+    image: ankane/pgvector
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: thanh123
+      POSTGRES_DB: chatbot
+    ports:
+      - "5433:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  server:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    environment:
+      # Allow overriding OpenAI key from host env when using docker-compose up
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      DATABASE_URL: ${DATABASE_URL}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    volumes:
+      - .:/app:delegated
+
+volumes:
+  db-data:

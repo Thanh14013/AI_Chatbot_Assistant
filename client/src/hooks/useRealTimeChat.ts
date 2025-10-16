@@ -41,6 +41,12 @@ export const useRealTimeChat = (
 
   // Refs
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingMessageIdRef = useRef<string | null>(null);
+  const pendingClearTimeoutRef = useRef<number | null>(null);
+
+  // lightweight message id generator (avoid adding uuid dependency)
+  const createMessageId = () =>
+    `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
   // WebSocket integration with typed handlers
   const websocket = useWebSocket({
@@ -66,11 +72,29 @@ export const useRealTimeChat = (
           total_tokens_used: number;
           message_count: number;
         };
+        messageId?: string;
       }) => {
-        if (data.userMessage.conversation_id !== conversation?.id) return;
+        // Only process conversation updates if it's the current conversation
+        if (data.userMessage.conversation_id !== conversation?.id) {
+          // Still dispatch event for other components to handle
+          window.dispatchEvent(
+            new CustomEvent("message:complete", { detail: data })
+          );
+          return;
+        }
 
+        // Clear both typing and sending flags for the conversation.
+        // If messageId is provided, only clear the pendingMessageIdRef when it matches.
         setIsAITyping(false);
         setIsSending(false);
+        if (data.messageId && pendingMessageIdRef.current === data.messageId) {
+          pendingMessageIdRef.current = null;
+        }
+        // Clear any pending safety timeout
+        if (pendingClearTimeoutRef.current) {
+          window.clearTimeout(pendingClearTimeoutRef.current as number);
+          pendingClearTimeoutRef.current = null;
+        }
 
         if (data.conversation && onConversationUpdate) {
           onConversationUpdate({
@@ -84,18 +108,20 @@ export const useRealTimeChat = (
         window.dispatchEvent(
           new CustomEvent("message:complete", { detail: data })
         );
-        // success notification retained intentionally (UI message)
       },
       [conversation?.id, onConversationUpdate]
     ),
 
     // AI typing handlers
     onAITypingStart: useCallback(
-      (data: { conversationId: string }) => {
+      (data: { conversationId: string; messageId?: string }) => {
         if (data.conversationId !== conversation?.id) return;
+
+        // Mark global typing state for this conversation so all tabs' inputs
+        // are disabled while the AI is streaming.
         setIsAITyping(true);
 
-        // Dispatch event to ChatPage to add typing message in chat
+        // Dispatch event to ChatPage to add typing message in chat for all tabs
         window.dispatchEvent(
           new CustomEvent("ai:typing:start", { detail: data })
         );
@@ -104,8 +130,11 @@ export const useRealTimeChat = (
     ),
 
     onAITypingStop: useCallback(
-      (data: { conversationId: string }) => {
+      (data: { conversationId: string; messageId?: string }) => {
         if (data.conversationId !== conversation?.id) return;
+
+        // Clear global typing state for this conversation so all tabs' inputs
+        // are re-enabled once streaming stops.
         setIsAITyping(false);
 
         // Dispatch event to ChatPage to remove typing messages
@@ -214,13 +243,52 @@ export const useRealTimeChat = (
         setIsSending(true);
         setIsAITyping(true);
 
-        // Send via WebSocket
-        websocket.sendMessage(conversation.id, content);
+        // Generate a messageId for sequence tracking
+        const messageId = createMessageId();
+        pendingMessageIdRef.current = messageId;
+
+        // Clear any existing safety timeout
+        if (pendingClearTimeoutRef.current) {
+          window.clearTimeout(
+            pendingClearTimeoutRef.current as unknown as number
+          );
+          pendingClearTimeoutRef.current = null;
+        }
+
+        // Safety timeout: clear sending state after 8s if no matching complete arrives
+        pendingClearTimeoutRef.current = window.setTimeout(() => {
+          if (pendingMessageIdRef.current === messageId) {
+            pendingMessageIdRef.current = null;
+            setIsSending(false);
+            setIsAITyping(false);
+          }
+          pendingClearTimeoutRef.current = null;
+        }, 8000) as unknown as number;
+
+        // Send via WebSocket including messageId
+        // prefer explicit API that accepts messageId
+        const wsWithId = websocket as unknown as {
+          sendMessageWithId?: (
+            conversationId: string,
+            content: string,
+            messageId?: string
+          ) => void;
+        };
+        if (wsWithId.sendMessageWithId) {
+          wsWithId.sendMessageWithId(conversation.id, content, messageId);
+        } else {
+          // fallback for older implementations
+          websocket.sendMessage(conversation.id, content);
+        }
 
         // Dispatch event for optimistic UI update
         window.dispatchEvent(
           new CustomEvent("message:send", {
-            detail: { conversationId: conversation.id, content },
+            detail: {
+              conversationId: conversation.id,
+              content,
+              messageId: pendingMessageIdRef.current,
+            },
           })
         );
       } catch (error) {

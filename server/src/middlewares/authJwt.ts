@@ -32,6 +32,17 @@ export const authenticateAccessToken = (req: Req, res: Response, next: NextFunct
   try {
     const accessToken = extractToken(req);
 
+    // Development-only logging to help trace auth issues
+    if (process.env.NODE_ENV === "development") {
+      try {
+        console.log(
+          "[authJwt] Authorization header:",
+          req.headers?.authorization?.substring(0, 60)
+        );
+        console.log("[authJwt] Extracted token present:", !!accessToken);
+      } catch {}
+    }
+
     if (!accessToken) {
       res.status(401).json({ success: false, message: "Access token is required" });
       return;
@@ -53,6 +64,17 @@ export const authenticateAccessToken = (req: Req, res: Response, next: NextFunct
     req.user = accessResult.decoded;
     if (!req.body) req.body = {};
     req.body.user = accessResult.decoded;
+
+    if (process.env.NODE_ENV === "development") {
+      try {
+        console.log(
+          "[authJwt] Decoded token:",
+          typeof accessResult.decoded === "object"
+            ? JSON.stringify(accessResult.decoded).slice(0, 200)
+            : accessResult.decoded
+        );
+      } catch {}
+    }
 
     next();
   } catch (err: unknown) {

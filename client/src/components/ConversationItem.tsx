@@ -18,6 +18,7 @@ import {
   deleteConversation,
 } from "../services/chat.service";
 import { websocketService } from "../services/websocket.service";
+import ConversationForm, { ConversationFormValues } from "./ConversationForm";
 import styles from "./ConversationItem.module.css";
 
 const { Text } = Typography;
@@ -40,10 +41,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   onUpdate,
 }) => {
   const { message } = App.useApp();
-  const [isRenaming, setIsRenaming] = useState(false);
-  const [newTitle, setNewTitle] = useState(conversation.title);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const navigate = useNavigate();
 
   /**
@@ -84,9 +85,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
    * Handle conversation item click
    */
   const handleClick = () => {
-    if (!isRenaming) {
-      onClick(conversation.id);
-    }
+    onClick(conversation.id);
   };
 
   /**
@@ -98,39 +97,39 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   };
 
   /**
-   * Handle rename conversation
+   * Handle edit conversation
    */
-  const handleRename = async () => {
-    if (!newTitle.trim()) {
-      message.error("Title cannot be empty");
-      return;
-    }
+  const handleEditClick = (e: any) => {
+    e.domEvent.stopPropagation();
+    setIsEditModalOpen(true);
+  };
 
-    if (newTitle.trim() === conversation.title) {
-      setIsRenaming(false);
-      return;
-    }
-
+  /**
+   * Handle edit form submission
+   */
+  const handleEditSubmit = async (values: ConversationFormValues) => {
+    setIsUpdating(true);
     try {
-      await updateConversation(conversation.id, { title: newTitle.trim() });
-      message.success("Conversation renamed successfully");
-      setIsRenaming(false);
+      await updateConversation(conversation.id, values);
+      message.success("Conversation updated successfully");
+      setIsEditModalOpen(false);
       onUpdate?.();
 
       // Notify WebSocket for multi-tab sync
       if (websocketService.isConnected()) {
         try {
           websocketService.notifyConversationUpdated(conversation.id, {
-            title: newTitle.trim(),
+            ...values,
             updatedAt: new Date().toISOString(),
           });
         } catch {}
       }
     } catch (error: any) {
       message.error(
-        error?.response?.data?.message || "Failed to rename conversation"
+        error?.response?.data?.message || "Failed to update conversation"
       );
-      setNewTitle(conversation.title); // Reset to original
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -191,13 +190,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   const menuItems = useMemo(() => {
     return [
       {
-        key: "rename",
-        label: "Rename",
+        key: "edit",
+        label: "Edit",
         icon: <EditOutlined />,
-        onClick: (e: any) => {
-          e.domEvent.stopPropagation();
-          setIsRenaming(true);
-        },
+        onClick: handleEditClick,
       },
       {
         key: "delete",
@@ -210,8 +206,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         },
       },
     ];
-    // conversation.id intentionally not included because handlers use state setters defined here
-    // and we only want to avoid recreating the items array each render
   }, [handleDelete]);
 
   return (
@@ -234,23 +228,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
 
       {/* Conversation details */}
       <div className={styles.details}>
-        {/* Title - editable when renaming */}
-        {isRenaming ? (
-          <Input
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            onPressEnter={handleRename}
-            onBlur={handleRename}
-            autoFocus
-            size="small"
-            onClick={(e) => e.stopPropagation()}
-            className={styles.renameInput}
-          />
-        ) : (
-          <span className={styles.title}>
-            {truncateText(conversation.title, 30)}
-          </span>
-        )}
+        {/* Title */}
+        <span className={styles.title}>
+          {truncateText(conversation.title, 30)}
+        </span>
 
         {/* Message count and timestamp */}
         <div className={styles.metadata}>
@@ -291,6 +272,20 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           be undone.
         </div>
       </Modal>
+
+      {/* Edit Conversation Modal */}
+      <ConversationForm
+        open={isEditModalOpen}
+        onCancel={() => setIsEditModalOpen(false)}
+        onSubmit={handleEditSubmit}
+        loading={isUpdating}
+        mode="edit"
+        initialValues={{
+          title: conversation.title,
+          model: conversation.model || "gpt-5-nano",
+          context_window: conversation.context_window || 10,
+        }}
+      />
 
       {/* Active indicator */}
       {isActive && <div className={styles.activeIndicator} />}

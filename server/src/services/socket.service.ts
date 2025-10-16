@@ -250,7 +250,11 @@ export const initializeSocketIO = (
     // Handle message sending with streaming AI response
     socket.on("message:send", async (data) => {
       try {
-        const { conversationId, content } = data;
+        const { conversationId, content, messageId } = data as {
+          conversationId: string;
+          content: string;
+          messageId?: string;
+        };
 
         if (!conversationId || !content) {
           socket.emit("error", { message: "Conversation ID and content are required" });
@@ -278,6 +282,7 @@ export const initializeSocketIO = (
               conversationId,
               chunk,
               content: assistantContent, // send accumulated content
+              messageId,
             });
           },
           // onUserMessageCreated - broadcast the persisted user message immediately so other tabs see it
@@ -287,6 +292,7 @@ export const initializeSocketIO = (
               socket.to(`conversation:${conversationId}`).emit("message:new", {
                 conversationId,
                 message: userMessage,
+                messageId,
               });
 
               // Also notify other sockets of the same user that are NOT in the conversation room.
@@ -320,6 +326,7 @@ export const initializeSocketIO = (
               // appears after the user message in other tabs.
               io.to(`conversation:${conversationId}`).emit("ai:typing:start", {
                 conversationId,
+                messageId,
               });
             } catch (err) {
               // ignore
@@ -330,6 +337,7 @@ export const initializeSocketIO = (
         // Stop typing indicator for ALL users in conversation room (including sender) for sync
         io.to(`conversation:${conversationId}`).emit("ai:typing:stop", {
           conversationId,
+          messageId,
         });
 
         // Broadcast complete messages to conversation room
@@ -337,6 +345,7 @@ export const initializeSocketIO = (
           userMessage: result.userMessage,
           assistantMessage: result.assistantMessage,
           conversation: result.conversation,
+          messageId,
         });
 
         // Broadcast conversation update to user room for multi-tab conversation list sync

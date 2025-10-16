@@ -1,11 +1,14 @@
 import { Router } from "express";
 import authRoutes from "./auth.route.js";
 import conversationRoutes from "./conversation.route.js";
+import searchRoutes from "./search.route.js";
 const router = Router();
 // Authentication routes
 router.use("/auth", authRoutes);
 // Conversation and message routes
 router.use("/conversations", conversationRoutes);
+// Global search routes
+router.use("/search", searchRoutes);
 // Health check route
 router.get("/health", (req, res) => {
     res.json({

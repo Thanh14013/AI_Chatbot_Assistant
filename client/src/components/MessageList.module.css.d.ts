@@ -7,3 +7,4 @@ export const skeletonItem: string;
 export const scrollButton: string;
 export const loadingIndicator: string;
 export const loadingText: string;
+export const highlighted: string;

@@ -1,11 +1,15 @@
 declare const styles: {
   readonly header: string;
-  readonly newButton: string;
-  readonly searchInput: string;
+  readonly collapsed: string;
   readonly headerTopRow: string;
   readonly inlineToggle: string;
-  readonly collapsedTopPlaceholder: string;
   readonly toggleIcon: string;
+  readonly newButton: string;
+  readonly searchInput: string;
+  readonly searchContainer: string;
+  readonly searchButton: string;
+  readonly errorMessage: string;
+  readonly collapsedTopPlaceholder: string;
 };
 
 export default styles;

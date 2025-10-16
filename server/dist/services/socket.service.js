@@ -185,7 +185,7 @@ export const initializeSocketIO = (httpServer) => {
         // Handle message sending with streaming AI response
         socket.on("message:send", async (data) => {
             try {
-                const { conversationId, content } = data;
+                const { conversationId, content, messageId } = data;
                 if (!conversationId || !content) {
                     socket.emit("error", { message: "Conversation ID and content are required" });
                     return;
@@ -205,6 +205,7 @@ export const initializeSocketIO = (httpServer) => {
                         conversationId,
                         chunk,
                         content: assistantContent, // send accumulated content
+                        messageId,
                     });
                 }, 
                 // onUserMessageCreated - broadcast the persisted user message immediately so other tabs see it
@@ -214,6 +215,7 @@ export const initializeSocketIO = (httpServer) => {
                         socket.to(`conversation:${conversationId}`).emit("message:new", {
                             conversationId,
                             message: userMessage,
+                            messageId,
                         });
                         // Also notify other sockets of the same user that are NOT in the conversation room.
                         // This avoids sending the same message twice to sockets that are already in the conversation room
@@ -246,6 +248,7 @@ export const initializeSocketIO = (httpServer) => {
                         // appears after the user message in other tabs.
                         io.to(`conversation:${conversationId}`).emit("ai:typing:start", {
                             conversationId,
+                            messageId,
                         });
                     }
                     catch (err) {
@@ -255,12 +258,14 @@ export const initializeSocketIO = (httpServer) => {
                 // Stop typing indicator for ALL users in conversation room (including sender) for sync
                 io.to(`conversation:${conversationId}`).emit("ai:typing:stop", {
                     conversationId,
+                    messageId,
                 });
                 // Broadcast complete messages to conversation room
                 io.to(`conversation:${conversationId}`).emit("message:complete", {
                     userMessage: result.userMessage,
                     assistantMessage: result.assistantMessage,
                     conversation: result.conversation,
+                    messageId,
                 });
                 // Broadcast conversation update to user room for multi-tab conversation list sync
                 if (result.conversation) {
