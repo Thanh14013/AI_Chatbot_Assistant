@@ -215,8 +215,10 @@ export const initializeSocketIO = (
     handleUserConnection(socket);
 
     // Join user to their personal room (for user-specific broadcasts)
+    // Also join a session room using userId as sessionId for multi-tab sync
     if (socket.userId) {
       socket.join(`user:${socket.userId}`);
+      socket.join(`session:${socket.userId}`); // Session room for multi-tab sync
     }
 
     // Handle joining conversation rooms
@@ -369,6 +371,49 @@ export const initializeSocketIO = (
         userId: socket.userId,
         conversationId,
       });
+    });
+
+    // Handle follow-up suggestions request
+    socket.on("request_followups", async (data) => {
+      try {
+        const { sessionId, messageId, lastUserMessage, lastBotMessage } = data;
+
+        if (!sessionId || !messageId || !lastBotMessage) {
+          socket.emit("followups_error", {
+            messageId: messageId || "",
+            error: "Session ID, message ID, and bot message are required",
+          });
+          return;
+        }
+
+        // Import followup service dynamically
+        const { generateFollowupSuggestions } = await import("./followup.service.js");
+
+        // Generate suggestions with context
+        const suggestions = await generateFollowupSuggestions(lastUserMessage, lastBotMessage);
+
+        // Broadcast suggestions to all sockets in the same session (multi-tab sync)
+        io.to(`session:${sessionId}`).emit("followups_response", {
+          messageId,
+          suggestions,
+        });
+      } catch (error: any) {
+        const messageId = (data as any)?.messageId || "";
+        const sessionId = (data as any)?.sessionId || "";
+
+        // Broadcast error to all sockets in the same session
+        if (sessionId) {
+          io.to(`session:${sessionId}`).emit("followups_error", {
+            messageId,
+            error: error?.message || "Failed to generate suggestions",
+          });
+        } else {
+          socket.emit("followups_error", {
+            messageId,
+            error: error?.message || "Failed to generate suggestions",
+          });
+        }
+      }
     });
 
     // Handle disconnection

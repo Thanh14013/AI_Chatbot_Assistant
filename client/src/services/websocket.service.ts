@@ -60,6 +60,13 @@ interface ServerToClientEvents {
     messageCount: number;
     totalTokens: number;
   }) => void;
+
+  // Follow-up suggestion events
+  followups_response: (data: {
+    messageId: string;
+    suggestions: string[];
+  }) => void;
+  followups_error: (data: { messageId: string; error: string }) => void;
 }
 
 // Client events interface
@@ -79,6 +86,14 @@ interface ClientToServerEvents {
   // Typing events
   "typing:start": (conversationId: string) => void;
   "typing:stop": (conversationId: string) => void;
+
+  // Follow-up suggestion events
+  request_followups: (data: {
+    messageId: string;
+    lastUserMessage: string;
+    lastBotMessage: string;
+    sessionId: string;
+  }) => void;
 
   // Conversation events (multi-tab sync)
   "conversation:create": (conversation: ConversationListItem) => void;
@@ -133,6 +148,13 @@ export interface WebSocketEventHandlers {
     messageCount: number;
     totalTokens: number;
   }) => void;
+
+  // Follow-up suggestion handlers
+  onFollowupsResponse?: (data: {
+    messageId: string;
+    suggestions: string[];
+  }) => void;
+  onFollowupsError?: (data: { messageId: string; error: string }) => void;
 
   // Connection handlers
   onConnect?: () => void;
@@ -321,6 +343,23 @@ class WebSocketService {
         }
       });
 
+      // Follow-up suggestion events
+      this.socket.on("followups_response", (data) => {
+        try {
+          this.handlers.onFollowupsResponse?.(data);
+        } catch (err) {
+          console.debug("websocket: onFollowupsResponse handler error", err);
+        }
+      });
+
+      this.socket.on("followups_error", (data) => {
+        try {
+          this.handlers.onFollowupsError?.(data);
+        } catch (err) {
+          console.debug("websocket: onFollowupsError handler error", err);
+        }
+      });
+
       // Start connection
       this.socket.connect();
 
@@ -467,6 +506,26 @@ class WebSocketService {
   ping(): void {
     if (!this.socket?.connected) return;
     this.socket.emit("ping");
+  }
+
+  /**
+   * Request follow-up suggestions for a message
+   */
+  requestFollowups(
+    messageId: string,
+    lastUserMessage: string,
+    lastBotMessage: string,
+    sessionId: string
+  ): void {
+    if (!this.socket?.connected) {
+      throw new Error("WebSocket not connected");
+    }
+    this.socket.emit("request_followups", {
+      messageId,
+      lastUserMessage,
+      lastBotMessage,
+      sessionId,
+    });
   }
 
   /**

@@ -20,6 +20,10 @@ export interface Message {
   localStatus?: "pending" | "failed" | "sent";
   // isTyping: mark an assistant typing placeholder
   isTyping?: boolean;
+  // followupSuggestions: cached follow-up suggestions for this message
+  followupSuggestions?: string[];
+  // isLoadingFollowups: whether suggestions are currently being generated
+  isLoadingFollowups?: boolean;
 }
 
 // Payload to create a new message (client -> server)

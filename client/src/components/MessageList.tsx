@@ -21,6 +21,9 @@ interface MessageListProps {
   // For semantic search: ref to store message elements and highlighted message ID
   messageRefs?: React.MutableRefObject<Map<string, HTMLElement>>;
   highlightedMessageId?: string | null;
+  // Follow-up suggestion handlers
+  onRequestFollowups?: (messageId: string, content: string) => void;
+  onFollowupClick?: (suggestion: string) => void;
 }
 
 /**
@@ -36,6 +39,8 @@ const MessageList: React.FC<MessageListProps> = ({
   onRetry,
   messageRefs,
   highlightedMessageId,
+  onRequestFollowups,
+  onFollowupClick,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -311,7 +316,12 @@ const MessageList: React.FC<MessageListProps> = ({
               highlightedMessageId === message.id ? styles.highlighted : ""
             }
           >
-            <MessageBubble message={message} onRetry={onRetry} />
+            <MessageBubble
+              message={message}
+              onRetry={onRetry}
+              onRequestFollowups={onRequestFollowups}
+              onFollowupClick={onFollowupClick}
+            />
           </div>
         ))}
 

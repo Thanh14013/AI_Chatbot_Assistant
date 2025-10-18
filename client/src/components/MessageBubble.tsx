@@ -4,13 +4,14 @@
  */
 
 import React, { useState, useEffect, useRef } from "react";
-import { Avatar, Typography, Button, App } from "antd";
+import { Avatar, Typography, Button, App, Tag } from "antd";
 import {
   UserOutlined,
   RobotOutlined,
   CopyOutlined,
   CheckOutlined,
   ReloadOutlined,
+  BulbOutlined,
 } from "@ant-design/icons";
 import { Message, MessageRole } from "../types/chat.type";
 import styles from "./MessageBubble.module.css";
@@ -21,13 +22,22 @@ interface MessageBubbleProps {
   message: Message;
   // Optional retry handler for failed messages
   onRetry?: (message: Message) => void;
+  // Optional handler for requesting follow-up suggestions
+  onRequestFollowups?: (messageId: string, content: string) => void;
+  // Optional handler for clicking a follow-up suggestion
+  onFollowupClick?: (suggestion: string) => void;
 }
 
 /**
  * MessageBubble component
  * Renders a single message with avatar, content, timestamp, and copy button
  */
-const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }) => {
+const MessageBubble: React.FC<MessageBubbleProps> = ({
+  message,
+  onRetry,
+  onRequestFollowups,
+  onFollowupClick,
+}) => {
   const { message: antMessage } = App.useApp();
   const [isCopied, setIsCopied] = useState(false);
   // Client-side streaming display (progressive reveal)
@@ -47,6 +57,20 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }) => {
   // Local status helpers
   const isFailed = message.localStatus === "failed";
   const isPending = message.localStatus === "pending";
+
+  // Follow-up suggestions state
+  const hasFollowups =
+    message.followupSuggestions && message.followupSuggestions.length > 0;
+  const isLoadingFollowups = message.isLoadingFollowups || false;
+
+  /**
+   * Handle requesting follow-up suggestions
+   */
+  const handleRequestFollowups = () => {
+    if (!message.isTyping && message.content && onRequestFollowups) {
+      onRequestFollowups(message.id, message.content);
+    }
+  };
 
   /**
    * Format timestamp to readable format
@@ -215,7 +239,19 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }) => {
 
           {/* Message content bubble */}
           <div className={styles.messageBubble}>
-            {/* debug badge removed per UX request */}
+            {/* Follow-up button positioned in top-right corner for assistant messages */}
+            {!isUser && !message.isTyping && message.content && (
+              <Button
+                type="text"
+                size="small"
+                icon={<BulbOutlined />}
+                onClick={handleRequestFollowups}
+                loading={isLoadingFollowups}
+                className={styles.followupButtonCorner}
+                title="Get follow-up suggestions"
+              />
+            )}
+
             <div className={styles.messageContent}>
               {message.role === "assistant" &&
               (!displayedContent || displayedContent.trim() === "") ? (
@@ -255,6 +291,37 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onRetry }) => {
                 )}
               </div>
             </div>
+
+            {/* Follow-up suggestions displayed below the message with animation */}
+            {!isUser && hasFollowups && (
+              <div className={styles.followupSuggestionsCard}>
+                <div className={styles.suggestionChips}>
+                  {message.followupSuggestions!.map((suggestion, index) => (
+                    <div
+                      key={index}
+                      className={styles.suggestionChip}
+                      onClick={() =>
+                        onFollowupClick && onFollowupClick(suggestion)
+                      }
+                    >
+                      {suggestion}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Loading indicator for follow-up suggestions */}
+            {!isUser && isLoadingFollowups && !hasFollowups && (
+              <div className={styles.followupLoading}>
+                <span className={styles.loadingDot} />
+                <span className={styles.loadingDot} />
+                <span className={styles.loadingDot} />
+                <span className={styles.loadingText}>
+                  Generating suggestions...
+                </span>
+              </div>
+            )}
           </div>
 
           {/* User avatar on the right */}

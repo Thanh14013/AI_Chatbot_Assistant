@@ -24,6 +24,7 @@ import {
 import { websocketService } from "../services/websocket.service";
 import { NetworkStatus, TypingIndicator } from "../components";
 import { searchConversation } from "../services/searchService";
+import { useAuthContext } from "../hooks/useAuthContext";
 import styles from "./ChatPage.module.css";
 
 const { Content } = Layout;
@@ -35,6 +36,7 @@ const { Title } = Typography;
  */
 const ChatPage: React.FC = () => {
   const { message: antdMessage } = App.useApp();
+  const { user } = useAuthContext();
   // Search state
   const [searchQuery, setSearchQuery] = useState<string>("");
 
@@ -977,6 +979,124 @@ const ChatPage: React.FC = () => {
     }
   };
 
+  /**
+   * Handle requesting follow-up suggestions for a message
+   */
+  const handleRequestFollowups = (messageId: string, content: string) => {
+    if (!isConnected) {
+      antdMessage.warning("Not connected to server");
+      return;
+    }
+
+    if (!user?.id) {
+      antdMessage.warning("User not authenticated");
+      return;
+    }
+
+    // Find the bot message and the last user message before it
+    const msgIndex = messages.findIndex((m) => m.id === messageId);
+    if (msgIndex === -1) return;
+
+    const lastBotMessage = content;
+    let lastUserMessage = "";
+
+    // Find the most recent user message before this bot message
+    for (let i = msgIndex - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        lastUserMessage = messages[i].content;
+        break;
+      }
+    }
+
+    // Mark message as loading suggestions
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId ? { ...msg, isLoadingFollowups: true } : msg
+      )
+    );
+
+    // Request suggestions via websocket with both messages and sessionId for multi-tab sync
+    const sessionId = String(user.id);
+    websocketService.requestFollowups(
+      messageId,
+      lastUserMessage,
+      lastBotMessage,
+      sessionId
+    );
+  };
+
+  /**
+   * Handle clicking a follow-up suggestion
+   */
+  const handleFollowupClick = (suggestion: string) => {
+    if (!currentConversation) return;
+    handleSendMessage(suggestion);
+  };
+
+  // Listen for follow-up response events
+  useEffect(() => {
+    const handleFollowupsResponse = (event: CustomEvent) => {
+      const { messageId, suggestions } = event.detail;
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId
+            ? {
+                ...msg,
+                followupSuggestions: suggestions,
+                isLoadingFollowups: false,
+              }
+            : msg
+        )
+      );
+    };
+
+    const handleFollowupsError = (event: CustomEvent) => {
+      const { messageId, error } = event.detail;
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId ? { ...msg, isLoadingFollowups: false } : msg
+        )
+      );
+      antdMessage.error(`Failed to get suggestions: ${error}`);
+    };
+
+    window.addEventListener(
+      "followups_response",
+      handleFollowupsResponse as EventListener
+    );
+    window.addEventListener(
+      "followups_error",
+      handleFollowupsError as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "followups_response",
+        handleFollowupsResponse as EventListener
+      );
+      window.removeEventListener(
+        "followups_error",
+        handleFollowupsError as EventListener
+      );
+    };
+  }, [antdMessage]);
+
+  // Set up websocket handlers for follow-ups
+  useEffect(() => {
+    websocketService.setHandlers({
+      onFollowupsResponse: (data) => {
+        window.dispatchEvent(
+          new CustomEvent("followups_response", { detail: data })
+        );
+      },
+      onFollowupsError: (data) => {
+        window.dispatchEvent(
+          new CustomEvent("followups_error", { detail: data })
+        );
+      },
+    });
+  }, []);
+
   return (
     <Layout className={styles.chatPageLayout}>
       <Layout className={styles.mainLayout}>
@@ -1025,6 +1145,8 @@ const ChatPage: React.FC = () => {
                 onRetry={handleRetryMessage}
                 messageRefs={messageRefs}
                 highlightedMessageId={highlightedMessageId}
+                onRequestFollowups={handleRequestFollowups}
+                onFollowupClick={handleFollowupClick}
               />
 
               {/* Chat input - disable while AI is typing to mirror sender tab behaviour */}

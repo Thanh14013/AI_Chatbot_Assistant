@@ -71,6 +71,18 @@ export interface ErrorData {
   type?: string;
 }
 
+export interface RequestFollowupsData {
+  sessionId: string;
+  messageId: string;
+  lastUserMessage: string;
+  lastBotMessage: string;
+}
+
+export interface FollowupsResponseData {
+  messageId: string;
+  suggestions: string[];
+}
+
 // Server to Client Events
 export interface ServerToClientEvents {
   // Message events
@@ -99,6 +111,10 @@ export interface ServerToClientEvents {
   "ai:typing:start": (data: TypingData) => void;
   "ai:typing:stop": (data: TypingData) => void;
 
+  // Follow-up suggestions
+  followups_response: (data: FollowupsResponseData) => void;
+  followups_error: (data: { messageId: string; error: string }) => void;
+
   // Connection events
   pong: () => void;
   error: (data: ErrorData) => void;
@@ -119,6 +135,9 @@ export interface ClientToServerEvents {
   // Typing events
   "typing:start": (conversationId: string) => void;
   "typing:stop": (conversationId: string) => void;
+
+  // Follow-up suggestions
+  request_followups: (data: RequestFollowupsData) => void;
 
   // Connection events
   ping: () => void;
