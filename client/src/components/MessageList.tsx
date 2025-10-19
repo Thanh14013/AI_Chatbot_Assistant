@@ -300,6 +300,11 @@ const MessageList: React.FC<MessageListProps> = ({
         className={styles.messageList}
         onScroll={handleScroll}
       >
+        {/* Show empty placeholder when no messages */}
+        {messages.length === 0 && !isLoading && (
+          <div className={styles.emptyPlaceholder}>what's new?</div>
+        )}
+
         {/* Show loading skeleton */}
         {isLoading && messages.length === 0 && renderLoadingSkeleton()}
 

@@ -386,6 +386,14 @@ export const initializeSocketIO = (
           return;
         }
 
+        if (!lastUserMessage || lastUserMessage.trim().length === 0) {
+          socket.emit("followups_error", {
+            messageId: messageId || "",
+            error: "User message context is required for generating follow-up suggestions",
+          });
+          return;
+        }
+
         // Import followup service dynamically
         const { generateFollowupSuggestions } = await import("./followup.service.js");
 

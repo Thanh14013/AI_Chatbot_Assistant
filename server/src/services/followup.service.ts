@@ -25,49 +25,83 @@ export const generateFollowupSuggestions = async (
   }
 
   try {
-    const prompt = `Based on the following conversation:
-- User: ${lastUserMessage}
-- Assistant: ${lastBotMessage}
+    // Simplified prompt: ONLY request plain text numbered list
+    const prompt = `Dựa vào cuộc hội thoại:
 
-Suggest 3 concise and natural follow-up questions the user might ask next.
-Return only the questions, as a JSON array of strings.`;
+User: "${lastUserMessage}"
+Assistant: "${lastBotMessage}"
+
+Hãy tạo đúng 3 câu hỏi follow-up ngắn gọn, tự nhiên, sáng tạo liên quan đến nội dung trên.
+Chỉ trả về danh sách 3 câu hỏi, mỗi câu 1 dòng, không cần số thứ tự hay ký tự đặc biệt.`;
 
     const response = await openai.chat.completions.create({
       model: "gpt-5-nano",
       messages: [
         {
+          role: "system",
+          content:
+            "You generate exactly 3 follow-up questions, one per line, without numbering or special characters.",
+        },
+        {
           role: "user",
           content: prompt,
         },
       ],
-      max_completion_tokens: 200,
+      max_completion_tokens: 2000,
+      temperature: 1,
     });
 
-    const content = response.choices[0]?.message?.content || "";
-
+    let content = response.choices[0]?.message?.content || "";
     if (!content.trim()) {
       throw new Error("OpenAI returned empty content for follow-ups");
     }
 
+    console.log("[FOLLOWUPS] Raw OpenAI response:", content);
+
+    // Clean up content: remove markdown code blocks if present
+    content = content.trim();
+    if (content.startsWith("```")) {
+      content = content
+        .replace(/^```(?:json|txt)?\s*/i, "")
+        .replace(/```\s*$/, "")
+        .trim();
+    }
+
+    console.log("[FOLLOWUPS] Cleaned content:", content);
+
+    // Parse suggestions from text
     let suggestions: string[] = [];
 
-    // Try to parse as JSON array first
-    try {
-      const parsed = JSON.parse(content);
-      if (Array.isArray(parsed)) {
-        suggestions = parsed.filter((s: any) => typeof s === "string").slice(0, 3);
+    // Split by newlines first
+    const lines = content
+      .split("\n")
+      .map((line: string) => line.trim())
+      .filter((line: string) => line.length > 0);
+
+    // Clean each line: remove numbering, bullets, quotes
+    for (const line of lines) {
+      const cleaned = line
+        .replace(/^\d+[\.\)\:\-\s]+/, "") // Remove "1. " "1) " "1: " "1- " "1 "
+        .replace(/^[\-\u2022\*\+]\s*/, "") // Remove "- " "• " "* " "+ "
+        .replace(/^["'\u201C\u201D\u2018\u2019]|["'\u201C\u201D\u2018\u2019]$/g, "") // Remove quotes
+        .trim();
+
+      if (cleaned.length > 5) {
+        // Must be meaningful
+        suggestions.push(cleaned);
       }
-    } catch {
-      // If JSON parsing fails, fall back to line-by-line parsing
-      suggestions = content
-        .split("\n")
-        .map((line: string) => line.trim())
-        .filter((line: string) => line.length > 0 && !line.match(/^\d+[\.\)]/))
-        .slice(0, 3);
+
+      // Stop after getting 3 suggestions
+      if (suggestions.length >= 3) {
+        break;
+      }
     }
+
+    console.log("[FOLLOWUPS] Parsed suggestions:", suggestions);
 
     // Ensure we have exactly 3 suggestions
     if (suggestions.length < 3) {
+      console.warn("[FOLLOWUPS] Not enough suggestions, padding with defaults");
       const defaults = [
         "Can you explain that in more detail?",
         "What else should I know about this?",
@@ -77,6 +111,11 @@ Return only the questions, as a JSON array of strings.`;
         suggestions.push(defaults[suggestions.length] || "Tell me more");
       }
     }
+
+    // Take only first 3
+    suggestions = suggestions.slice(0, 3);
+
+    console.log("[FOLLOWUPS] Final suggestions to return:", suggestions);
 
     // Cache the result
     followupCache.set(cacheKey, suggestions);

@@ -286,3 +286,50 @@ export const deleteConversation = async (
     message: "Conversation deleted successfully",
   };
 };
+
+/**
+ * Generate a smart title for a conversation based on first messages
+ * Uses OpenAI to create a concise, relevant title
+ *
+ * @param userMessage - First user message content
+ * @param assistantMessage - First assistant message content
+ * @returns Generated title (max 60 characters)
+ */
+export const generateConversationTitle = async (
+  userMessage: string,
+  assistantMessage: string
+): Promise<string> => {
+  try {
+    const openai = (await import("./openai.service.js")).default;
+
+    // Create a prompt to generate a concise title
+    const prompt = `Based on this conversation, generate a short, concise title (maximum 60 characters). Only return the title, nothing else.
+
+User: ${userMessage.substring(0, 200)}
+Assistant: ${assistantMessage.substring(0, 200)}
+
+Title:`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-5-nano",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a helpful assistant that creates short, concise conversation titles. Return only the title, maximum 60 characters.",
+        },
+        { role: "user", content: prompt },
+      ],
+      max_completion_tokens: 20,
+    });
+
+    const title = response.choices[0]?.message?.content?.trim() || "New Chat";
+
+    // Ensure title doesn't exceed 60 characters
+    return title.length > 60 ? title.substring(0, 57) + "..." : title;
+  } catch (error) {
+    console.error("Failed to generate conversation title:", error);
+    // Return a default title if generation fails
+    return "New Chat";
+  }
+};

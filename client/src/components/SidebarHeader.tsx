@@ -50,13 +50,11 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
 
     // Clear results if query is empty
     if (!trimmedQuery) {
-      console.log("[SidebarHeader] Empty query, clearing results");
       onSemanticResults?.(null);
       setError(null);
       return;
     }
 
-    console.log("[SidebarHeader] Starting semantic search for:", trimmedQuery);
     setIsSearching(true);
     setError(null);
 
@@ -66,12 +64,6 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
         limit: 10,
         messagesPerConversation: 2,
       });
-
-      console.log(
-        "[SidebarHeader] Search successful, found",
-        res.results?.length || 0,
-        "conversations"
-      );
 
       // Always surface the results to the header UI. If there are zero
       // results, present an empty list so the dropdown shows "Found 0".
@@ -102,10 +94,7 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
               onHighlightMessage
             ) {
               // Already in the conversation, just highlight the message
-              console.log(
-                "[SidebarHeader] Already in conversation, searching and highlighting:",
-                bestConversationId
-              );
+
               try {
                 const convRes = await searchConversation(bestConversationId, {
                   query: trimmedQuery,
@@ -122,10 +111,7 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
               }
             } else {
               // Navigate to the conversation
-              console.log(
-                "[SidebarHeader] Auto-navigating to best conversation:",
-                bestConversationId
-              );
+
               const basePath = `/conversations/${bestConversationId}`;
               navigate(`${basePath}?q=${encodeURIComponent(trimmedQuery)}`);
             }

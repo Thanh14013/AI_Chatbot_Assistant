@@ -19,6 +19,21 @@ export const createConversation = async (
   return resp.data.data as ConversationType;
 };
 
+/** Generate a smart title for a conversation based on message content */
+export const generateConversationTitle = async (
+  content: string
+): Promise<string> => {
+  try {
+    const resp = await axiosInstance.post("/conversations/generate-title", {
+      content,
+    });
+    return resp.data.data?.title || "New Chat";
+  } catch (error) {
+    console.error("Failed to generate title:", error);
+    return "New Chat";
+  }
+};
+
 /** Get list of conversations with pagination and search */
 export type GetConversationsParams = {
   page?: number;

@@ -310,6 +310,7 @@
   background: rgba(240, 245, 255, 0.5);
   border-radius: 8px;
   animation: fadeIn 0.3s ease-out;
+  color: black;
 }
 
 @keyframes fadeIn {
@@ -354,7 +355,7 @@
 
 .loadingText {
   font-size: 12px;
-  color: rgba(0, 0, 0, 0.55);
+  color: #000; /* make loading text black (Generating suggestions...) */
   font-style: italic;
 }
 
@@ -452,7 +453,7 @@
   }
 
   .loadingText {
-    color: rgba(255, 255, 255, 0.55);
+    color: rgba(7, 0, 0, 0.55);
   }
 }
 

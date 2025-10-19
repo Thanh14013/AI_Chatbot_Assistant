@@ -97,9 +97,7 @@ const ConversationForm: React.FC<ConversationFormProps> = ({
           setContextWindow(10); // Reset to default only for create mode
         }
       })
-      .catch((info) => {
-        console.log("Validate Failed:", info);
-      });
+      .catch((info) => {});
   };
 
   /**

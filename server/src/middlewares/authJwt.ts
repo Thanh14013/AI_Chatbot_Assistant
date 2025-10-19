@@ -35,11 +35,6 @@ export const authenticateAccessToken = (req: Req, res: Response, next: NextFunct
     // Development-only logging to help trace auth issues
     if (process.env.NODE_ENV === "development") {
       try {
-        console.log(
-          "[authJwt] Authorization header:",
-          req.headers?.authorization?.substring(0, 60)
-        );
-        console.log("[authJwt] Extracted token present:", !!accessToken);
       } catch {}
     }
 
@@ -67,12 +62,6 @@ export const authenticateAccessToken = (req: Req, res: Response, next: NextFunct
 
     if (process.env.NODE_ENV === "development") {
       try {
-        console.log(
-          "[authJwt] Decoded token:",
-          typeof accessResult.decoded === "object"
-            ? JSON.stringify(accessResult.decoded).slice(0, 200)
-            : accessResult.decoded
-        );
       } catch {}
     }
 

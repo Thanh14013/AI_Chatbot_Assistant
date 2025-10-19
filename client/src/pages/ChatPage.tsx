@@ -5,16 +5,20 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Layout, Typography, App } from "antd";
-import { createConversation as apiCreateConversation } from "../services/chat.service";
+import {
+  createConversation as apiCreateConversation,
+  generateConversationTitle as apiGenerateTitle,
+  updateConversation as apiUpdateConversation,
+} from "../services/chat.service";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import MessageList from "../components/MessageList";
 import ChatInput from "../components/ChatInput";
-import EmptyState from "../components/EmptyState";
 import { ConversationSearch } from "../components/ConversationSearch";
-import ConversationForm, {
-  ConversationFormValues,
-} from "../components/ConversationForm";
+// ConversationForm not used anymore in new draft mode flow
+// import ConversationForm, {
+//   ConversationFormValues,
+// } from "../components/ConversationForm";
 import { useChat, useWebSocket, useRealTimeChat } from "../hooks";
 import {
   Conversation,
@@ -91,9 +95,9 @@ const ChatPage: React.FC = () => {
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   // Sidebar is rendered by the new Sidebar component
 
-  // Modal/form state for creating conversation
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
+  // Modal/form state for creating conversation - deprecated in draft mode
+  // const [isModalVisible, setIsModalVisible] = useState(false);
+  // const [isCreating, setIsCreating] = useState(false);
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
@@ -152,13 +156,11 @@ const ChatPage: React.FC = () => {
 
   /**
    * Handle creating a new conversation
+   * Deprecated: Modal approach replaced with inline draft mode
    */
+  /*
   const openNewConversationModal = () => {
     setIsModalVisible(true);
-  };
-
-  const handleNewConversation = () => {
-    openNewConversationModal();
   };
 
   const handleCreateSubmit = async (values: ConversationFormValues) => {
@@ -173,26 +175,21 @@ const ChatPage: React.FC = () => {
       const conversation = await apiCreateConversation(payload as any);
       antdMessage.success("Conversation created");
 
-      // Close modal and reset
       setIsModalVisible(false);
 
-      // Navigate to conversation URL
       navigate(`/conversations/${conversation.id}`);
 
-      // Refresh conversations list so the new one shows up
       await refreshConversations();
 
-      // Notify other UI parts (Sidebar) to reload conversations list
       try {
         window.dispatchEvent(new Event("conversations:refresh"));
       } catch {}
 
-      // Notify WebSocket for multi-tab sync
       if (isConnected) {
         try {
           websocketService.notifyConversationCreated(conversation as any);
         } catch {}
-      } // Set current conversation and clear messages placeholder
+      }
       setCurrentConversation(conversation as any);
       setMessages([]);
     } catch (err: any) {
@@ -202,6 +199,21 @@ const ChatPage: React.FC = () => {
     } finally {
       setIsCreating(false);
     }
+  };
+  */
+
+  /**
+   * Handle New Conversation button click
+   * Navigate to home route to show empty chat (draft mode)
+   */
+  const handleNewConversation = () => {
+    // Navigate to home route to show empty chat interface
+    navigate("/");
+    // Clear current conversation to show draft mode
+    setCurrentConversation(null);
+    setMessages([]);
+    setMessagesPage(1);
+    setMessagesHasMore(false);
   };
 
   /**
@@ -217,6 +229,9 @@ const ChatPage: React.FC = () => {
   // this effect which would cause an infinite loop. Track previous id with a ref
   // so we can leave the old conversation when navigating to a new one.
   const prevConversationIdRef = useRef<string | null>(null);
+
+  // Track newly created conversations to avoid race condition with message loading
+  const justCreatedConversationIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const id = params.id;
@@ -247,6 +262,16 @@ const ChatPage: React.FC = () => {
         setCurrentConversation(conv as any);
 
         // Join WebSocket room for this conversation will be handled by useRealTimeChat effect
+
+        // Skip loading messages if this conversation was just created
+        // (to avoid race condition where we clear optimistic messages)
+        const isJustCreated = justCreatedConversationIdRef.current === convId;
+        if (isJustCreated) {
+          // Clear the flag after using it
+          justCreatedConversationIdRef.current = null;
+          setIsLoadingMessages(false);
+          return;
+        }
 
         const result = await svc.getMessages(convId, 1, 20);
         setMessages(result.messages);
@@ -298,7 +323,7 @@ const ChatPage: React.FC = () => {
         const qParam = searchParams.get("q");
         if (qParam && !highlightParam) {
           // Only proceed if no highlight param (to avoid double processing)
-          console.log("[ChatPage] Processing ?q param:", qParam);
+
           try {
             const convSearch = await searchConversation(convId, {
               query: qParam,
@@ -306,14 +331,10 @@ const ChatPage: React.FC = () => {
               contextMessages: 2,
             });
             const bestMatch = convSearch.bestMatch;
-            console.log("[ChatPage] Conversation search result:", bestMatch);
+
             if (bestMatch && bestMatch.message_id) {
               // Wait a bit for refs to be set, then try to highlight
               setTimeout(() => {
-                console.log(
-                  "[ChatPage] Calling handleSearchResultClick for",
-                  bestMatch.message_id
-                );
                 handleSearchResultClick(bestMatch.message_id);
               }, 200);
               // Remove q param from URL to avoid repeated actions
@@ -597,14 +618,301 @@ const ChatPage: React.FC = () => {
    * Handle sending a message
    */
   const handleSendMessage = async (content: string) => {
-    // Prevent sending if already sending or no conversation selected
-    if (isSendingMessage || isSendingRealtimeMessage || !currentConversation)
-      return;
+    // Prevent sending if already sending
+    if (isSendingMessage || isSendingRealtimeMessage) return;
 
-    // Use WebSocket if connected, otherwise fallback to HTTP
+    // ============ NEW CONVERSATION FLOW ============
+    if (!currentConversation) {
+      setIsSendingMessage(true);
+
+      try {
+        // Step 1: Generate title với timeout
+        const wordCount = content.trim().split(/\s+/).length;
+        let title: string;
+
+        if (wordCount <= 4 || content.length <= 50) {
+          title = content.trim();
+          console.log("[NEW CONV] Using content as title (short):", title);
+        } else {
+          try {
+            console.log(
+              "[NEW CONV] Generating smart title for long message..."
+            );
+            const titlePromise = apiGenerateTitle(content);
+            const timeoutPromise = new Promise<string>((resolve) =>
+              setTimeout(() => {
+                console.log(
+                  "[NEW CONV] Title generation timeout, using fallback"
+                );
+                resolve(content.trim().slice(0, 50) + "...");
+              }, 3000)
+            );
+            title = await Promise.race([titlePromise, timeoutPromise]);
+            console.log("[NEW CONV] Generated title:", title);
+          } catch (err) {
+            console.error("[NEW CONV] Title generation error:", err);
+            title = content.trim().slice(0, 50) + "...";
+          }
+        }
+
+        // Validate title before creating conversation
+        if (!title || title.trim().length === 0) {
+          console.error("[NEW CONV] Invalid title, using fallback");
+          title = "New Chat";
+        }
+
+        console.log("[NEW CONV] Final title for conversation:", title);
+
+        // Step 2: Create conversation
+        const newConversation = await apiCreateConversation({
+          title,
+          model: "gpt-5-nano",
+          context_window: 10,
+        });
+
+        // Mark this conversation as just created to skip message reload
+        justCreatedConversationIdRef.current = newConversation.id;
+
+        // Step 3: Set current conversation (without navigation yet)
+        setCurrentConversation(newConversation as any);
+
+        // IMPORTANT: Join WebSocket room immediately before sending message
+        // (useEffect auto-join may not run in time)
+        if (isConnected) {
+          joinConversation(newConversation.id);
+        }
+
+        // Step 4: Notify WebSocket about conversation creation
+        if (isConnected) {
+          try {
+            websocketService.notifyConversationCreated(newConversation as any);
+          } catch {}
+        }
+
+        // Refresh conversations list
+        refreshConversations().catch(() => {});
+        try {
+          window.dispatchEvent(new Event("conversations:refresh"));
+        } catch {}
+
+        // Step 5: Add optimistic user message
+        const tempId = `temp_${Date.now()}`;
+        const userMsg: Message = {
+          id: tempId,
+          conversation_id: newConversation.id,
+          role: "user",
+          content,
+          tokens_used: 0,
+          model: newConversation.model,
+          createdAt: new Date().toISOString(),
+          localStatus: "pending",
+        };
+        setMessages([userMsg]);
+
+        // Scroll to show user message
+        try {
+          setTimeout(
+            () => window.dispatchEvent(new Event("messages:scrollToBottom")),
+            40
+          );
+        } catch {}
+
+        // Navigate to conversation URL after a short delay
+        // This allows message sending to start before useEffect triggers
+        setTimeout(() => {
+          navigate(`/conversations/${newConversation.id}`, { replace: true });
+        }, 50);
+
+        // Wait a tiny bit for state updates to propagate before sending
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Step 6: Try sending via WebSocket first
+        if (isConnected) {
+          try {
+            console.log("[NEW CONV] Attempting WebSocket send...");
+
+            // Send directly via websocketService instead of hook
+            // (hook may not have updated conversation prop yet)
+            websocketService.sendMessage(newConversation.id, content);
+
+            console.log("[NEW CONV] WebSocket send initiated!");
+
+            // Update conversation metadata optimistically
+            try {
+              moveConversationToTop(newConversation.id);
+              updateConversationOptimistic(newConversation.id, {
+                message_count: 1,
+                updatedAt: new Date().toISOString(),
+              });
+              refreshConversations().catch(() => {});
+              window.dispatchEvent(new Event("message:sent"));
+            } catch {}
+
+            setIsSendingMessage(false);
+
+            // WebSocket is fire-and-forget, response will come via event listeners
+            // Don't return here - let HTTP fallback handle if WebSocket fails
+            // Actually, we should wait a bit to see if WebSocket succeeds
+            await new Promise((resolve) => setTimeout(resolve, 500));
+
+            // If we're still here and no error, assume success
+            console.log("[NEW CONV] WebSocket send assumed successful");
+            return;
+          } catch (err) {
+            console.warn(
+              "[NEW CONV] WebSocket send failed, falling back to HTTP:",
+              err
+            );
+            // Continue to HTTP fallback
+          }
+        } else {
+          console.log(
+            "[NEW CONV] WebSocket not connected, using HTTP directly"
+          );
+        }
+
+        // Step 7: Fallback to HTTP streaming
+        console.log("[NEW CONV] Starting HTTP fallback...");
+
+        // Add typing indicator
+        const typingId = `typing_${Date.now()}`;
+        const typingMsg: Message = {
+          id: typingId,
+          conversation_id: newConversation.id,
+          role: "assistant",
+          content: "",
+          tokens_used: 0,
+          model: newConversation.model,
+          createdAt: new Date().toISOString(),
+          isTyping: true,
+        };
+        setMessages((prev) => [...prev, typingMsg]);
+
+        console.log(
+          "[NEW CONV] Added typing indicator, sending HTTP request..."
+        );
+
+        try {
+          const svc = await import("../services/chat.service");
+          await svc.sendMessageStream(
+            newConversation.id,
+            content,
+            // onChunk
+            (chunk) => {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === typingId
+                    ? { ...m, content: (m.content || "") + chunk }
+                    : m
+                )
+              );
+            },
+            // onDone
+            (result: any) => {
+              console.log("[NEW CONV] HTTP response received:", result);
+              const serverUserMsg = result?.userMessage;
+              const assistantMsg = result?.assistantMessage;
+
+              setMessages((prev) => {
+                // Remove typing indicator
+                const withoutTyping = prev.filter((m) => m.id !== typingId);
+
+                // Replace optimistic user message with server version
+                let replacedList = withoutTyping.map((m) =>
+                  m.id === tempId && serverUserMsg ? serverUserMsg : m
+                );
+
+                // Add server user message if not already present
+                if (
+                  serverUserMsg &&
+                  !replacedList.some((m) => m.id === serverUserMsg.id)
+                ) {
+                  replacedList.push(serverUserMsg);
+                }
+
+                // Add assistant message
+                if (assistantMsg) {
+                  replacedList.push(assistantMsg);
+                }
+
+                return replacedList;
+              });
+
+              // Scroll to bottom
+              try {
+                setTimeout(
+                  () =>
+                    window.dispatchEvent(new Event("messages:scrollToBottom")),
+                  40
+                );
+              } catch {}
+
+              // Update conversation metadata
+              if (result?.conversation) {
+                const conv = result.conversation;
+                setCurrentConversation((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        total_tokens_used: conv.total_tokens_used,
+                        message_count: conv.message_count,
+                        updatedAt: new Date().toISOString(),
+                      }
+                    : prev
+                );
+
+                try {
+                  moveConversationToTop(newConversation.id);
+                  updateConversationOptimistic(newConversation.id, {
+                    message_count: conv.message_count,
+                    updatedAt: new Date().toISOString(),
+                  });
+                  refreshConversations().catch(() => {});
+                  window.dispatchEvent(new Event("message:sent"));
+                } catch {}
+              }
+            },
+            // onError
+            (err) => {
+              antdMessage.error("Failed to send message");
+              // Mark optimistic message as failed
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === tempId ? { ...m, localStatus: "failed" } : m
+                )
+              );
+              // Remove typing indicator
+              setMessages((prev) => prev.filter((m) => m.id !== typingId));
+            }
+          );
+        } catch (err) {
+          antdMessage.error("Failed to send message");
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === tempId ? { ...m, localStatus: "failed" } : m
+            )
+          );
+          setMessages((prev) => prev.filter((m) => m.id !== typingId));
+        } finally {
+          setIsSendingMessage(false);
+        }
+
+        return; // End of new conversation flow
+      } catch (err: any) {
+        antdMessage.error(
+          err?.response?.data?.message || "Failed to create conversation"
+        );
+        setCurrentConversation(null);
+        setMessages([]);
+        setIsSendingMessage(false);
+        return;
+      }
+    }
+
+    // ============ EXISTING CONVERSATION FLOW ============
+    // (Giữ nguyên code cũ cho phần này)
     if (isConnected) {
       try {
-        // Add optimistic user message
         const tempId = `temp_${Date.now()}`;
         const userMsg: Message = {
           id: tempId,
@@ -617,7 +925,7 @@ const ChatPage: React.FC = () => {
           localStatus: "pending",
         };
         setMessages((prev) => [...prev, userMsg]);
-        // scroll to show optimistic user message
+
         try {
           setTimeout(
             () => window.dispatchEvent(new Event("messages:scrollToBottom")),
@@ -625,27 +933,20 @@ const ChatPage: React.FC = () => {
           );
         } catch {}
 
-        // Don't add typing indicator here - server will broadcast ai:typing:start to all clients
         await sendRealtimeMessage(content);
-        // Optimistically move conversation to top and refresh sidebar immediately
+
         try {
           moveConversationToTop(currentConversation.id);
           updateConversationOptimistic(currentConversation.id, {
             message_count: (currentConversation.message_count || 0) + 1,
             updatedAt: new Date().toISOString(),
           });
-          // Wait for the conversation list to refresh so the sidebar reflects ordering immediately
           await refreshConversations();
-          try {
-            window.dispatchEvent(new Event("message:sent"));
-          } catch {}
-        } catch (err) {
-          // refreshConversations failed (log suppressed)
-        }
+          window.dispatchEvent(new Event("message:sent"));
+        } catch {}
+
         return;
       } catch (err) {
-        // WebSocket send failed, falling back to HTTP (log suppressed)
-        // Remove optimistic messages on error
         setMessages((prev) =>
           prev.filter(
             (msg) => !msg.localStatus || msg.localStatus !== "pending"
@@ -653,7 +954,6 @@ const ChatPage: React.FC = () => {
         );
         setMessages((prev) => prev.filter((msg) => !msg.isTyping));
 
-        // Dispatch ai:typing:stop to reset isAITyping state if WebSocket failed
         try {
           window.dispatchEvent(
             new CustomEvent("ai:typing:stop", {
@@ -664,8 +964,7 @@ const ChatPage: React.FC = () => {
       }
     }
 
-    // Fallback to HTTP streaming
-    // Optimistically add user message to the list
+    // HTTP fallback for existing conversation
     const tempId = `temp_${Date.now()}`;
     const userMsg: Message = {
       id: tempId,
@@ -678,11 +977,9 @@ const ChatPage: React.FC = () => {
       localStatus: "pending",
     };
 
-    // Optimistically add user message
     setMessages((prev) => [...prev, userMsg]);
     setIsSendingMessage(true);
 
-    // add assistant typing placeholder
     const typingId = `typing_${Date.now()}`;
     const typingMsg: Message = {
       id: typingId,
@@ -695,7 +992,7 @@ const ChatPage: React.FC = () => {
       isTyping: true,
     };
     setMessages((prev) => [...prev, typingMsg]);
-    // scroll so typing placeholder is visible
+
     try {
       setTimeout(
         () => window.dispatchEvent(new Event("messages:scrollToBottom")),
@@ -703,144 +1000,169 @@ const ChatPage: React.FC = () => {
       );
     } catch {}
 
-    (async () => {
-      try {
-        const svc = await import("../services/chat.service");
+    try {
+      const svc = await import("../services/chat.service");
+      await svc.sendMessageStream(
+        currentConversation.id,
+        content,
+        (chunk) => {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === typingId
+                ? { ...m, content: (m.content || "") + chunk }
+                : m
+            )
+          );
+        },
+        (result: any) => {
+          const serverUserMsg = result?.userMessage;
+          const assistantMsg = result?.assistantMessage;
 
-        await svc.sendMessageStream(
-          currentConversation.id,
-          content,
-          // onChunk: append chunk to typing message content
-          (chunk) => {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === typingId
-                  ? { ...m, content: (m.content || "") + chunk }
-                  : m
-              )
+          setMessages((prev) => {
+            const withoutTyping = prev.filter((m) => m.id !== typingId);
+            let replacedList = withoutTyping.map((m) =>
+              m.id === tempId && serverUserMsg ? serverUserMsg : m
             );
-          },
-          // onDone: replace typing placeholder and update user message
-          (result: any) => {
-            const userMsg: any = result?.userMessage;
-            const assistantMsg: any = result?.assistantMessage;
-
-            setMessages((prev) => {
-              // remove typing placeholder
-              const withoutTyping = prev.filter((m) => m.id !== typingId);
-
-              // replace optimistic user message (tempId) with server userMessage if provided
-              let replacedList = withoutTyping.map((m) =>
-                m.id === tempId && userMsg ? userMsg : m
-              );
-
-              // If server didn't return a userMessage, but there is still no matching
-              // optimistic message, append server user msg (defensive)
-              if (userMsg && !replacedList.some((m) => m.id === userMsg.id)) {
-                replacedList.push(userMsg);
-              }
-
-              // append assistant message from server (final)
-              if (assistantMsg) replacedList.push(assistantMsg);
-
-              return replacedList;
-            });
-
-            // ensure final messages are visible after server completes
-            try {
-              setTimeout(
-                () =>
-                  window.dispatchEvent(new Event("messages:scrollToBottom")),
-                40
-              );
-            } catch {}
-
-            // refresh conversation metadata if present and force reload of conversation list
-            if ((result as any)?.conversation) {
-              const conv = (result as any).conversation;
-              setCurrentConversation((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      total_tokens_used: conv.total_tokens_used,
-                      message_count: conv.message_count,
-                      updatedAt: new Date().toISOString(),
-                    }
-                  : prev
-              );
-
-              // Move conversation to top and update optimistic metadata
-              try {
-                moveConversationToTop(currentConversation.id);
-                updateConversationOptimistic(currentConversation.id, {
-                  message_count: conv.message_count,
-                  updatedAt: new Date().toISOString(),
-                });
-                // force refresh and wait so UI shows most recent ordering immediately
-                refreshConversations().catch(
-                  (err) =>
-                    // suppressed debug
-                    null
-                );
-                try {
-                  window.dispatchEvent(new Event("message:sent"));
-                } catch {}
-              } catch (err) {
-                console.debug("move/update conversation failed:", err);
-              }
+            if (
+              serverUserMsg &&
+              !replacedList.some((m) => m.id === serverUserMsg.id)
+            ) {
+              replacedList.push(serverUserMsg);
             }
+            if (assistantMsg) replacedList.push(assistantMsg);
+            return replacedList;
+          });
 
-            // Dispatch ai:typing:stop to reset isAITyping state (for HTTP fallback)
-            try {
-              window.dispatchEvent(
-                new CustomEvent("ai:typing:stop", {
-                  detail: { conversationId: currentConversation.id },
-                })
-              );
-            } catch {}
-          },
-          (err) => {
-            antdMessage.error("Failed to stream AI response");
-            // mark optimistic user as failed
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === tempId ? { ...m, localStatus: "failed" } : m
-              )
+          try {
+            setTimeout(
+              () => window.dispatchEvent(new Event("messages:scrollToBottom")),
+              40
             );
-            // remove typing placeholder
-            setMessages((prev) => prev.filter((m) => m.id !== typingId));
+          } catch {}
 
-            // Dispatch ai:typing:stop to reset isAITyping state (for HTTP fallback error)
+          if (result?.conversation) {
+            const conv = result.conversation;
+            setCurrentConversation((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    total_tokens_used: conv.total_tokens_used,
+                    message_count: conv.message_count,
+                    updatedAt: new Date().toISOString(),
+                  }
+                : prev
+            );
+
             try {
-              window.dispatchEvent(
-                new CustomEvent("ai:typing:stop", {
-                  detail: { conversationId: currentConversation.id },
-                })
-              );
+              moveConversationToTop(currentConversation.id);
+              updateConversationOptimistic(currentConversation.id, {
+                message_count: conv.message_count,
+                updatedAt: new Date().toISOString(),
+              });
+              refreshConversations().catch(() => {});
+              window.dispatchEvent(new Event("message:sent"));
             } catch {}
           }
-        );
-      } catch (err) {
-        antdMessage.error("Failed to send message");
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === tempId ? { ...m, localStatus: "failed" } : m
-          )
-        );
-        setMessages((prev) => prev.filter((m) => m.id !== typingId));
 
-        // Dispatch ai:typing:stop to reset isAITyping state (for HTTP fallback error)
-        try {
-          window.dispatchEvent(
-            new CustomEvent("ai:typing:stop", {
-              detail: { conversationId: currentConversation.id },
-            })
+          try {
+            window.dispatchEvent(
+              new CustomEvent("ai:typing:stop", {
+                detail: { conversationId: currentConversation.id },
+              })
+            );
+          } catch {}
+        },
+        (err) => {
+          antdMessage.error("Failed to stream AI response");
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === tempId ? { ...m, localStatus: "failed" } : m
+            )
           );
-        } catch {}
-      } finally {
-        setIsSendingMessage(false);
+          setMessages((prev) => prev.filter((m) => m.id !== typingId));
+
+          try {
+            window.dispatchEvent(
+              new CustomEvent("ai:typing:stop", {
+                detail: { conversationId: currentConversation.id },
+              })
+            );
+          } catch {}
+        }
+      );
+    } catch (err) {
+      antdMessage.error("Failed to send message");
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, localStatus: "failed" } : m))
+      );
+      setMessages((prev) => prev.filter((m) => m.id !== typingId));
+
+      try {
+        window.dispatchEvent(
+          new CustomEvent("ai:typing:stop", {
+            detail: { conversationId: currentConversation.id },
+          })
+        );
+      } catch {}
+    } finally {
+      setIsSendingMessage(false);
+    }
+  };
+
+  // Helper function để tránh duplicate logic
+  const sendMessageViaWebSocketOrHTTP = async (
+    conversation: Conversation,
+    content: string,
+    tempId: string,
+    userMsg: Message
+  ) => {
+    // Try WebSocket first
+    if (isConnected) {
+      try {
+        await sendRealtimeMessage(content);
+        moveConversationToTop(conversation.id);
+        await refreshConversations();
+        return true;
+      } catch (err) {
+        console.warn("WebSocket send failed, falling back to HTTP");
       }
-    })();
+    }
+
+    // Fallback to HTTP
+    const typingMsg: Message = {
+      id: `typing_${Date.now()}`,
+      conversation_id: conversation.id,
+      role: "assistant",
+      content: "",
+      tokens_used: 0,
+      model: conversation.model,
+      createdAt: new Date().toISOString(),
+      isTyping: true,
+    };
+    setMessages((prev) => [...prev, typingMsg]);
+
+    try {
+      const svc = await import("../services/chat.service");
+      await svc.sendMessageStream(
+        conversation.id,
+        content,
+        (chunk) => {
+          /* handle chunk */
+        },
+        (result) => {
+          /* handle completion */
+        },
+        (err) => {
+          /* handle error */
+        }
+      );
+      return true;
+    } catch (err) {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, localStatus: "failed" } : m))
+      );
+      return false;
+    }
   };
 
   // Load earlier messages (pagination)
@@ -995,7 +1317,10 @@ const ChatPage: React.FC = () => {
 
     // Find the bot message and the last user message before it
     const msgIndex = messages.findIndex((m) => m.id === messageId);
-    if (msgIndex === -1) return;
+    if (msgIndex === -1) {
+      console.error("[FOLLOWUPS] Message not found:", messageId);
+      return;
+    }
 
     const lastBotMessage = content;
     let lastUserMessage = "";
@@ -1007,6 +1332,29 @@ const ChatPage: React.FC = () => {
         break;
       }
     }
+
+    // Validate that we have both messages
+    if (!lastUserMessage || lastUserMessage.trim().length === 0) {
+      console.error("[FOLLOWUPS] No user message found before bot message");
+      antdMessage.warning(
+        "Cannot generate suggestions: conversation context not found"
+      );
+      return;
+    }
+
+    if (!lastBotMessage || lastBotMessage.trim().length === 0) {
+      console.error("[FOLLOWUPS] Bot message is empty");
+      antdMessage.warning(
+        "Cannot generate suggestions: message content is empty"
+      );
+      return;
+    }
+
+    console.log("[FOLLOWUPS] Requesting suggestions with context:", {
+      messageId,
+      lastUserMessage: lastUserMessage.slice(0, 50) + "...",
+      lastBotMessage: lastBotMessage.slice(0, 50) + "...",
+    });
 
     // Mark message as loading suggestions
     setMessages((prev) =>
@@ -1037,6 +1385,11 @@ const ChatPage: React.FC = () => {
   useEffect(() => {
     const handleFollowupsResponse = (event: CustomEvent) => {
       const { messageId, suggestions } = event.detail;
+      console.log("[FOLLOWUPS] Received suggestions:", {
+        messageId,
+        count: suggestions?.length,
+      });
+
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === messageId
@@ -1052,12 +1405,20 @@ const ChatPage: React.FC = () => {
 
     const handleFollowupsError = (event: CustomEvent) => {
       const { messageId, error } = event.detail;
+      console.error("[FOLLOWUPS] Error:", { messageId, error });
+
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === messageId ? { ...msg, isLoadingFollowups: false } : msg
         )
       );
-      antdMessage.error(`Failed to get suggestions: ${error}`);
+
+      // Show user-friendly error message
+      const errorMsg =
+        typeof error === "string"
+          ? error
+          : "Unable to generate suggestions. Please try again.";
+      antdMessage.error(errorMsg);
     };
 
     window.addEventListener(
@@ -1112,9 +1473,39 @@ const ChatPage: React.FC = () => {
         <Content className={styles.contentArea}>
           {/* Main content */}
 
-          {/* Show empty state or messages */}
+          {/* Always show chat interface (either empty or with messages) */}
           {!currentConversation ? (
-            <EmptyState type="messages" onAction={handleNewConversation} />
+            <>
+              {/* Empty conversation - show placeholder and input */}
+              <div className={styles.conversationHeader}>
+                <div className={styles.conversationHeaderLeft}>
+                  <Title level={4} className={styles.conversationTitle}>
+                    New Chat
+                  </Title>
+                  <NetworkStatus position="inline" />
+                </div>
+              </div>
+
+              {/* Empty message list with placeholder */}
+              <MessageList
+                messages={[]}
+                isLoading={false}
+                showScrollButton={false}
+                messageRefs={messageRefs}
+                highlightedMessageId={highlightedMessageId}
+                onRequestFollowups={handleRequestFollowups}
+                onFollowupClick={handleFollowupClick}
+              />
+
+              {/* Chat input for new conversation */}
+              <ChatInput
+                onSendMessage={handleSendMessage}
+                disabled={isSendingMessage}
+                placeholder="Type your message to start a new conversation..."
+                onTypingStart={() => isConnected && startTyping()}
+                onTypingStop={() => isConnected && stopTyping()}
+              />
+            </>
           ) : (
             <>
               {/* Conversation header */}
@@ -1164,13 +1555,15 @@ const ChatPage: React.FC = () => {
         </Content>
       </Layout>
 
-      {/* New Conversation Modal */}
+      {/* New Conversation Modal - Deprecated: now using inline draft mode */}
+      {/* 
       <ConversationForm
         open={isModalVisible}
         onCancel={() => setIsModalVisible(false)}
         onSubmit={handleCreateSubmit}
         loading={isCreating}
       />
+      */}
     </Layout>
   );
 };
