@@ -57,6 +57,8 @@ export interface ConversationListItem {
   context_window?: number; // Added for edit functionality
   message_count: number;
   updatedAt: string | Date;
+  // Client-side only field for unread tracking (multi-tab)
+  hasUnread?: boolean;
 }
 
 // Input for creating a conversation (client -> server)

@@ -56,7 +56,7 @@ Chỉ trả về danh sách 3 câu hỏi, mỗi câu 1 dòng, không cần số 
       throw new Error("OpenAI returned empty content for follow-ups");
     }
 
-    console.log("[FOLLOWUPS] Raw OpenAI response:", content);
+    // logging removed
 
     // Clean up content: remove markdown code blocks if present
     content = content.trim();
@@ -67,7 +67,7 @@ Chỉ trả về danh sách 3 câu hỏi, mỗi câu 1 dòng, không cần số 
         .trim();
     }
 
-    console.log("[FOLLOWUPS] Cleaned content:", content);
+    // logging removed
 
     // Parse suggestions from text
     let suggestions: string[] = [];
@@ -97,11 +97,11 @@ Chỉ trả về danh sách 3 câu hỏi, mỗi câu 1 dòng, không cần số 
       }
     }
 
-    console.log("[FOLLOWUPS] Parsed suggestions:", suggestions);
+    // logging removed
 
     // Ensure we have exactly 3 suggestions
     if (suggestions.length < 3) {
-      console.warn("[FOLLOWUPS] Not enough suggestions, padding with defaults");
+      // logging removed
       const defaults = [
         "Can you explain that in more detail?",
         "What else should I know about this?",
@@ -115,7 +115,7 @@ Chỉ trả về danh sách 3 câu hỏi, mỗi câu 1 dòng, không cần số 
     // Take only first 3
     suggestions = suggestions.slice(0, 3);
 
-    console.log("[FOLLOWUPS] Final suggestions to return:", suggestions);
+    // logging removed
 
     // Cache the result
     followupCache.set(cacheKey, suggestions);
@@ -130,7 +130,7 @@ Chỉ trả về danh sách 3 câu hỏi, mỗi câu 1 dòng, không cần số 
 
     return suggestions;
   } catch (error: any) {
-    console.error("Failed to generate follow-up suggestions:", error.message);
+    // logging removed
 
     // Return default suggestions on error
     return [

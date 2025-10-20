@@ -60,6 +60,12 @@ interface ServerToClientEvents {
     messageCount: number;
     totalTokens: number;
   }) => void;
+  // New event for unread status (multi-tab unread tracking)
+  "conversation:unread_status": (data: {
+    conversationId: string;
+    hasUnread: boolean;
+    socketId?: string;
+  }) => void;
 
   // Follow-up suggestion events
   followups_response: (data: {
@@ -102,6 +108,9 @@ interface ClientToServerEvents {
     update: Partial<ConversationListItem>;
   }) => void;
   "conversation:delete": (conversationId: string) => void;
+  // New events for tracking conversation view state (multi-tab unread)
+  "conversation:view": (data: { conversationId: string }) => void;
+  "conversation:leave_view": (data: { conversationId: string }) => void;
 }
 
 export type SocketType = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -147,6 +156,12 @@ export interface WebSocketEventHandlers {
     lastActivity: string;
     messageCount: number;
     totalTokens: number;
+  }) => void;
+  // New unread status handler (for multi-tab unread tracking)
+  onConversationUnreadStatus?: (data: {
+    conversationId: string;
+    hasUnread: boolean;
+    socketId?: string;
   }) => void;
 
   // Follow-up suggestion handlers
@@ -196,7 +211,7 @@ class WebSocketService {
         return;
       }
 
-      // console.log("[WebSocket] Connecting to server...");
+      // logging removed
 
       this.socket = io(
         import.meta.env.VITE_API_URL || "http://localhost:3000",
@@ -212,10 +227,10 @@ class WebSocketService {
 
       // Connection events
       this.socket.on("connect", () => {
-        // console.log("[WebSocket] Connected successfully");
+        // logging removed
 
         if (this.wasDisconnected) {
-          // console.log("[WebSocket] Reconnected");
+          // logging removed
           this.handlers.onReconnect?.();
 
           // Rejoin current conversation if any
@@ -232,7 +247,7 @@ class WebSocketService {
       });
 
       this.socket.on("disconnect", (reason) => {
-        // console.log("[WebSocket] Disconnected:", reason);
+        // logging removed
         this.wasDisconnected = true;
         this.handlers.onDisconnect?.(reason);
 
@@ -243,7 +258,6 @@ class WebSocketService {
       });
 
       this.socket.on("connect_error", (error) => {
-        // console.error("[WebSocket] Connection error:", error.message);
         this.isConnecting = false;
 
         // If authentication failed, don't auto-reconnect
@@ -262,7 +276,7 @@ class WebSocketService {
 
       // Error handling
       this.socket.on("error", (error) => {
-        // console.error("[WebSocket] Socket error:", error);
+        // logging removed
         this.handlers.onError?.(error);
       });
 
@@ -305,20 +319,38 @@ class WebSocketService {
         this.handlers.onConversationDeleted?.(data);
       });
 
+      // Unread status tracking (multi-tab)
+      this.socket.on("conversation:unread_status", (data) => {
+        try {
+          // Allow handlers to process unread status
+          this.handlers.onConversationUnreadStatus?.(data);
+        } catch {
+          // logging removed
+        }
+        try {
+          // Dispatch global event for unread status update
+          window.dispatchEvent(
+            new CustomEvent("conversation:unread_status", { detail: data })
+          );
+        } catch {
+          // logging removed
+        }
+      });
+
       // New message notification (sent by other sockets)
       this.socket.on("message:new", (data) => {
         try {
           // Allow handlers to process new message
           this.handlers.onMessageNew?.(data);
-        } catch (err) {
-          console.debug("websocket: onMessageNew handler error", err);
+        } catch {
+          // logging removed
         }
         try {
           window.dispatchEvent(
             new CustomEvent("message:new", { detail: data })
           );
-        } catch (err) {
-          console.debug("websocket: dispatch message:new failed", err);
+        } catch {
+          // logging removed
         }
       });
 
@@ -327,19 +359,16 @@ class WebSocketService {
         try {
           // Allow handlers to process activity
           this.handlers.onConversationActivity?.(data);
-        } catch (err) {
-          console.debug("websocket: onConversationActivity handler error", err);
+        } catch {
+          // logging removed
         }
         try {
           // Dispatch global event for conversation list refresh
           window.dispatchEvent(
             new CustomEvent("conversation:activity", { detail: data })
           );
-        } catch (err) {
-          console.debug(
-            "websocket: dispatch conversation:activity failed",
-            err
-          );
+        } catch {
+          // logging removed
         }
       });
 
@@ -347,16 +376,16 @@ class WebSocketService {
       this.socket.on("followups_response", (data) => {
         try {
           this.handlers.onFollowupsResponse?.(data);
-        } catch (err) {
-          console.debug("websocket: onFollowupsResponse handler error", err);
+        } catch {
+          // logging removed
         }
       });
 
       this.socket.on("followups_error", (data) => {
         try {
           this.handlers.onFollowupsError?.(data);
-        } catch (err) {
-          console.debug("websocket: onFollowupsError handler error", err);
+        } catch {
+          // logging removed
         }
       });
 
@@ -379,7 +408,7 @@ class WebSocketService {
    * Disconnect from WebSocket server
    */
   disconnect(): void {
-    // console.log("[WebSocket] Manually disconnecting...");
+    // logging removed
     this.clearReconnectTimer();
 
     if (this.socket) {
@@ -498,6 +527,22 @@ class WebSocketService {
   notifyConversationDeleted(conversationId: string): void {
     if (!this.socket?.connected) return;
     this.socket.emit("conversation:delete", conversationId);
+  }
+
+  /**
+   * Notify that user is viewing a conversation (for unread tracking)
+   */
+  viewConversation(conversationId: string): void {
+    if (!this.socket?.connected) return;
+    this.socket.emit("conversation:view", { conversationId });
+  }
+
+  /**
+   * Notify that user left conversation view (for unread tracking)
+   */
+  leaveConversationView(conversationId: string): void {
+    if (!this.socket?.connected) return;
+    this.socket.emit("conversation:leave_view", { conversationId });
   }
 
   /**

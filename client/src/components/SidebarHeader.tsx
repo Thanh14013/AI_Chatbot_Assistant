@@ -103,11 +103,8 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
                 if (convRes.bestMatch?.message_id) {
                   onHighlightMessage(convRes.bestMatch.message_id);
                 }
-              } catch (searchErr) {
-                console.debug(
-                  "[SidebarHeader] Conversation search failed:",
-                  searchErr
-                );
+              } catch {
+                // logging removed: conversation search failed
               }
             } else {
               // Navigate to the conversation
@@ -117,11 +114,11 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
             }
           }
         }
-      } catch (navErr) {
-        console.debug("[SidebarHeader] Auto-navigate failed:", navErr);
+      } catch {
+        // logging removed: auto-navigate failed
       }
     } catch (err: any) {
-      console.error("[SidebarHeader] Semantic search failed:", err);
+      // logging removed: semantic search failed
       const errorMsg =
         err.response?.data?.message || err.message || "Search failed";
       setError(errorMsg);

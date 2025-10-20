@@ -91,12 +91,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onResultClick }) => {
             navigate(`${basePath}?q=${encodeURIComponent(query)}`);
           }
         }
-      } catch (err) {
+      } catch {
         // non-fatal: navigation failure should not break search UI
-        console.debug("SearchBar: auto-navigate to best match failed", err);
+        // logging removed
       }
     } catch (err: any) {
-      console.error("Search failed:", err);
+      // logging removed: search failed
       setError(err.response?.data?.message || "Search failed");
       setResults([]);
     } finally {

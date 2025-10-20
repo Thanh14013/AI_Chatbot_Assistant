@@ -16,6 +16,7 @@ interface SidebarProps {
   onSelectConversation?: (id: string) => void;
   onNewConversation?: () => void;
   onHighlightMessage?: (messageId: string) => void;
+  unreadConversations?: Set<string>; // For unread tracking (multi-tab)
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -23,6 +24,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onSelectConversation,
   onNewConversation,
   onHighlightMessage,
+  unreadConversations,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const { user } = useAuth();
@@ -113,14 +115,20 @@ const Sidebar: React.FC<SidebarProps> = ({
         title: r.conversation_title,
         message_count: r.message_count,
         updatedAt: r.updated_at,
+        hasUnread: unreadConversations?.has(r.conversation_id) || false,
       })) as ConversationListItem[];
       setFilteredConversations(mapped);
       return;
     }
 
     // Otherwise show the full conversations list (no local title filtering)
-    setFilteredConversations(conversations);
-  }, [conversations, semanticResults]);
+    // Add hasUnread status based on unreadConversations Set
+    const withUnread = conversations.map((conv) => ({
+      ...conv,
+      hasUnread: unreadConversations?.has(conv.id) || false,
+    }));
+    setFilteredConversations(withUnread);
+  }, [conversations, semanticResults, unreadConversations]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);

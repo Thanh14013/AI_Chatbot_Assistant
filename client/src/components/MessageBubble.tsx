@@ -44,10 +44,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const [displayedContent, setDisplayedContent] = useState<string>(
     message.content || ""
   );
-  // Render-time debug log to help check whether the component re-renders
-  try {
-    // render debug logging removed
-  } catch {}
+  // Render-time debug logging removed
   const lastStreamedMessageId = useRef<string | null>(null);
   const displayedContentRef = useRef<string>(displayedContent);
   // MessageRole is a string union ('user' | 'assistant' | 'system')

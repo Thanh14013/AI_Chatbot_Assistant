@@ -217,11 +217,8 @@ export const useRealTimeChat = (
                 detail: { conversationId: data.conversationId },
               })
             );
-          } catch (err) {
-            console.debug(
-              "useRealTimeChat: conversation activity dispatch failed",
-              err
-            );
+          } catch {
+            // logging removed
           }
         }
       },

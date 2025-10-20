@@ -224,6 +224,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
       {/* Conversation icon */}
       <div className={styles.iconContainer}>
         <MessageOutlined className={styles.icon} />
+        {/* Unread indicator (green dot) */}
+        {conversation.hasUnread && !isActive && (
+          <div className={styles.unreadIndicator} />
+        )}
       </div>
 
       {/* Conversation details */}

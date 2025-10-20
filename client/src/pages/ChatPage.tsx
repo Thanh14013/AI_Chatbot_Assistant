@@ -93,6 +93,12 @@ const ChatPage: React.FC = () => {
   const [messagesHasMore, setMessagesHasMore] = useState<boolean>(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+
+  // Unread tracking state (multi-tab)
+  const [unreadConversations, setUnreadConversations] = useState<Set<string>>(
+    new Set()
+  );
+
   // Sidebar is rendered by the new Sidebar component
 
   // Modal/form state for creating conversation - deprecated in draft mode
@@ -615,6 +621,63 @@ const ChatPage: React.FC = () => {
   }, [currentConversation]);
 
   /**
+   * Handle unread status tracking (multi-tab)
+   * - Emit conversation:view when user opens a conversation
+   * - Listen for unread status updates from server
+   */
+  useEffect(() => {
+    // Emit view event when currentConversation changes
+    if (currentConversation && isConnected) {
+      websocketService.viewConversation(currentConversation.id);
+
+      // Mark as read immediately in local state
+      setUnreadConversations((prev) => {
+        const next = new Set(prev);
+        next.delete(currentConversation.id);
+        return next;
+      });
+    }
+
+    // Cleanup: emit leave_view when unmounting or switching conversation
+    return () => {
+      if (currentConversation && isConnected) {
+        websocketService.leaveConversationView(currentConversation.id);
+      }
+    };
+  }, [currentConversation?.id, isConnected]);
+
+  /**
+   * Listen for unread status updates from WebSocket
+   */
+  useEffect(() => {
+    const handleUnreadStatus = (event: CustomEvent) => {
+      const { conversationId, hasUnread } = event.detail;
+
+      setUnreadConversations((prev) => {
+        const next = new Set(prev);
+        if (hasUnread) {
+          next.add(conversationId);
+        } else {
+          next.delete(conversationId);
+        }
+        return next;
+      });
+    };
+
+    window.addEventListener(
+      "conversation:unread_status",
+      handleUnreadStatus as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "conversation:unread_status",
+        handleUnreadStatus as EventListener
+      );
+    };
+  }, []);
+
+  /**
    * Handle sending a message
    */
   const handleSendMessage = async (content: string) => {
@@ -632,36 +695,30 @@ const ChatPage: React.FC = () => {
 
         if (wordCount <= 4 || content.length <= 50) {
           title = content.trim();
-          console.log("[NEW CONV] Using content as title (short):", title);
+          // logging removed: using content as title (short)
         } else {
           try {
-            console.log(
-              "[NEW CONV] Generating smart title for long message..."
-            );
+            // logging removed: generating smart title for long message
             const titlePromise = apiGenerateTitle(content);
             const timeoutPromise = new Promise<string>((resolve) =>
               setTimeout(() => {
-                console.log(
-                  "[NEW CONV] Title generation timeout, using fallback"
-                );
+                // logging removed: title generation timeout
                 resolve(content.trim().slice(0, 50) + "...");
               }, 3000)
             );
             title = await Promise.race([titlePromise, timeoutPromise]);
-            console.log("[NEW CONV] Generated title:", title);
+            // logging removed: generated title
           } catch (err) {
-            console.error("[NEW CONV] Title generation error:", err);
+            // logging removed: title generation error
             title = content.trim().slice(0, 50) + "...";
           }
         }
 
         // Validate title before creating conversation
         if (!title || title.trim().length === 0) {
-          console.error("[NEW CONV] Invalid title, using fallback");
+          // logging removed: invalid title, using fallback
           title = "New Chat";
         }
-
-        console.log("[NEW CONV] Final title for conversation:", title);
 
         // Step 2: Create conversation
         const newConversation = await apiCreateConversation({
@@ -729,13 +786,13 @@ const ChatPage: React.FC = () => {
         // Step 6: Try sending via WebSocket first
         if (isConnected) {
           try {
-            console.log("[NEW CONV] Attempting WebSocket send...");
+            // logging removed: attempting WebSocket send
 
             // Send directly via websocketService instead of hook
             // (hook may not have updated conversation prop yet)
             websocketService.sendMessage(newConversation.id, content);
 
-            console.log("[NEW CONV] WebSocket send initiated!");
+            // logging removed: WebSocket send initiated
 
             // Update conversation metadata optimistically
             try {
@@ -756,23 +813,18 @@ const ChatPage: React.FC = () => {
             await new Promise((resolve) => setTimeout(resolve, 500));
 
             // If we're still here and no error, assume success
-            console.log("[NEW CONV] WebSocket send assumed successful");
+            // logging removed: WebSocket send assumed successful
             return;
           } catch (err) {
-            console.warn(
-              "[NEW CONV] WebSocket send failed, falling back to HTTP:",
-              err
-            );
+            // logging removed: WebSocket send failed, falling back to HTTP
             // Continue to HTTP fallback
           }
         } else {
-          console.log(
-            "[NEW CONV] WebSocket not connected, using HTTP directly"
-          );
+          // logging removed: WebSocket not connected, using HTTP directly
         }
 
         // Step 7: Fallback to HTTP streaming
-        console.log("[NEW CONV] Starting HTTP fallback...");
+        // logging removed: starting HTTP fallback
 
         // Add typing indicator
         const typingId = `typing_${Date.now()}`;
@@ -788,9 +840,7 @@ const ChatPage: React.FC = () => {
         };
         setMessages((prev) => [...prev, typingMsg]);
 
-        console.log(
-          "[NEW CONV] Added typing indicator, sending HTTP request..."
-        );
+        // logging removed: added typing indicator, sending HTTP request
 
         try {
           const svc = await import("../services/chat.service");
@@ -809,7 +859,7 @@ const ChatPage: React.FC = () => {
             },
             // onDone
             (result: any) => {
-              console.log("[NEW CONV] HTTP response received:", result);
+              // logging removed: HTTP response received
               const serverUserMsg = result?.userMessage;
               const assistantMsg = result?.assistantMessage;
 
@@ -1318,7 +1368,7 @@ const ChatPage: React.FC = () => {
     // Find the bot message and the last user message before it
     const msgIndex = messages.findIndex((m) => m.id === messageId);
     if (msgIndex === -1) {
-      console.error("[FOLLOWUPS] Message not found:", messageId);
+      // logging removed: message not found
       return;
     }
 
@@ -1335,7 +1385,7 @@ const ChatPage: React.FC = () => {
 
     // Validate that we have both messages
     if (!lastUserMessage || lastUserMessage.trim().length === 0) {
-      console.error("[FOLLOWUPS] No user message found before bot message");
+      // logging removed: no user message before bot message
       antdMessage.warning(
         "Cannot generate suggestions: conversation context not found"
       );
@@ -1343,18 +1393,14 @@ const ChatPage: React.FC = () => {
     }
 
     if (!lastBotMessage || lastBotMessage.trim().length === 0) {
-      console.error("[FOLLOWUPS] Bot message is empty");
+      // logging removed: bot message is empty
       antdMessage.warning(
         "Cannot generate suggestions: message content is empty"
       );
       return;
     }
 
-    console.log("[FOLLOWUPS] Requesting suggestions with context:", {
-      messageId,
-      lastUserMessage: lastUserMessage.slice(0, 50) + "...",
-      lastBotMessage: lastBotMessage.slice(0, 50) + "...",
-    });
+    // logging removed: requesting suggestions with context
 
     // Mark message as loading suggestions
     setMessages((prev) =>
@@ -1385,10 +1431,7 @@ const ChatPage: React.FC = () => {
   useEffect(() => {
     const handleFollowupsResponse = (event: CustomEvent) => {
       const { messageId, suggestions } = event.detail;
-      console.log("[FOLLOWUPS] Received suggestions:", {
-        messageId,
-        count: suggestions?.length,
-      });
+      // logging removed: received suggestions
 
       setMessages((prev) =>
         prev.map((msg) =>
@@ -1405,7 +1448,7 @@ const ChatPage: React.FC = () => {
 
     const handleFollowupsError = (event: CustomEvent) => {
       const { messageId, error } = event.detail;
-      console.error("[FOLLOWUPS] Error:", { messageId, error });
+      // logging removed: followups error
 
       setMessages((prev) =>
         prev.map((msg) =>
@@ -1467,6 +1510,7 @@ const ChatPage: React.FC = () => {
           onSelectConversation={handleSelectConversation}
           onNewConversation={handleNewConversation}
           onHighlightMessage={handleSearchResultClick}
+          unreadConversations={unreadConversations}
         />
 
         {/* Main content area */}

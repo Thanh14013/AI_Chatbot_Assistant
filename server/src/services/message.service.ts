@@ -43,12 +43,8 @@ export const createMessage = async (data: CreateMessageInput): Promise<MessageRe
 
   // Generate and store embedding asynchronously (don't wait for it)
   // This runs in the background and doesn't block the response
-  generateAndStoreEmbedding(message.id, message.content).catch((error) => {
-    // Log error but don't fail the message creation
-    console.error(
-      `Background embedding generation failed for message ${message.id}:`,
-      error.message
-    );
+  generateAndStoreEmbedding(message.id, message.content).catch(() => {
+    // logging removed: background embedding generation failed for message
   });
 
   // Return message response
@@ -294,11 +290,8 @@ export const sendMessageAndStreamResponse = async (
   await conversation.save();
 
   // Generate and store embedding for user message (async, non-blocking)
-  generateAndStoreEmbedding(userMessage.id, userMessage.content).catch((error) => {
-    console.error(
-      `Background embedding generation failed for user message ${userMessage.id}:`,
-      error.message
-    );
+  generateAndStoreEmbedding(userMessage.id, userMessage.content).catch(() => {
+    // logging removed: background embedding generation failed for user message
   });
 
   // Build context
@@ -327,9 +320,9 @@ export const sendMessageAndStreamResponse = async (
         useSemanticSearch: true,
       });
       contextMessages = enhancedContext;
-    } catch (error: any) {
+    } catch {
       // If semantic context fails, fall back to simple recent messages
-      console.warn("Semantic context failed, using recent messages:", error.message);
+      // logging removed: semantic context failed, using recent messages
       // Fall through to simple context below
       const recentMessages = await Message.findAll({
         where: { conversation_id: conversationId },

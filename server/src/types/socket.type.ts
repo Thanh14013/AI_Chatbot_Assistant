@@ -66,6 +66,16 @@ export interface ConversationUpdateData {
   };
 }
 
+export interface ConversationViewData {
+  conversationId: string;
+}
+
+export interface ConversationUnreadStatusData {
+  conversationId: string;
+  hasUnread: boolean;
+  socketId?: string;
+}
+
 export interface ErrorData {
   message: string;
   type?: string;
@@ -104,6 +114,8 @@ export interface ServerToClientEvents {
     messageCount: number;
     totalTokens: number;
   }) => void;
+  // New event for unread status tracking (multi-tab sync)
+  "conversation:unread_status": (data: ConversationUnreadStatusData) => void;
 
   // Typing events
   "user:typing:start": (data: TypingData) => void;
@@ -131,6 +143,9 @@ export interface ClientToServerEvents {
   "conversation:create": (conversation: any) => void;
   "conversation:update": (data: ConversationUpdateData) => void;
   "conversation:delete": (conversationId: string) => void;
+  // New events for tracking conversation view state (multi-tab unread)
+  "conversation:view": (data: ConversationViewData) => void;
+  "conversation:leave_view": (data: ConversationViewData) => void;
 
   // Typing events
   "typing:start": (conversationId: string) => void;

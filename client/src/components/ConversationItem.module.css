@@ -34,6 +34,7 @@
 
 /* Icon container */
 .iconContainer {
+  position: relative;
   flex-shrink: 0;
   width: 36px;
   height: 36px;
@@ -56,6 +57,31 @@
 
 .conversationItem.active .icon {
   color: white;
+}
+
+/* Unread indicator (green dot) */
+.unreadIndicator {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  background-color: #52c41a;
+  border: 2px solid white;
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
 }
 
 /* Details container */

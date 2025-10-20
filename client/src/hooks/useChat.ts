@@ -210,9 +210,9 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
 
         // Background refresh to ensure consistency with server
         loadConversations(true).catch(() => {});
-      } catch (err) {
+      } catch {
         // ignore non-fatal errors during cross-tab sync handling
-        console.debug("useChat: conversation created handler error", err);
+        // logging removed
       }
     };
 
@@ -232,9 +232,9 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
 
         // Background refresh to ensure consistency
         loadConversations(true).catch(() => {});
-      } catch (err) {
+      } catch {
         // ignore non-fatal errors during cross-tab sync handling
-        console.debug("useChat: conversation updated handler error", err);
+        // logging removed
       }
     };
 
@@ -249,9 +249,9 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
 
         // Background refresh to ensure consistency
         loadConversations(true).catch(() => {});
-      } catch (err) {
+      } catch {
         // ignore non-fatal errors during cross-tab sync handling
-        console.debug("useChat: conversation deleted handler error", err);
+        // logging removed
       }
     };
 
@@ -297,8 +297,8 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
 
         // Background refresh to ensure consistency
         loadConversations(true).catch(() => {});
-      } catch (err) {
-        console.debug("useChat: conversation activity handler error", err);
+      } catch {
+        // logging removed
       }
     };
 

@@ -2,6 +2,7 @@ export const conversationItem: string;
 export const active: string;
 export const iconContainer: string;
 export const icon: string;
+export const unreadIndicator: string;
 export const details: string;
 export const moreButton: string;
 export const renameInput: string;

@@ -167,10 +167,10 @@ export async function getRelevantMessagesForContext(
       model: row.model || "unknown",
       createdAt: row.createdAt || new Date(),
     }));
-  } catch (error: any) {
+  } catch {
     // If semantic search fails, return empty array
     // This ensures the app continues to work even if embeddings aren't available
-    console.error("Failed to get relevant messages for context:", error.message);
+    // logging removed
     return [];
   }
 }

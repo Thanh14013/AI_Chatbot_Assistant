@@ -28,8 +28,8 @@ export const generateConversationTitle = async (
       content,
     });
     return resp.data.data?.title || "New Chat";
-  } catch (error) {
-    console.error("Failed to generate title:", error);
+  } catch {
+    // logging removed: failed to generate title
     return "New Chat";
   }
 };

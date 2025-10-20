@@ -22,6 +22,10 @@ interface AuthenticatedSocket
 const userSockets = new Map<string, Set<string>>(); // userId -> Set<socketId>
 const socketUsers = new Map<string, string>(); // socketId -> userId
 
+// Store conversation view state for unread tracking (multi-tab)
+const socketViewingConversation = new Map<string, string | null>(); // socketId -> conversationId | null
+const socketUnreadConversations = new Map<string, Set<string>>(); // socketId -> Set<conversationId>
+
 /**
  * Socket.io Authentication Middleware
  * Verifies JWT token and attaches user info to socket
@@ -79,6 +83,11 @@ const handleUserConnection = (socket: AuthenticatedSocket) => {
   userSockets.get(userId)!.add(socket.id);
   socketUsers.set(socket.id, userId);
 
+  // Initialize unread tracking for this socket
+  if (!socketUnreadConversations.has(socket.id)) {
+    socketUnreadConversations.set(socket.id, new Set());
+  }
+
   // user connection handled
 };
 
@@ -99,6 +108,10 @@ const handleUserDisconnection = (socket: AuthenticatedSocket) => {
     }
     socketUsers.delete(socket.id);
 
+    // Cleanup unread tracking
+    socketViewingConversation.delete(socket.id);
+    socketUnreadConversations.delete(socket.id);
+
     // user disconnection handled
   }
 };
@@ -115,6 +128,76 @@ export const getUserSockets = (userId: string): string[] => {
  */
 export const getUserFromSocket = (socketId: string): string | undefined => {
   return socketUsers.get(socketId);
+};
+
+/**
+ * Mark a conversation as read for a specific socket
+ */
+export const markConversationAsRead = (socketId: string, conversationId: string): void => {
+  // Set this socket as viewing this conversation
+  socketViewingConversation.set(socketId, conversationId);
+
+  // Remove from unread set if present
+  const unreadSet = socketUnreadConversations.get(socketId);
+  if (unreadSet) {
+    unreadSet.delete(conversationId);
+  }
+};
+
+/**
+ * Mark a conversation as unread for a specific socket
+ */
+export const markConversationAsUnread = (socketId: string, conversationId: string): void => {
+  // Only mark as unread if socket is NOT currently viewing this conversation
+  const viewing = socketViewingConversation.get(socketId);
+  if (viewing === conversationId) {
+    return; // Socket is viewing this conversation, don't mark as unread
+  }
+
+  // Add to unread set
+  let unreadSet = socketUnreadConversations.get(socketId);
+  if (!unreadSet) {
+    unreadSet = new Set();
+    socketUnreadConversations.set(socketId, unreadSet);
+  }
+  unreadSet.add(conversationId);
+};
+
+/**
+ * Get unread conversations for a socket
+ */
+export const getUnreadConversations = (socketId: string): string[] => {
+  const unreadSet = socketUnreadConversations.get(socketId);
+  return unreadSet ? Array.from(unreadSet) : [];
+};
+
+/**
+ * Broadcast unread status for a conversation to all sockets of a user
+ */
+export const broadcastUnreadStatus = (
+  userId: string,
+  conversationId: string,
+  hasUnread: boolean,
+  targetSocketId?: string
+): void => {
+  const sockets = getUserSockets(userId);
+  sockets.forEach((socketId) => {
+    const socket = io?.sockets.sockets.get(socketId);
+    if (socket) {
+      (socket as any).emit("conversation:unread_status", {
+        conversationId,
+        hasUnread,
+        socketId: targetSocketId,
+      });
+    }
+  });
+};
+
+/**
+ * Leave conversation view for a socket
+ */
+export const leaveConversationView = (socketId: string): void => {
+  socketViewingConversation.set(socketId, null);
 };
 
 /**
@@ -330,6 +413,31 @@ export const initializeSocketIO = (
                 conversationId,
                 messageId,
               });
+
+              // Mark conversation as unread for sockets of this user that are NOT viewing it
+              if (socket.userId) {
+                const userSocketIds = getUserSockets(socket.userId);
+                userSocketIds.forEach((sid) => {
+                  // Skip if socket is currently viewing this conversation
+                  const viewingConv = socketViewingConversation.get(sid);
+                  if (viewingConv === conversationId) {
+                    return;
+                  }
+
+                  // Mark as unread for this socket
+                  markConversationAsUnread(sid, conversationId);
+
+                  // Emit unread status to this socket
+                  const targetSocket = io.sockets.sockets.get(sid);
+                  if (targetSocket) {
+                    (targetSocket as any).emit("conversation:unread_status", {
+                      conversationId,
+                      hasUnread: true,
+                      socketId: socket.id,
+                    });
+                  }
+                });
+              }
             } catch (err) {
               // ignore
             }
@@ -500,6 +608,48 @@ export const initializeSocketIO = (
 
       io.in(`conversation:${conversationId}`).socketsLeave(`conversation:${conversationId}`);
       // conversation room cleared
+    });
+
+    // Handle conversation view (for unread tracking - multi-tab)
+    socket.on("conversation:view", (data) => {
+      const { conversationId } = data;
+
+      if (!conversationId) {
+        socket.emit("error", { message: "Conversation ID is required" });
+        return;
+      }
+
+      // Mark conversation as read for this socket
+      markConversationAsRead(socket.id, conversationId);
+
+      // Broadcast to all sockets of this user that this conversation is now read
+      // This allows other tabs to update their UI
+      if (socket.userId) {
+        const userSocketIds = getUserSockets(socket.userId);
+        userSocketIds.forEach((sid) => {
+          const targetSocket = io.sockets.sockets.get(sid);
+          if (targetSocket) {
+            (targetSocket as any).emit("conversation:unread_status", {
+              conversationId,
+              hasUnread: false,
+              socketId: socket.id,
+            });
+          }
+        });
+      }
+    });
+
+    // Handle leaving conversation view (for unread tracking - multi-tab)
+    socket.on("conversation:leave_view", (data) => {
+      const { conversationId } = data;
+
+      if (!conversationId) {
+        socket.emit("error", { message: "Conversation ID is required" });
+        return;
+      }
+
+      // Clear viewing state for this socket
+      leaveConversationView(socket.id);
     });
 
     // Handle ping/pong for connection health

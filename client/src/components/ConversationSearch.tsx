@@ -61,7 +61,7 @@ export const ConversationSearch: React.FC<ConversationSearchProps> = ({
         onResultClick(data.bestMatch.message_id);
       }
     } catch (err: any) {
-      console.error("Conversation search failed:", err);
+      // logging removed: conversation search failed
       setError(err.response?.data?.message || "Search failed");
       setResults([]);
     } finally {

@@ -187,7 +187,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
 
       // Redirect to home after deletion (replace history so back doesn't return)
       try {
-        console.debug("Deleting convo successful, navigating to /");
+        // logging removed: deleting conversation succeeded, navigating to /
         navigate("/", { replace: true });
         // Fallback in case navigate didn't change the location (rare)
         setTimeout(() => {
