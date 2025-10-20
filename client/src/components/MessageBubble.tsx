@@ -12,16 +12,21 @@ import {
   CheckOutlined,
   ReloadOutlined,
   BulbOutlined,
+  ClockCircleOutlined,
+  SyncOutlined,
+  CheckCircleOutlined,
+  WarningOutlined,
 } from "@ant-design/icons";
 import { Message, MessageRole } from "../types/chat.type";
+import { PendingMessage } from "../types/offline-message.type";
 import styles from "./MessageBubble.module.css";
 
 const { Text } = Typography;
 
 interface MessageBubbleProps {
-  message: Message;
+  message: Message | PendingMessage;
   // Optional retry handler for failed messages
-  onRetry?: (message: Message) => void;
+  onRetry?: (message: Message | PendingMessage) => void;
   // Optional handler for requesting follow-up suggestions
   onRequestFollowups?: (messageId: string, content: string) => void;
   // Optional handler for clicking a follow-up suggestion
@@ -51,20 +56,36 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   // compare against the literal value
   const isUser = message.role === "user";
 
-  // Local status helpers
-  const isFailed = message.localStatus === "failed";
-  const isPending = message.localStatus === "pending";
+  // Type guard to check if message is PendingMessage
+  const isPendingMessage = (
+    msg: Message | PendingMessage
+  ): msg is PendingMessage => {
+    return "status" in msg && "retryCount" in msg;
+  };
 
-  // Follow-up suggestions state
+  // Local status helpers - check both Message.localStatus and PendingMessage.status
+  const messageStatus = isPendingMessage(message)
+    ? message.status
+    : (message as Message).localStatus;
+
+  const isFailed = messageStatus === "failed";
+  const isPending = messageStatus === "pending";
+  const isSending = messageStatus === "sending";
+
+  // Follow-up suggestions state (only for Message type)
   const hasFollowups =
-    message.followupSuggestions && message.followupSuggestions.length > 0;
-  const isLoadingFollowups = message.isLoadingFollowups || false;
+    !isPendingMessage(message) &&
+    message.followupSuggestions &&
+    message.followupSuggestions.length > 0;
+  const isLoadingFollowups =
+    !isPendingMessage(message) && (message.isLoadingFollowups || false);
+  const isTyping = !isPendingMessage(message) && (message.isTyping || false);
 
   /**
    * Handle requesting follow-up suggestions
    */
   const handleRequestFollowups = () => {
-    if (!message.isTyping && message.content && onRequestFollowups) {
+    if (!isTyping && message.content && onRequestFollowups) {
       onRequestFollowups(message.id, message.content);
     }
   };
@@ -147,7 +168,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     // content immediately on each chunk so the UI shows per-chunk updates.
     const full = message.content || "";
 
-    if (message.isTyping) {
+    if (isTyping) {
       try {
         // streaming chunk debug removed
       } catch {}
@@ -207,7 +228,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     return () => {
       clearInterval(timer);
     };
-  }, [message.id, message.content, message.role, message.isTyping]);
+  }, [message.id, message.content, message.role, isTyping]);
 
   // Keep a ref in sync with displayedContent so the streaming effect can
   // compute how many tokens were already shown without adding displayedContent
@@ -224,7 +245,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     >
       {/* Render content even while isTyping if content exists (shows streaming).
           Only show typing dots when content is empty. */}
-      {!(message.isTyping && displayedContent.trim() === "") ? (
+      {!(isTyping && displayedContent.trim() === "") ? (
         <>
           {/* Avatar - show on left for assistant, right for user */}
           {!isUser && (
@@ -237,7 +258,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           {/* Message content bubble */}
           <div className={styles.messageBubble}>
             {/* Follow-up button positioned in top-right corner for assistant messages */}
-            {!isUser && !message.isTyping && message.content && (
+            {!isUser && !isTyping && message.content && (
               <Button
                 type="text"
                 size="small"
@@ -323,10 +344,24 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
           {/* User avatar on the right */}
           {isUser && (
-            <Avatar
-              icon={<UserOutlined />}
-              className={`${styles.avatar} ${styles.userAvatar}`}
-            />
+            <>
+              <Avatar
+                icon={<UserOutlined />}
+                className={`${styles.avatar} ${styles.userAvatar}`}
+              />
+              {/* Status indicator for pending/sending/failed messages - show next to avatar */}
+              {(isPending || isSending || isFailed) && (
+                <div className={styles.messageStatusBadge}>
+                  {isPending && (
+                    <ClockCircleOutlined style={{ color: "#8c8c8c" }} />
+                  )}
+                  {isSending && (
+                    <SyncOutlined spin style={{ color: "#1890ff" }} />
+                  )}
+                  {isFailed && <WarningOutlined style={{ color: "#ff4d4f" }} />}
+                </div>
+              )}
+            </>
           )}
         </>
       ) : (

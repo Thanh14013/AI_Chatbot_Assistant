@@ -11,5 +11,7 @@ declare const styles: {
   readonly "bottom-left": string;
   readonly "bottom-right": string;
   readonly spinning: string;
+  readonly offlineBanner: string;
+  readonly syncBanner: string;
 };
 export = styles;

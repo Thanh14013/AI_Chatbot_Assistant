@@ -8,9 +8,12 @@ import {
   WifiOutlined,
   DisconnectOutlined,
   LoadingOutlined,
+  SyncOutlined,
 } from "@ant-design/icons";
-import { Badge, Tooltip } from "antd";
+import { Badge, Tooltip, Alert } from "antd";
 import { useWebSocket } from "../hooks/useWebSocket";
+import { useNetworkStatus } from "../hooks/useNetworkStatus";
+import type { SyncStatus } from "../types/offline-message.type";
 import styles from "./NetworkStatus.module.css";
 
 export type NetworkStatusType =
@@ -29,6 +32,9 @@ interface NetworkStatusProps {
     | "bottom-left"
     | "bottom-right"
     | "inline";
+  // New props for offline message sync
+  syncStatus?: SyncStatus;
+  showBanner?: boolean; // Show offline banner
 }
 
 /**
@@ -40,10 +46,13 @@ const NetworkStatus: React.FC<NetworkStatusProps> = ({
   size = "small",
   className = "",
   position = "inline",
+  syncStatus,
+  showBanner = true,
 }) => {
   const [networkStatus, setNetworkStatus] =
     useState<NetworkStatusType>("online");
   const { isConnected } = useWebSocket({ enabled: false }); // Just check status, don't auto-connect
+  const { isOnline } = useNetworkStatus();
 
   // Monitor network status
   useEffect(() => {
@@ -130,6 +139,10 @@ const NetworkStatus: React.FC<NetworkStatusProps> = ({
 
   if (!config) return null;
 
+  // Render offline banner if showBanner is enabled and user is offline
+  const shouldShowBanner = showBanner && !isOnline;
+  const shouldShowSyncBanner = showBanner && syncStatus?.inProgress;
+
   const statusElement = (
     <div
       className={`${styles.networkStatus} ${styles[size]} ${styles[position]} ${className}`}
@@ -157,9 +170,41 @@ const NetworkStatus: React.FC<NetworkStatusProps> = ({
   }
 
   return (
-    <Tooltip title={config.tooltip} placement="top">
-      {statusElement}
-    </Tooltip>
+    <>
+      {/* Offline banner */}
+      {shouldShowBanner && (
+        <Alert
+          message="🔴 Mất kết nối"
+          description="Tin nhắn sẽ tự động gửi khi kết nối lại"
+          type="warning"
+          showIcon
+          banner
+          closable={false}
+          className={styles.offlineBanner}
+        />
+      )}
+
+      {/* Sync progress banner */}
+      {shouldShowSyncBanner && (
+        <Alert
+          message={
+            <span>
+              <SyncOutlined spin /> Đang đồng bộ... ({syncStatus.synced}/
+              {syncStatus.total})
+            </span>
+          }
+          type="info"
+          showIcon
+          banner
+          closable={false}
+          className={styles.syncBanner}
+        />
+      )}
+
+      <Tooltip title={config.tooltip} placement="top">
+        {statusElement}
+      </Tooltip>
+    </>
   );
 };
 

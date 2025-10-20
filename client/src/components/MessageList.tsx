@@ -7,17 +7,19 @@ import React, { useEffect, useRef, useState } from "react";
 import { Button, Spin, Skeleton } from "antd";
 import { DownOutlined, UpOutlined } from "@ant-design/icons";
 import { Message } from "../types/chat.type";
+import { PendingMessage } from "../types/offline-message.type";
 import MessageBubble from "./MessageBubble";
 import styles from "./MessageList.module.css";
 
 interface MessageListProps {
   messages: Message[];
+  pendingMessages?: PendingMessage[]; // New prop for offline messages
   isLoading?: boolean;
   showScrollButton?: boolean;
   // Handler to load earlier messages (page will be managed by parent)
   onLoadEarlier?: () => Promise<void> | void;
   hasMore?: boolean;
-  onRetry?: (message: Message) => void;
+  onRetry?: (message: Message | PendingMessage) => void;
   // For semantic search: ref to store message elements and highlighted message ID
   messageRefs?: React.MutableRefObject<Map<string, HTMLElement>>;
   highlightedMessageId?: string | null;
@@ -32,6 +34,7 @@ interface MessageListProps {
  */
 const MessageList: React.FC<MessageListProps> = ({
   messages,
+  pendingMessages = [],
   isLoading = false,
   showScrollButton = true,
   onLoadEarlier,
@@ -42,6 +45,30 @@ const MessageList: React.FC<MessageListProps> = ({
   onRequestFollowups,
   onFollowupClick,
 }) => {
+  // Merge pending messages with real messages and sort by timestamp
+  const allMessages = React.useMemo(() => {
+    const pending = pendingMessages.map(
+      (pm): Message => ({
+        id: pm.id,
+        conversation_id: pm.conversationId,
+        role: pm.role || "user",
+        content: pm.content,
+        tokens_used: 0,
+        model: "",
+        createdAt: pm.createdAt,
+        localStatus: pm.status as "pending" | "failed" | "sent",
+      })
+    );
+
+    const combined = [...messages, ...pending];
+
+    // Sort by timestamp
+    return combined.sort((a, b) => {
+      const timeA = new Date(a.createdAt).getTime();
+      const timeB = new Date(b.createdAt).getTime();
+      return timeA - timeB;
+    });
+  }, [messages, pendingMessages]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
@@ -203,9 +230,9 @@ const MessageList: React.FC<MessageListProps> = ({
     // Also handle streaming updates where the assistant updates the content of
     // the existing typing message (same id but content changes) — scroll then too.
     const prevLen = prevMessagesLengthRef.current;
-    const currLen = messages.length;
+    const currLen = allMessages.length;
 
-    const last = messages[currLen - 1];
+    const last = allMessages[currLen - 1];
 
     if (currLen > prevLen) {
       // Detect prepend: if the last message id didn't change but length increased,
@@ -259,7 +286,7 @@ const MessageList: React.FC<MessageListProps> = ({
       id: last?.id,
       content: last?.content,
     };
-  }, [messages, isAutoScrollEnabled]);
+  }, [allMessages, isAutoScrollEnabled]);
 
   /**
    * Scroll to bottom on initial load (use retry to handle async DOM updates)
@@ -301,15 +328,15 @@ const MessageList: React.FC<MessageListProps> = ({
         onScroll={handleScroll}
       >
         {/* Show empty placeholder when no messages */}
-        {messages.length === 0 && !isLoading && (
+        {allMessages.length === 0 && !isLoading && (
           <div className={styles.emptyPlaceholder}>what's new?</div>
         )}
 
         {/* Show loading skeleton */}
-        {isLoading && messages.length === 0 && renderLoadingSkeleton()}
+        {isLoading && allMessages.length === 0 && renderLoadingSkeleton()}
 
-        {/* Render messages */}
-        {messages.map((message) => (
+        {/* Render messages (including pending) */}
+        {allMessages.map((message) => (
           <div
             key={message.id}
             ref={(el) => {

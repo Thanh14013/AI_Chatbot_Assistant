@@ -235,7 +235,7 @@
   flex-direction: column;
   gap: 8px;
   padding: 10px;
-  background: #ffffff; /* solid white for follow-up suggestions */
+  background: #ffffff;
   border-radius: 10px;
   border: 1px solid rgba(0, 0, 0, 0.04);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
@@ -244,7 +244,7 @@
 /* Individual suggestion chip */
 .suggestionChip {
   cursor: pointer;
-  background: #ffffff; /* solid white chip */
+  background: #ffffff;
   border: 1px solid rgba(0, 0, 0, 0.06);
   color: #2f54eb;
   padding: 8px 14px;
@@ -355,7 +355,7 @@
 
 .loadingText {
   font-size: 12px;
-  color: #000; /* make loading text black (Generating suggestions...) */
+  color: #000;
   font-style: italic;
 }
 
@@ -411,6 +411,29 @@
   30% {
     transform: translateY(-10px);
   }
+}
+
+/* Dev-only debug badge shown in corner of bubble when present */
+.debugBadge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* Message status badge - show next to user avatar */
+.messageStatusBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 6px;
+  font-size: 16px;
 }
 
 /* Dark mode support */
@@ -482,18 +505,4 @@
     font-size: 12px;
     padding: 6px 12px;
   }
-}
-
-/* Dev-only debug badge shown in corner of bubble when present */
-.debugBadge {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  background: rgba(0, 0, 0, 0.6);
-  color: white;
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 8px;
-  z-index: 5;
-  pointer-events: none;
 }

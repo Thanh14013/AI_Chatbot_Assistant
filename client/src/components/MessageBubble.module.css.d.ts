@@ -25,3 +25,4 @@ export const typingRow: string;
 export const typingPlaceholder: string;
 export const typingDot: string;
 export const debugBadge: string;
+export const messageStatusBadge: string;
