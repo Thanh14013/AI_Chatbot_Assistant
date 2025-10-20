@@ -9,6 +9,8 @@ import type {
   SemanticSearchRequest,
   SemanticSearchResponse,
 } from "../types/embedding.type.js";
+import { cacheAside, CACHE_TTL } from "./cache.service.js";
+import { semanticSearchKey } from "../utils/cache-key.util.js";
 
 /**
  * Perform semantic search on messages within a conversation
@@ -37,41 +39,53 @@ export async function searchConversationByEmbedding(
     throw new Error("Search query cannot be empty");
   }
 
-  // Verify conversation exists and user has access
-  const conversation = await Conversation.findOne({
-    where: {
-      id: conversationId,
-      deleted_at: null,
-    },
-  });
+  console.log(`🔍 [SEMANTIC SEARCH] Query: "${query}" in conversation: ${conversationId}`);
 
-  if (!conversation) {
-    throw new Error("Conversation not found");
-  }
+  // Use cache for semantic search results
+  const cacheKey = semanticSearchKey(conversationId, query, limit, similarity_threshold);
+  console.log(`🔑 [SEMANTIC SEARCH] Cache key: ${cacheKey}`);
 
-  if (conversation.user_id !== userId) {
-    throw new Error("Unauthorized access to conversation");
-  }
+  const performSearch = async () => {
+    console.log(`🧮 [SEMANTIC SEARCH] Generating embedding for query...`);
 
-  // Generate embedding for search query
-  const queryEmbedding = await generateEmbedding(query.trim());
+    // Verify conversation exists and user has access
+    const conversation = await Conversation.findOne({
+      where: {
+        id: conversationId,
+        deleted_at: null,
+      },
+    });
 
-  // Convert embedding array to PostgreSQL vector format
-  // Format: '[1.0, 2.0, 3.0, ...]'
-  const vectorString = `[${queryEmbedding.join(",")}]`;
+    if (!conversation) {
+      throw new Error("Conversation not found");
+    }
 
-  // Perform semantic search using PostgreSQL vector operations
-  // Cosine similarity operator: <=>
-  // Formula: 1 - cosine_distance = similarity (range: 0-1, where 1 is identical)
-  //
-  // This query:
-  // 1. Joins messages with their embeddings
-  // 2. Calculates cosine similarity between query and each message
-  // 3. Filters by conversation ID and similarity threshold
-  // 4. Orders by similarity (highest first)
-  // 5. Limits results
-  const results = await sequelize.query(
-    `
+    if (conversation.user_id !== userId) {
+      throw new Error("Unauthorized access to conversation");
+    }
+
+    // Generate embedding for search query
+    const queryEmbedding = await generateEmbedding(query.trim());
+
+    // Convert embedding array to PostgreSQL vector format
+    // Format: '[1.0, 2.0, 3.0, ...]'
+    const vectorString = `[${queryEmbedding.join(",")}]`;
+
+    console.log(`📊 [SEMANTIC SEARCH] Performing vector similarity search in DB...`);
+    const searchStartTime = Date.now();
+
+    // Perform semantic search using PostgreSQL vector operations
+    // Cosine similarity operator: <=>
+    // Formula: 1 - cosine_distance = similarity (range: 0-1, where 1 is identical)
+    //
+    // This query:
+    // 1. Joins messages with their embeddings
+    // 2. Calculates cosine similarity between query and each message
+    // 3. Filters by conversation ID and similarity threshold
+    // 4. Orders by similarity (highest first)
+    // 5. Limits results
+    const results = await sequelize.query(
+      `
     SELECT 
       m.id as message_id,
       m.conversation_id,
@@ -88,29 +102,37 @@ export async function searchConversationByEmbedding(
     ORDER BY e.embedding <=> $1::vector ASC
     LIMIT $4
     `,
-    {
-      bind: [vectorString, conversationId, similarity_threshold, limit],
-      type: QueryTypes.SELECT,
-    }
-  );
+      {
+        bind: [vectorString, conversationId, similarity_threshold, limit],
+        type: QueryTypes.SELECT,
+      }
+    );
 
-  // Map database results to SemanticSearchResult type
-  const searchResults: SemanticSearchResult[] = (results as any[]).map((row: any) => ({
-    message_id: row.message_id,
-    conversation_id: row.conversation_id,
-    role: row.role as "user" | "assistant" | "system",
-    content: row.content,
-    similarity: parseFloat(row.similarity) || 0,
-    tokens_used: row.tokens_used || 0,
-    model: row.model || "unknown",
-    createdAt: row.createdAt || new Date(),
-  }));
+    const searchElapsed = Date.now() - searchStartTime;
+    console.log(
+      `✅ [SEMANTIC SEARCH] Found ${(results as any[]).length} results in ${searchElapsed}ms`
+    );
 
-  return {
-    query: query.trim(),
-    results: searchResults,
-    count: searchResults.length,
+    // Map database results to SemanticSearchResult type
+    const searchResults: SemanticSearchResult[] = (results as any[]).map((row: any) => ({
+      message_id: row.message_id,
+      conversation_id: row.conversation_id,
+      role: row.role as "user" | "assistant" | "system",
+      content: row.content,
+      similarity: parseFloat(row.similarity) || 0,
+      tokens_used: row.tokens_used || 0,
+      model: row.model || "unknown",
+      createdAt: row.createdAt || new Date(),
+    }));
+
+    return {
+      query: query.trim(),
+      results: searchResults,
+      count: searchResults.length,
+    };
   };
+
+  return await cacheAside(cacheKey, performSearch, CACHE_TTL.SEMANTIC_SEARCH);
 }
 
 /**

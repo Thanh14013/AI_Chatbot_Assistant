@@ -6,6 +6,12 @@ import type {
   UpdateConversationInput,
   ConversationResponse,
 } from "../types/conversation.type.js";
+import { cacheAside, CACHE_TTL, invalidateCachePattern, deleteCache } from "./cache.service.js";
+import {
+  conversationListKey,
+  conversationListPattern,
+  conversationMetaKey,
+} from "../utils/cache-key.util.js";
 
 /**
  * Create a new conversation
@@ -21,6 +27,8 @@ export const createConversation = async (
     throw new Error("User ID and title are required");
   }
 
+  console.log(`📝 [CONVERSATION] Creating new conversation for user: ${data.user_id}`);
+
   // Create conversation with default values
   const conversation = await Conversation.create({
     user_id: data.user_id,
@@ -31,6 +39,10 @@ export const createConversation = async (
     message_count: 0,
     deleted_at: null,
   });
+
+  // Invalidate conversation list cache for this user
+  console.log(`🗑️  [CONVERSATION] Invalidating cache for user: ${data.user_id}`);
+  await invalidateCachePattern(conversationListPattern(data.user_id));
 
   // Return conversation response
   return {
@@ -70,61 +82,73 @@ export const getUserConversations = async (
     totalPages: number;
   };
 }> => {
-  // Calculate offset
-  const offset = (page - 1) * limit;
+  console.log(
+    `💬 [CONVERSATION] Fetching conversations for user: ${userId} (page: ${page}, limit: ${limit})`
+  );
 
-  // Build where clause with optional search filter
-  const whereClause: any = {
-    user_id: userId,
-    deleted_at: null,
-  };
+  // Use cache for conversation lists
+  const cacheKey = conversationListKey(userId, page, limit, search);
+  console.log(`🔑 [CONVERSATION] Cache key: ${cacheKey}`);
 
-  // Add search filter if provided
-  if (search && search.trim()) {
-    whereClause.title = {
-      [Op.iLike]: `%${search.trim()}%`, // Case-insensitive search
+  const fetchConversations = async () => {
+    // Calculate offset
+    const offset = (page - 1) * limit;
+
+    // Build where clause with optional search filter
+    const whereClause: any = {
+      user_id: userId,
+      deleted_at: null,
     };
-  }
 
-  // Get total count for pagination
-  const total = await Conversation.count({
-    where: whereClause,
-  });
+    // Add search filter if provided
+    if (search && search.trim()) {
+      whereClause.title = {
+        [Op.iLike]: `%${search.trim()}%`, // Case-insensitive search
+      };
+    }
 
-  // Get conversations with pagination
-  const conversations = await Conversation.findAll({
-    where: whereClause,
-    order: [["updatedAt", "DESC"]], // Most recently updated first
-    limit,
-    offset,
-  });
+    // Get total count for pagination
+    const total = await Conversation.count({
+      where: whereClause,
+    });
 
-  // Map to response format
-  const conversationResponses: ConversationResponse[] = conversations.map((conv) => ({
-    id: conv.id,
-    user_id: conv.user_id,
-    title: conv.title,
-    model: conv.model,
-    context_window: conv.context_window,
-    total_tokens_used: conv.total_tokens_used,
-    message_count: conv.message_count,
-    createdAt: conv.createdAt,
-    updatedAt: conv.updatedAt,
-    deleted_at: conv.deleted_at,
-  }));
-
-  // Calculate total pages
-  const totalPages = Math.ceil(total / limit);
-
-  return {
-    conversations: conversationResponses,
-    pagination: {
-      page,
+    // Get conversations with pagination
+    const conversations = await Conversation.findAll({
+      where: whereClause,
+      order: [["updatedAt", "DESC"]], // Most recently updated first
       limit,
-      total,
-      totalPages,
-    },
+      offset,
+    });
+
+    // Map to response format
+    const conversationResponses: ConversationResponse[] = conversations.map((conv) => ({
+      id: conv.id,
+      user_id: conv.user_id,
+      title: conv.title,
+      model: conv.model,
+      context_window: conv.context_window,
+      total_tokens_used: conv.total_tokens_used,
+      message_count: conv.message_count,
+      createdAt: conv.createdAt,
+      updatedAt: conv.updatedAt,
+      deleted_at: conv.deleted_at,
+    }));
+
+    // Calculate total pages
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      conversations: conversationResponses,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    };
   };
+
+  return await cacheAside(cacheKey, fetchConversations, CACHE_TTL.CONVERSATION_LIST);
 };
 
 /**
@@ -218,6 +242,13 @@ export const updateConversation = async (
   // Save changes
   await conversation.save();
 
+  // Invalidate caches
+  console.log(
+    `🗑️  [CONVERSATION] Invalidating cache after update (conversation: ${conversationId})`
+  );
+  await invalidateCachePattern(conversationListPattern(userId));
+  await deleteCache(conversationMetaKey(conversationId));
+
   // Return updated conversation
   return {
     id: conversation.id,
@@ -269,6 +300,13 @@ export const deleteConversation = async (
   // conversations have many messages.
   conversation.deleted_at = new Date();
   await conversation.save();
+
+  // Invalidate all caches related to this conversation
+  console.log(
+    `🗑️  [CONVERSATION] Invalidating cache after delete (conversation: ${conversationId})`
+  );
+  await invalidateCachePattern(conversationListPattern(userId));
+  await deleteCache(conversationMetaKey(conversationId));
 
   // Fire-and-forget: delete messages in background and log any failures.
   // We intentionally do NOT await this Promise so the HTTP response can
