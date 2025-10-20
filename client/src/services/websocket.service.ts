@@ -440,11 +440,9 @@ class WebSocketService {
    */
   joinConversation(conversationId: string): void {
     if (!this.socket?.connected) {
-      // console.warn("[WebSocket] Cannot join conversation: not connected");
       return;
     }
 
-    // console.log(`[WebSocket] Joining conversation: ${conversationId}`);
     this.currentConversationId = conversationId;
     this.socket.emit("join:conversation", conversationId);
   }
@@ -454,8 +452,6 @@ class WebSocketService {
    */
   leaveConversation(conversationId: string): void {
     if (!this.socket?.connected) return;
-
-    // console.log(`[WebSocket] Leaving conversation: ${conversationId}`);
     this.socket.emit("leave:conversation", conversationId);
 
     if (this.currentConversationId === conversationId) {
@@ -471,7 +467,6 @@ class WebSocketService {
       throw new Error("WebSocket not connected");
     }
 
-    // console.log(`[WebSocket] Sending message to conversation: ${conversationId}`);
     this.socket.emit("message:send", { conversationId, content });
   }
 
@@ -580,14 +575,10 @@ class WebSocketService {
     this.clearReconnectTimer();
 
     const delay = 3000; // 3 seconds
-    // console.log(`[WebSocket] Scheduling reconnect in ${delay}ms...`);
 
     this.reconnectTimer = setTimeout(() => {
       if (!this.socket?.connected) {
-        // console.log("[WebSocket] Attempting auto-reconnect...");
-        this.connect().catch(() => {
-          // console.error("[WebSocket] Auto-reconnect failed:", /* error message suppressed */);
-        });
+        this.connect().catch(() => {});
       }
     }, delay);
   }

@@ -18,6 +18,7 @@ interface SidebarProps {
   onHighlightMessage?: (messageId: string) => void;
   unreadConversations?: Set<string>; // For unread tracking (multi-tab)
   onSettingsClick?: () => void; // Add settings callback
+  onProfileClick?: () => void; // Add profile callback
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -27,6 +28,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onHighlightMessage,
   unreadConversations,
   onSettingsClick,
+  onProfileClick,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const { user } = useAuth();
@@ -214,6 +216,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           user={user}
           collapsed={collapsed}
           onSettingsClick={onSettingsClick}
+          onProfileClick={onProfileClick}
         />
       </div>
     </Sider>

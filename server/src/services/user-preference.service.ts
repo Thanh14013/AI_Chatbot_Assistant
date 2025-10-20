@@ -5,6 +5,30 @@ import type {
 } from "../types/user-preference.type.js";
 
 /**
+ * Sanitize HTML/script tags from string to prevent XSS
+ */
+const sanitizeInput = (input: string | null | undefined): string | null => {
+  if (!input) return null;
+
+  // Remove HTML tags and script content
+  const sanitized = input
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    .replace(/<[^>]+>/g, "")
+    .trim();
+
+  return sanitized || null;
+};
+
+/**
+ * Trim and clean string input
+ */
+const cleanString = (input: string | null | undefined): string | null => {
+  if (!input) return null;
+  const trimmed = input.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+/**
  * Get user preferences
  * If preferences don't exist, create default preferences
  *
@@ -12,31 +36,33 @@ import type {
  * @returns User preferences
  */
 export const getUserPreferences = async (userId: string): Promise<UserPreferenceResponse> => {
-  console.log(`⚙️  [PREFERENCES] Fetching preferences for user: ${userId}`);
+  try {
+    // Try to find existing preferences
+    let preferences = await UserPreference.findByUserId(userId);
 
-  // Try to find existing preferences
-  let preferences = await UserPreference.findByUserId(userId);
+    // If preferences don't exist, create default preferences
+    if (!preferences) {
+      preferences = await UserPreference.create({
+        user_id: userId,
+        language: "en",
+        response_style: "balanced",
+        custom_instructions: null,
+      });
+    }
 
-  // If preferences don't exist, create default preferences
-  if (!preferences) {
-    console.log(`⚙️  [PREFERENCES] No preferences found, creating defaults for user: ${userId}`);
-    preferences = await UserPreference.create({
-      user_id: userId,
-      language: "en",
-      response_style: "balanced",
-      custom_instructions: null,
-    });
+    return {
+      id: preferences.id,
+      user_id: preferences.user_id,
+      language: preferences.language,
+      response_style: preferences.response_style,
+      custom_instructions: preferences.custom_instructions,
+      createdAt: preferences.createdAt,
+      updatedAt: preferences.updatedAt,
+    };
+  } catch (error) {
+    console.error(`❌ [PREFERENCES] Error fetching preferences for user ${userId}:`, error);
+    throw new Error("Failed to fetch user preferences. Please try again.");
   }
-
-  return {
-    id: preferences.id,
-    user_id: preferences.user_id,
-    language: preferences.language,
-    response_style: preferences.response_style,
-    custom_instructions: preferences.custom_instructions,
-    createdAt: preferences.createdAt,
-    updatedAt: preferences.updatedAt,
-  };
 };
 
 /**
@@ -50,39 +76,74 @@ export const updateUserPreferences = async (
   userId: string,
   updates: UpdateUserPreferenceInput
 ): Promise<UserPreferenceResponse> => {
-  console.log(`⚙️  [PREFERENCES] Updating preferences for user: ${userId}`);
+  try {
+    // Clean and sanitize inputs
+    const cleanedUpdates: UpdateUserPreferenceInput = {};
 
-  // Validate language if provided
-  const validLanguages = ["en", "vi", "es", "fr", "de", "ja", "ko", "zh"];
-  if (updates.language && !validLanguages.includes(updates.language)) {
-    throw new Error(`Invalid language code. Supported languages: ${validLanguages.join(", ")}`);
+    if (updates.language !== undefined) {
+      cleanedUpdates.language = cleanString(updates.language) || undefined;
+    }
+
+    if (updates.response_style !== undefined) {
+      cleanedUpdates.response_style = cleanString(updates.response_style) || undefined;
+    }
+
+    if (updates.custom_instructions !== undefined) {
+      // Sanitize custom instructions to prevent XSS
+      const cleaned = cleanString(updates.custom_instructions);
+      cleanedUpdates.custom_instructions = cleaned ? sanitizeInput(cleaned) : null;
+    }
+
+    // Validate language if provided
+    const validLanguages = ["en", "vi", "es", "fr", "de", "ja", "ko", "zh"];
+    if (cleanedUpdates.language && !validLanguages.includes(cleanedUpdates.language)) {
+      throw new Error(
+        `Invalid language code: "${cleanedUpdates.language}". Supported languages: ${validLanguages.join(", ")}`
+      );
+    }
+
+    // Validate response_style if provided
+    const validStyles = ["concise", "detailed", "balanced", "casual", "professional"];
+    if (cleanedUpdates.response_style && !validStyles.includes(cleanedUpdates.response_style)) {
+      throw new Error(
+        `Invalid response style: "${cleanedUpdates.response_style}". Supported styles: ${validStyles.join(", ")}`
+      );
+    }
+
+    // Validate custom_instructions length if provided
+    if (cleanedUpdates.custom_instructions && cleanedUpdates.custom_instructions.length > 2000) {
+      throw new Error(
+        `Custom instructions are too long (${cleanedUpdates.custom_instructions.length} characters). Maximum allowed: 2000 characters.`
+      );
+    }
+
+    // Use upsert to create or update preferences
+    const preferences = await UserPreference.upsertPreferences(userId, cleanedUpdates);
+    return {
+      id: preferences.id,
+      user_id: preferences.user_id,
+      language: preferences.language,
+      response_style: preferences.response_style,
+      custom_instructions: preferences.custom_instructions,
+      createdAt: preferences.createdAt,
+      updatedAt: preferences.updatedAt,
+    };
+  } catch (error) {
+    console.error(`❌ [PREFERENCES] Error updating preferences for user ${userId}:`, error);
+
+    // Re-throw validation errors with original message
+    if (error instanceof Error && error.message.includes("Invalid")) {
+      throw error;
+    }
+
+    // Re-throw length validation errors
+    if (error instanceof Error && error.message.includes("too long")) {
+      throw error;
+    }
+
+    // Generic error for database issues
+    throw new Error("Failed to update preferences. Please try again.");
   }
-
-  // Validate response_style if provided
-  const validStyles = ["concise", "detailed", "balanced", "casual", "professional"];
-  if (updates.response_style && !validStyles.includes(updates.response_style)) {
-    throw new Error(`Invalid response style. Supported styles: ${validStyles.join(", ")}`);
-  }
-
-  // Validate custom_instructions length if provided
-  if (updates.custom_instructions && updates.custom_instructions.length > 2000) {
-    throw new Error("Custom instructions cannot exceed 2000 characters");
-  }
-
-  // Use upsert to create or update preferences
-  const preferences = await UserPreference.upsertPreferences(userId, updates);
-
-  console.log(`✅ [PREFERENCES] Preferences updated successfully for user: ${userId}`);
-
-  return {
-    id: preferences.id,
-    user_id: preferences.user_id,
-    language: preferences.language,
-    response_style: preferences.response_style,
-    custom_instructions: preferences.custom_instructions,
-    createdAt: preferences.createdAt,
-    updatedAt: preferences.updatedAt,
-  };
 };
 
 /**

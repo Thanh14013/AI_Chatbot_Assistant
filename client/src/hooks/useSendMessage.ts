@@ -56,12 +56,6 @@ export function useSendMessage(options: UseSendMessageOptions) {
         role: "user",
       };
 
-      console.log(
-        `📤 [SEND] Creating message ${tempId} (${
-          isOnline ? "online" : "offline"
-        })`
-      );
-
       // 2. Save to localStorage immediately (for offline persistence)
       savePendingMessage(pendingMessage);
 
@@ -72,7 +66,6 @@ export function useSendMessage(options: UseSendMessageOptions) {
 
       // 4. If offline, stop here - message will be sent on reconnect
       if (!isOnline) {
-        console.log(`📴 [SEND] Offline - Message saved to localStorage`);
         return {
           success: false,
           tempId,
@@ -91,9 +84,6 @@ export function useSendMessage(options: UseSendMessageOptions) {
         // Note: Success is confirmed by WebSocket event listener
         // The real message will come back from server via 'message:new' event
         // At that point, we'll remove the pending message
-
-        console.log(`✅ [SEND] Message sent via WebSocket: ${tempId}`);
-
         return {
           success: true,
           tempId,
@@ -124,15 +114,8 @@ export function useSendMessage(options: UseSendMessageOptions) {
    */
   const retryMessage = useCallback(
     async (message: PendingMessage): Promise<SendMessageResult> => {
-      console.log(
-        `🔄 [RETRY] Retrying message ${message.id} (attempt ${
-          message.retryCount + 1
-        })`
-      );
-
       // Check if online
       if (!isOnline) {
-        console.log(`📴 [RETRY] Still offline - skipping retry`);
         return {
           success: false,
           tempId: message.id,
@@ -153,9 +136,6 @@ export function useSendMessage(options: UseSendMessageOptions) {
           message.content,
           message.id
         );
-
-        console.log(`✅ [RETRY] Message resent: ${message.id}`);
-
         return {
           success: true,
           tempId: message.id,
@@ -188,8 +168,6 @@ export function useSendMessage(options: UseSendMessageOptions) {
    */
   const handleMessageSuccess = useCallback(
     (tempId: string, realMessage?: unknown) => {
-      console.log(`🎉 [SEND] Message delivered successfully: ${tempId}`);
-
       // Remove from localStorage
       removePendingMessage(conversationId, tempId);
 

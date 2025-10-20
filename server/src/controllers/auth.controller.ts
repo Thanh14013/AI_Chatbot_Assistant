@@ -221,6 +221,7 @@ export const getCurrentUser = async (req: Request, res: Response): Promise<void>
         id: userRecord.id,
         name: userRecord.name,
         email: userRecord.email,
+        avatarUrl: userRecord.avatar_url,
         createdAt: userRecord.createdAt,
         updatedAt: userRecord.updatedAt,
       },

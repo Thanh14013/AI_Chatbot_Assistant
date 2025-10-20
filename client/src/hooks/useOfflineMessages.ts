@@ -106,9 +106,6 @@ export function useOfflineMessages(
       total: messages.length,
       synced: 0,
     });
-
-    console.log(`🔄 [OFFLINE] Starting sync of ${messages.length} messages...`);
-
     for (let i = 0; i < messages.length; i++) {
       const message = messages[i];
 
@@ -126,7 +123,6 @@ export function useOfflineMessages(
         loadPendingMessages();
 
         setSyncStatus((prev) => ({ ...prev, synced: prev.synced + 1 }));
-        console.log(`✅ [OFFLINE] Synced ${i + 1}/${messages.length}`);
       } catch (error) {
         console.error(
           `❌ [OFFLINE] Failed to sync message ${message.id}:`,
@@ -144,8 +140,6 @@ export function useOfflineMessages(
       // Small delay between retries to avoid overwhelming server
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
-
-    console.log("✅ [OFFLINE] Sync complete");
     setSyncStatus({
       inProgress: false,
       total: 0,
@@ -168,14 +162,12 @@ export function useOfflineMessages(
       }
 
       try {
-        console.log(`🔄 [OFFLINE] Retrying message: ${messageId}`);
         updateMessageStatus(messageId, "sending");
 
         await onRetry(message);
 
         // Success: remove from pending
         removePendingMessage(messageId);
-        console.log(`✅ [OFFLINE] Message ${messageId} sent successfully`);
       } catch (error) {
         // Failed: mark as failed
         console.error(`❌ [OFFLINE] Message ${messageId} retry failed:`, error);
@@ -196,9 +188,6 @@ export function useOfflineMessages(
   useEffect(() => {
     const handleReconnect = async () => {
       if (isOnline && pendingMessages.length > 0) {
-        console.log(
-          `🔄 [OFFLINE] Network reconnected, retrying ${pendingMessages.length} messages...`
-        );
         await retryAllMessages();
       }
     };

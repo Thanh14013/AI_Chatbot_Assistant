@@ -31,11 +31,8 @@ export async function getCache<T>(key: string): Promise<T | null> {
 
     const data = await redisClient.get(key);
     if (!data) {
-      console.log(`❌ [CACHE MISS] Key: ${key}`);
       return null;
     }
-
-    console.log(`✅ [CACHE HIT] Key: ${key}`);
     return JSON.parse(data) as T;
   } catch (error) {
     console.error(`❌ [CACHE ERROR] GET failed for key ${key}:`, error);
@@ -83,7 +80,6 @@ export async function deleteCache(key: string): Promise<void> {
 
     const result = await redisClient.del(key);
     if (result > 0) {
-      console.log(`🗑️  [CACHE DELETE] Key: ${key}`);
     }
   } catch (error) {
     console.error(`❌ [CACHE ERROR] DELETE failed for key ${key}:`, error);
@@ -188,17 +184,13 @@ export async function cacheAside<T>(
   const cached = await getCache<T>(key);
   if (cached !== null) {
     const elapsed = Date.now() - startTime;
-    console.log(`⚡ [CACHE-ASIDE HIT] Served from Redis in ${elapsed}ms`);
     return cached;
   }
 
   // Cache miss - fetch from source
-  console.log(`🔍 [CACHE-ASIDE MISS] Fetching from DB...`);
   const dbStartTime = Date.now();
   const data = await fetchFn();
   const dbElapsed = Date.now() - dbStartTime;
-  console.log(`📊 [DB QUERY] Completed in ${dbElapsed}ms`);
-
   // Store in cache for next time (don't await, fire and forget)
   setCache(key, data, ttl).catch(() => {
     // Ignore cache set errors
@@ -220,7 +212,6 @@ export async function flushAllCache(): Promise<void> {
     }
 
     await redisClient.flushdb();
-    console.log("✓ Cache flushed successfully");
   } catch (error) {
     console.error("Cache FLUSH error:", error);
   }

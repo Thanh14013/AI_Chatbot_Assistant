@@ -12,12 +12,10 @@ export function useNetworkStatus(): NetworkStatus {
 
   useEffect(() => {
     const handleOnline = () => {
-      console.log("🟢 [NETWORK] Connection restored");
       setIsOnline(true);
 
       // If we were offline before, trigger reconnect event
       if (wasOffline) {
-        console.log("🔄 [NETWORK] Dispatching reconnect event");
         window.dispatchEvent(new CustomEvent("network-reconnected"));
       }
 
@@ -25,7 +23,6 @@ export function useNetworkStatus(): NetworkStatus {
     };
 
     const handleOffline = () => {
-      console.log("🔴 [NETWORK] Connection lost");
       setIsOnline(false);
       setWasOffline(true);
     };

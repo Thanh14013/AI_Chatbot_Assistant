@@ -14,4 +14,7 @@ export { default as SidebarHeader } from "./SidebarHeader";
 export { default as TypingIndicator } from "./TypingIndicator";
 export { default as UserSection } from "./UserSection";
 export { default as SettingsModal } from "./SettingsModal";
+export { default as ProfileModal } from "./ProfileModal";
 export { ConversationSearch } from "./ConversationSearch";
+export { AvatarUpload } from "./AvatarUpload";
+export { ChangePasswordModal } from "./ChangePasswordModal";

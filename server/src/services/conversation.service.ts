@@ -26,9 +26,6 @@ export const createConversation = async (
   if (!data.user_id || !data.title) {
     throw new Error("User ID and title are required");
   }
-
-  console.log(`📝 [CONVERSATION] Creating new conversation for user: ${data.user_id}`);
-
   // Create conversation with default values
   const conversation = await Conversation.create({
     user_id: data.user_id,
@@ -41,7 +38,6 @@ export const createConversation = async (
   });
 
   // Invalidate conversation list cache for this user
-  console.log(`🗑️  [CONVERSATION] Invalidating cache for user: ${data.user_id}`);
   await invalidateCachePattern(conversationListPattern(data.user_id));
 
   // Return conversation response
@@ -88,8 +84,6 @@ export const getUserConversations = async (
 
   // Use cache for conversation lists
   const cacheKey = conversationListKey(userId, page, limit, search);
-  console.log(`🔑 [CONVERSATION] Cache key: ${cacheKey}`);
-
   const fetchConversations = async () => {
     // Calculate offset
     const offset = (page - 1) * limit;

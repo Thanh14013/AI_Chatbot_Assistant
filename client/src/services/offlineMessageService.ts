@@ -43,8 +43,6 @@ export function savePendingMessage(message: PendingMessage): void {
     // Add new message
     const updated = [...existing, message];
     localStorage.setItem(key, JSON.stringify(updated));
-
-    console.log(`💾 [OFFLINE] Saved pending message: ${message.id}`);
   } catch (error) {
     console.error("[OFFLINE] Failed to save pending message:", error);
     // If localStorage is full or disabled, fail gracefully
@@ -96,10 +94,6 @@ export function updateMessageStatus(
 
     const key = getStorageKey(conversationId);
     localStorage.setItem(key, JSON.stringify(updated));
-
-    console.log(
-      `🔄 [OFFLINE] Updated message ${messageId} status to: ${status}`
-    );
   } catch (error) {
     console.error("[OFFLINE] Failed to update message status:", error);
   }
@@ -144,8 +138,6 @@ export function removePendingMessage(
     } else {
       localStorage.setItem(key, JSON.stringify(updated));
     }
-
-    console.log(`🗑️  [OFFLINE] Removed pending message: ${messageId}`);
   } catch (error) {
     console.error("[OFFLINE] Failed to remove pending message:", error);
   }
@@ -207,7 +199,6 @@ export function cleanExpiredMessages(): number {
     }
 
     if (totalCleaned > 0) {
-      console.log(`🧹 [OFFLINE] Cleaned ${totalCleaned} expired messages`);
     }
 
     return totalCleaned;
@@ -224,9 +215,6 @@ export function clearPendingMessages(conversationId: string): void {
   try {
     const key = getStorageKey(conversationId);
     localStorage.removeItem(key);
-    console.log(
-      `🗑️  [OFFLINE] Cleared all pending messages for conversation: ${conversationId}`
-    );
   } catch (error) {
     console.error("[OFFLINE] Failed to clear pending messages:", error);
   }

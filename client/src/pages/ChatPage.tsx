@@ -15,7 +15,7 @@ import Sidebar from "../components/Sidebar";
 import MessageList from "../components/MessageList";
 import ChatInput from "../components/ChatInput";
 import { ConversationSearch } from "../components/ConversationSearch";
-import { SettingsModal } from "../components";
+import { SettingsModal, ProfileModal } from "../components";
 // ConversationForm not used anymore in new draft mode flow
 // import ConversationForm, {
 //   ConversationFormValues,
@@ -31,6 +31,7 @@ import { websocketService } from "../services/websocket.service";
 import { NetworkStatus, TypingIndicator } from "../components";
 import { searchConversation } from "../services/searchService";
 import { useAuthContext } from "../hooks/useAuthContext";
+import { usePreferences } from "../stores/preferences.store";
 import styles from "./ChatPage.module.css";
 
 const { Content } = Layout;
@@ -44,8 +45,14 @@ const ChatPage: React.FC = () => {
   const { message: antdMessage } = App.useApp();
   const { user } = useAuthContext();
 
+  // Fetch user preferences on mount
+  const { fetchPreferences } = usePreferences();
+
   // Settings modal state
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+
+  // Profile modal state
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -244,6 +251,13 @@ const ChatPage: React.FC = () => {
 
   // Track newly created conversations to avoid race condition with message loading
   const justCreatedConversationIdRef = useRef<string | null>(null);
+
+  // Fetch user preferences on mount (auto-creates if doesn't exist)
+  useEffect(() => {
+    fetchPreferences().catch((err) => {
+      console.error("❌ [CHATPAGE] Error fetching preferences:", err);
+    });
+  }, [fetchPreferences]);
 
   useEffect(() => {
     const id = params.id;
@@ -1520,6 +1534,7 @@ const ChatPage: React.FC = () => {
           onHighlightMessage={handleSearchResultClick}
           unreadConversations={unreadConversations}
           onSettingsClick={() => setSettingsModalOpen(true)}
+          onProfileClick={() => setProfileModalOpen(true)}
         />
 
         {/* Main content area */}
@@ -1622,6 +1637,12 @@ const ChatPage: React.FC = () => {
       <SettingsModal
         open={settingsModalOpen}
         onCancel={() => setSettingsModalOpen(false)}
+      />
+
+      {/* Profile Modal */}
+      <ProfileModal
+        open={profileModalOpen}
+        onCancel={() => setProfileModalOpen(false)}
       />
     </Layout>
   );

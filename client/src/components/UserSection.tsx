@@ -6,6 +6,7 @@ import {
   LogoutOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../hooks";
+import { useNavigate } from "react-router-dom";
 import type { User } from "../types/auth.type";
 import styles from "./UserSection.module.css";
 
@@ -15,19 +16,24 @@ interface UserSectionProps {
   user: User | null;
   collapsed?: boolean;
   onSettingsClick?: () => void; // Add callback for settings
+  onProfileClick?: () => void; // Add callback for profile
 }
 
 const UserSection: React.FC<UserSectionProps> = ({
   user,
   collapsed = false,
   onSettingsClick,
+  onProfileClick,
 }) => {
   const { logout } = useAuth();
+  const navigate = useNavigate();
 
   const handleMenuClick = async (key: string) => {
     switch (key) {
       case "profile":
-        // TODO: Navigate to profile page
+        if (onProfileClick) {
+          onProfileClick();
+        }
         break;
       case "settings":
         if (onSettingsClick) {
