@@ -34,17 +34,13 @@ export function savePendingMessage(message: PendingMessage): void {
 
     // Prevent spam: limit max pending messages
     if (existing.length >= MAX_PENDING_MESSAGES) {
-      console.warn(
-        `Max pending messages (${MAX_PENDING_MESSAGES}) reached for conversation ${message.conversationId}`
-      );
       return;
     }
 
     // Add new message
     const updated = [...existing, message];
     localStorage.setItem(key, JSON.stringify(updated));
-  } catch (error) {
-    console.error("[OFFLINE] Failed to save pending message:", error);
+  } catch {
     // If localStorage is full or disabled, fail gracefully
   }
 }
@@ -72,8 +68,7 @@ export function getPendingMessages(conversationId: string): PendingMessage[] {
     }
 
     return validMessages;
-  } catch (error) {
-    console.error("[OFFLINE] Failed to get pending messages:", error);
+  } catch {
     return [];
   }
 }
@@ -86,17 +81,13 @@ export function updateMessageStatus(
   messageId: string,
   status: PendingMessage["status"]
 ): void {
-  try {
-    const messages = getPendingMessages(conversationId);
-    const updated = messages.map((msg) =>
-      msg.id === messageId ? { ...msg, status } : msg
-    );
+  const messages = getPendingMessages(conversationId);
+  const updated = messages.map((msg) =>
+    msg.id === messageId ? { ...msg, status } : msg
+  );
 
-    const key = getStorageKey(conversationId);
-    localStorage.setItem(key, JSON.stringify(updated));
-  } catch (error) {
-    console.error("[OFFLINE] Failed to update message status:", error);
-  }
+  const key = getStorageKey(conversationId);
+  localStorage.setItem(key, JSON.stringify(updated));
 }
 
 /**
@@ -106,17 +97,13 @@ export function incrementRetryCount(
   conversationId: string,
   messageId: string
 ): void {
-  try {
-    const messages = getPendingMessages(conversationId);
-    const updated = messages.map((msg) =>
-      msg.id === messageId ? { ...msg, retryCount: msg.retryCount + 1 } : msg
-    );
+  const messages = getPendingMessages(conversationId);
+  const updated = messages.map((msg) =>
+    msg.id === messageId ? { ...msg, retryCount: msg.retryCount + 1 } : msg
+  );
 
-    const key = getStorageKey(conversationId);
-    localStorage.setItem(key, JSON.stringify(updated));
-  } catch (error) {
-    console.error("[OFFLINE] Failed to increment retry count:", error);
-  }
+  const key = getStorageKey(conversationId);
+  localStorage.setItem(key, JSON.stringify(updated));
 }
 
 /**
@@ -126,20 +113,16 @@ export function removePendingMessage(
   conversationId: string,
   messageId: string
 ): void {
-  try {
-    const messages = getPendingMessages(conversationId);
-    const updated = messages.filter((msg) => msg.id !== messageId);
+  const messages = getPendingMessages(conversationId);
+  const updated = messages.filter((msg) => msg.id !== messageId);
 
-    const key = getStorageKey(conversationId);
+  const key = getStorageKey(conversationId);
 
-    if (updated.length === 0) {
-      // Remove key if no messages left
-      localStorage.removeItem(key);
-    } else {
-      localStorage.setItem(key, JSON.stringify(updated));
-    }
-  } catch (error) {
-    console.error("[OFFLINE] Failed to remove pending message:", error);
+  if (updated.length === 0) {
+    // Remove key if no messages left
+    localStorage.removeItem(key);
+  } else {
+    localStorage.setItem(key, JSON.stringify(updated));
   }
 }
 
@@ -162,8 +145,7 @@ export function getAllPendingMessages(): PendingMessage[] {
     }
 
     return allMessages;
-  } catch (error) {
-    console.error("[OFFLINE] Failed to get all pending messages:", error);
+  } catch {
     return [];
   }
 }
@@ -198,12 +180,8 @@ export function cleanExpiredMessages(): number {
       }
     }
 
-    if (totalCleaned > 0) {
-    }
-
     return totalCleaned;
-  } catch (error) {
-    console.error("[OFFLINE] Failed to clean expired messages:", error);
+  } catch {
     return 0;
   }
 }
@@ -212,12 +190,8 @@ export function cleanExpiredMessages(): number {
  * Clear all pending messages for a conversation
  */
 export function clearPendingMessages(conversationId: string): void {
-  try {
-    const key = getStorageKey(conversationId);
-    localStorage.removeItem(key);
-  } catch (error) {
-    console.error("[OFFLINE] Failed to clear pending messages:", error);
-  }
+  const key = getStorageKey(conversationId);
+  localStorage.removeItem(key);
 }
 
 /**

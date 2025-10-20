@@ -81,6 +81,9 @@ export const loginUser = async (loginData: LoginInput) => {
     id: user.id,
     name: user.name,
     email: user.email,
+    username: user.username || null,
+    bio: user.bio || null,
+    avatarUrl: user.avatar_url || null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };

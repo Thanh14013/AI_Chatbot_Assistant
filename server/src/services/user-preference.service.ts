@@ -60,7 +60,6 @@ export const getUserPreferences = async (userId: string): Promise<UserPreference
       updatedAt: preferences.updatedAt,
     };
   } catch (error) {
-    console.error(`❌ [PREFERENCES] Error fetching preferences for user ${userId}:`, error);
     throw new Error("Failed to fetch user preferences. Please try again.");
   }
 };
@@ -129,8 +128,6 @@ export const updateUserPreferences = async (
       updatedAt: preferences.updatedAt,
     };
   } catch (error) {
-    console.error(`❌ [PREFERENCES] Error updating preferences for user ${userId}:`, error);
-
     // Re-throw validation errors with original message
     if (error instanceof Error && error.message.includes("Invalid")) {
       throw error;
@@ -203,7 +200,6 @@ export const buildSystemPromptWithPreferences = async (
     return systemPrompt;
   } catch (error) {
     // If preferences fetch fails, return base prompt
-    console.error(`❌ [PREFERENCES] Failed to fetch preferences for user ${userId}:`, error);
     return basePrompt;
   }
 };

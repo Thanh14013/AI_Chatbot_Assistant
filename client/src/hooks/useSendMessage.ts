@@ -90,7 +90,6 @@ export function useSendMessage(options: UseSendMessageOptions) {
         };
       } catch (error) {
         // 6. Handle send failure
-        console.error(`❌ [SEND] Failed to send message ${tempId}:`, error);
 
         // Mark as failed in localStorage
         updateMessageStatus(conversationId, tempId, "failed");
@@ -141,11 +140,6 @@ export function useSendMessage(options: UseSendMessageOptions) {
           tempId: message.id,
         };
       } catch (error) {
-        console.error(
-          `❌ [RETRY] Failed to resend message ${message.id}:`,
-          error
-        );
-
         // Mark as failed again
         updateMessageStatus(conversationId, message.id, "failed");
 

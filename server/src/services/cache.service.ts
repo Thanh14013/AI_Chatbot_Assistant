@@ -25,7 +25,6 @@ export const CACHE_TTL = {
 export async function getCache<T>(key: string): Promise<T | null> {
   try {
     if (!isRedisConnected()) {
-      console.warn("⚠️  [CACHE] Redis not connected, cache miss");
       return null;
     }
 
@@ -35,7 +34,6 @@ export async function getCache<T>(key: string): Promise<T | null> {
     }
     return JSON.parse(data) as T;
   } catch (error) {
-    console.error(`❌ [CACHE ERROR] GET failed for key ${key}:`, error);
     return null; // Fail gracefully, return null on error
   }
 }
@@ -49,7 +47,6 @@ export async function getCache<T>(key: string): Promise<T | null> {
 export async function setCache<T>(key: string, value: T, ttl?: number): Promise<void> {
   try {
     if (!isRedisConnected()) {
-      console.warn("⚠️  [CACHE] Redis not connected, skipping cache set");
       return;
     }
 
@@ -57,13 +54,10 @@ export async function setCache<T>(key: string, value: T, ttl?: number): Promise<
 
     if (ttl) {
       await redisClient.setex(key, ttl, serialized);
-      console.log(`💾 [CACHE SET] Key: ${key} (TTL: ${ttl}s)`);
     } else {
       await redisClient.set(key, serialized);
-      console.log(`💾 [CACHE SET] Key: ${key} (No TTL)`);
     }
   } catch (error) {
-    console.error(`❌ [CACHE ERROR] SET failed for key ${key}:`, error);
     // Fail gracefully, don't throw error
   }
 }
@@ -81,9 +75,7 @@ export async function deleteCache(key: string): Promise<void> {
     const result = await redisClient.del(key);
     if (result > 0) {
     }
-  } catch (error) {
-    console.error(`❌ [CACHE ERROR] DELETE failed for key ${key}:`, error);
-  }
+  } catch (error) {}
 }
 
 /**
@@ -116,13 +108,11 @@ export async function invalidateCachePattern(pattern: string): Promise<number> {
     // Delete all matched keys
     if (keys.length > 0) {
       await redisClient.del(...keys);
-      console.log(`🗑️  [CACHE INVALIDATE] Pattern: ${pattern} (${keys.length} keys deleted)`);
       return keys.length;
     }
 
     return 0;
   } catch (error) {
-    console.error(`❌ [CACHE ERROR] INVALIDATE PATTERN failed for ${pattern}:`, error);
     return 0;
   }
 }
@@ -141,7 +131,6 @@ export async function existsCache(key: string): Promise<boolean> {
     const exists = await redisClient.exists(key);
     return exists === 1;
   } catch (error) {
-    console.error(`Cache EXISTS error for key ${key}:`, error);
     return false;
   }
 }
@@ -159,7 +148,6 @@ export async function getTTL(key: string): Promise<number> {
 
     return await redisClient.ttl(key);
   } catch (error) {
-    console.error(`Cache TTL error for key ${key}:`, error);
     return -2;
   }
 }
@@ -197,7 +185,6 @@ export async function cacheAside<T>(
   });
 
   const totalElapsed = Date.now() - startTime;
-  console.log(`⏱️  [CACHE-ASIDE] Total time: ${totalElapsed}ms (DB: ${dbElapsed}ms)`);
 
   return data;
 }
@@ -212,9 +199,7 @@ export async function flushAllCache(): Promise<void> {
     }
 
     await redisClient.flushdb();
-  } catch (error) {
-    console.error("Cache FLUSH error:", error);
-  }
+  } catch (error) {}
 }
 
 export default {

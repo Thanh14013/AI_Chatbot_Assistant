@@ -91,7 +91,6 @@ export function useOfflineMessages(
   // Retry all pending messages
   const retryAllMessages = useCallback(async () => {
     if (!onRetry) {
-      console.warn("[OFFLINE] No retry handler provided");
       return;
     }
 
@@ -123,11 +122,7 @@ export function useOfflineMessages(
         loadPendingMessages();
 
         setSyncStatus((prev) => ({ ...prev, synced: prev.synced + 1 }));
-      } catch (error) {
-        console.error(
-          `❌ [OFFLINE] Failed to sync message ${message.id}:`,
-          error
-        );
+      } catch {
         offlineMessageService.updateMessageStatus(
           conversationId,
           message.id,
@@ -151,13 +146,10 @@ export function useOfflineMessages(
   const retryMessage = useCallback(
     async (messageId: string) => {
       if (!onRetry) {
-        console.warn("[OFFLINE] No retry handler provided");
         return;
       }
-
       const message = pendingMessages.find((msg) => msg.id === messageId);
       if (!message) {
-        console.warn(`[OFFLINE] Message ${messageId} not found`);
         return;
       }
 
@@ -168,9 +160,8 @@ export function useOfflineMessages(
 
         // Success: remove from pending
         removePendingMessage(messageId);
-      } catch (error) {
+      } catch {
         // Failed: mark as failed
-        console.error(`❌ [OFFLINE] Message ${messageId} retry failed:`, error);
         updateMessageStatus(messageId, "failed");
         offlineMessageService.incrementRetryCount(conversationId, messageId);
       }

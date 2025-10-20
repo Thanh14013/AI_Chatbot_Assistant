@@ -254,9 +254,7 @@ const ChatPage: React.FC = () => {
 
   // Fetch user preferences on mount (auto-creates if doesn't exist)
   useEffect(() => {
-    fetchPreferences().catch((err) => {
-      console.error("❌ [CHATPAGE] Error fetching preferences:", err);
-    });
+    fetchPreferences().catch((err) => {});
   }, [fetchPreferences]);
 
   useEffect(() => {
@@ -372,7 +370,6 @@ const ChatPage: React.FC = () => {
             }
           } catch (err) {
             // Non-fatal: conversation-local search failed, no highlight
-            console.debug("ChatPage: conversation-local search failed", err);
           }
         }
         // Ensure message list scrolls to bottom when conversation loads,
@@ -1193,9 +1190,7 @@ const ChatPage: React.FC = () => {
         moveConversationToTop(conversation.id);
         await refreshConversations();
         return true;
-      } catch (err) {
-        console.warn("WebSocket send failed, falling back to HTTP");
-      }
+      } catch (err) {}
     }
 
     // Fallback to HTTP

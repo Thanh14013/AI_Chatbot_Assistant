@@ -3,7 +3,14 @@
  * Client-side cache for user preferences to avoid repeated API calls
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  ReactNode,
+} from "react";
 import {
   getUserPreferences,
   updateUserPreferences,
@@ -19,11 +26,15 @@ interface PreferencesContextType {
 
   // Actions
   fetchPreferences: () => Promise<void>;
-  updatePreferencesCache: (updates: UpdateUserPreferencesInput) => Promise<void>;
+  updatePreferencesCache: (
+    updates: UpdateUserPreferencesInput
+  ) => Promise<void>;
   clearPreferences: () => void;
 }
 
-const PreferencesContext = createContext<PreferencesContextType | undefined>(undefined);
+const PreferencesContext = createContext<PreferencesContextType | undefined>(
+  undefined
+);
 
 // Cache duration: 5 minutes
 const CACHE_DURATION = 5 * 60 * 1000;
@@ -32,7 +43,9 @@ interface PreferencesProviderProps {
   children: ReactNode;
 }
 
-export const PreferencesProvider: React.FC<PreferencesProviderProps> = ({ children }) => {
+export const PreferencesProvider: React.FC<PreferencesProviderProps> = ({
+  children,
+}) => {
   const [preferences, setPreferences] = useState<UserPreference | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +67,6 @@ export const PreferencesProvider: React.FC<PreferencesProviderProps> = ({ childr
           setPreferences(parsedPreferences);
           setLastFetched(timestamp);
         } catch (err) {
-          console.error("❌ [PREFERENCES] Error parsing cached preferences:", err);
           localStorage.removeItem("user-preferences");
           localStorage.removeItem("user-preferences-timestamp");
         }
@@ -71,7 +83,10 @@ export const PreferencesProvider: React.FC<PreferencesProviderProps> = ({ childr
     if (preferences) {
       localStorage.setItem("user-preferences", JSON.stringify(preferences));
       if (lastFetched) {
-        localStorage.setItem("user-preferences-timestamp", lastFetched.toString());
+        localStorage.setItem(
+          "user-preferences-timestamp",
+          lastFetched.toString()
+        );
       }
     }
   }, [preferences, lastFetched]);
@@ -105,8 +120,8 @@ export const PreferencesProvider: React.FC<PreferencesProviderProps> = ({ childr
         setLastFetched(Date.now());
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to fetch preferences";
-      console.error("❌ [PREFERENCES] Error:", errorMessage);
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to fetch preferences";
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -114,26 +129,29 @@ export const PreferencesProvider: React.FC<PreferencesProviderProps> = ({ childr
   }, [isLoading, preferences, shouldRefetch]);
 
   // Update preferences (API + cache)
-  const updatePreferencesCache = useCallback(async (updates: UpdateUserPreferencesInput) => {
-    try {
-      setIsLoading(true);
-      setError(null);
+  const updatePreferencesCache = useCallback(
+    async (updates: UpdateUserPreferencesInput) => {
+      try {
+        setIsLoading(true);
+        setError(null);
 
-      const response = await updateUserPreferences(updates);
+        const response = await updateUserPreferences(updates);
 
-      if (response.success && response.data) {
-        setPreferences(response.data);
-        setLastFetched(Date.now());
+        if (response.success && response.data) {
+          setPreferences(response.data);
+          setLastFetched(Date.now());
+        }
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to update preferences";
+        setError(errorMessage);
+        throw err; // Re-throw for UI to handle
+      } finally {
+        setIsLoading(false);
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to update preferences";
-      console.error("❌ [PREFERENCES] Error:", errorMessage);
-      setError(errorMessage);
-      throw err; // Re-throw for UI to handle
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   // Clear preferences (on logout)
   const clearPreferences = useCallback(() => {
@@ -153,7 +171,11 @@ export const PreferencesProvider: React.FC<PreferencesProviderProps> = ({ childr
     clearPreferences,
   };
 
-  return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>;
+  return (
+    <PreferencesContext.Provider value={value}>
+      {children}
+    </PreferencesContext.Provider>
+  );
 };
 
 // Custom hook to use preferences

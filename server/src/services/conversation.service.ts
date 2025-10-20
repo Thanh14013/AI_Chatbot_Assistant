@@ -78,10 +78,6 @@ export const getUserConversations = async (
     totalPages: number;
   };
 }> => {
-  console.log(
-    `💬 [CONVERSATION] Fetching conversations for user: ${userId} (page: ${page}, limit: ${limit})`
-  );
-
   // Use cache for conversation lists
   const cacheKey = conversationListKey(userId, page, limit, search);
   const fetchConversations = async () => {
@@ -237,9 +233,6 @@ export const updateConversation = async (
   await conversation.save();
 
   // Invalidate caches
-  console.log(
-    `🗑️  [CONVERSATION] Invalidating cache after update (conversation: ${conversationId})`
-  );
   await invalidateCachePattern(conversationListPattern(userId));
   await deleteCache(conversationMetaKey(conversationId));
 
@@ -296,9 +289,6 @@ export const deleteConversation = async (
   await conversation.save();
 
   // Invalidate all caches related to this conversation
-  console.log(
-    `🗑️  [CONVERSATION] Invalidating cache after delete (conversation: ${conversationId})`
-  );
   await invalidateCachePattern(conversationListPattern(userId));
   await deleteCache(conversationMetaKey(conversationId));
 
@@ -311,7 +301,6 @@ export const deleteConversation = async (
     })
     .catch((err) => {
       // Log failures for investigation; do not interrupt user flow.
-      console.warn(`Failed to delete messages for conversation ${conversationId}:`, err);
     });
 
   return {
@@ -360,7 +349,6 @@ Title:`;
     // Ensure title doesn't exceed 60 characters
     return title.length > 60 ? title.substring(0, 57) + "..." : title;
   } catch (error) {
-    console.error("Failed to generate conversation title:", error);
     // Return a default title if generation fails
     return "New Chat";
   }

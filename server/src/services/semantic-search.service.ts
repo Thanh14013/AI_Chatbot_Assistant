@@ -100,9 +100,6 @@ export async function searchConversationByEmbedding(
     );
 
     const searchElapsed = Date.now() - searchStartTime;
-    console.log(
-      `✅ [SEMANTIC SEARCH] Found ${(results as any[]).length} results in ${searchElapsed}ms`
-    );
 
     // Map database results to SemanticSearchResult type
     const searchResults: SemanticSearchResult[] = (results as any[]).map((row: any) => ({

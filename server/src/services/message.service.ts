@@ -97,10 +97,6 @@ export const getConversationMessages = async (
     hasMore: boolean;
   };
 }> => {
-  console.log(
-    `📨 [MESSAGE] Fetching messages for conversation: ${conversationId} (page: ${page}, limit: ${limit})`
-  );
-
   // Use cache for message history
   const cacheKey = messageHistoryKey(conversationId, page, limit, before);
   const fetchMessages = async () => {
@@ -486,12 +482,7 @@ export const sendMessageAndStreamResponse = async (
     await invalidateCachePattern(conversationListPattern(conversation.user_id));
 
     // Generate and store embedding for assistant message (async, non-blocking)
-    generateAndStoreEmbedding(assistantMessage.id, assistantMessage.content).catch((error) => {
-      console.error(
-        `Background embedding generation failed for assistant message ${assistantMessage.id}:`,
-        error.message
-      );
-    });
+    generateAndStoreEmbedding(assistantMessage.id, assistantMessage.content).catch((error) => {});
 
     // Return userMessage, assistantMessage, and updated conversation for client sync
     return {

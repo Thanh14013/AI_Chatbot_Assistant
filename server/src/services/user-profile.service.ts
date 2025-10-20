@@ -12,6 +12,8 @@ import type {
   AvatarUploadResponse,
 } from "../types/user.type.js";
 import { uploadAvatar, deleteAvatar } from "./cloudinary.service.js";
+import { deleteCache } from "./cache.service.js";
+import { userByIdKey, userByEmailKey } from "../utils/cache-key.util.js";
 
 /**
  * Get user profile by ID
@@ -66,6 +68,10 @@ export const updateUserProfile = async (
   // Update user
   await user.update(updates);
 
+  // Invalidate cache to ensure fresh data on next login
+  await deleteCache(userByIdKey(user.id));
+  await deleteCache(userByEmailKey(user.email));
+
   return {
     id: user.id,
     name: user.name,
@@ -106,6 +112,10 @@ export const updateUserAvatar = async (
   // Update user record
   await user.update({ avatar_url: avatarUrl });
 
+  // Invalidate cache to ensure fresh data on next login
+  await deleteCache(userByIdKey(user.id));
+  await deleteCache(userByEmailKey(user.email));
+
   return { avatar_url: avatarUrl };
 };
 
@@ -132,6 +142,10 @@ export const removeUserAvatar = async (userId: string): Promise<void> => {
 
   // Update user record
   await user.update({ avatar_url: null });
+
+  // Invalidate cache to ensure fresh data on next login
+  await deleteCache(userByIdKey(user.id));
+  await deleteCache(userByEmailKey(user.email));
 };
 
 /**
@@ -169,6 +183,10 @@ export const changeUserPassword = async (
 
   // Update password
   await user.update({ password: hashedPassword });
+
+  // Invalidate cache to ensure fresh password hash on next login
+  await deleteCache(userByIdKey(user.id));
+  await deleteCache(userByEmailKey(user.email));
 };
 
 /**

@@ -114,7 +114,7 @@ const UserSection: React.FC<UserSectionProps> = ({
         className={styles.avatar}
         src={(user as any)?.avatarUrl}
       >
-        {user.name?.charAt(0)?.toUpperCase() ||
+        {(user.username || user.name)?.charAt(0)?.toUpperCase() ||
           user.email?.charAt(0)?.toUpperCase() ||
           "U"}
       </Avatar>
@@ -122,9 +122,11 @@ const UserSection: React.FC<UserSectionProps> = ({
       {!collapsed && (
         <div className={styles.userDetails}>
           {/* Use CSS-based ellipsis via styles to avoid AntD EllipsisMeasure render loops */}
-          <span className={styles.userName}>{user.name || user.email}</span>
+          <span className={styles.userName}>
+            {user.username || user.name || user.email}
+          </span>
           <span className={styles.userEmail}>
-            {user.name ? user.email : "Free Plan"}
+            {user.username || user.name ? user.email : "Free Plan"}
           </span>
         </div>
       )}
@@ -146,10 +148,10 @@ const UserSection: React.FC<UserSectionProps> = ({
             title={
               <div>
                 <div className={styles.tooltipTitle}>
-                  {user.name || user.email}
+                  {user.username || user.name || user.email}
                 </div>
                 <div className={styles.tooltipSubtitle}>
-                  {user.name ? user.email : "Free Plan"}
+                  {user.username || user.name ? user.email : "Free Plan"}
                 </div>
               </div>
             }

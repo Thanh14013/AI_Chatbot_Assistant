@@ -31,7 +31,8 @@ export interface UserResponse {
   email: string;
   username?: string | null;
   bio?: string | null;
-  avatar_url?: string | null;
+  avatarUrl?: string | null; // Changed to camelCase to match frontend
+  avatar_url?: string | null; // Keep snake_case for backward compatibility
   createdAt: Date;
   updatedAt: Date;
 }
