@@ -1,4 +1,4 @@
-import { createConversation, getUserConversations, getConversationById, updateConversation, deleteConversation, } from "../services/conversation.service.js";
+import { createConversation, getUserConversations, getConversationById, updateConversation, deleteConversation, generateConversationTitle, } from "../services/conversation.service.js";
 import User from "../models/user.model.js";
 /**
  * Helper function to get user ID from authenticated request
@@ -299,6 +299,49 @@ export const remove = async (req, res) => {
             });
             return;
         }
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+            error: errorMessage,
+        });
+    }
+};
+/**
+ * Generate a smart title for a conversation based on message content
+ * POST /api/conversations/generate-title
+ */
+export const generateTitle = async (req, res) => {
+    try {
+        // Get user ID from authenticated request
+        const userId = await getUserIdFromRequest(req);
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                message: "Authentication required",
+            });
+            return;
+        }
+        // Extract message content from request body
+        const { content } = req.body;
+        if (!content || typeof content !== "string" || content.trim().length === 0) {
+            res.status(400).json({
+                success: false,
+                message: "Message content is required",
+            });
+            return;
+        }
+        // Generate title using the service
+        const title = await generateConversationTitle(content.trim(), "");
+        // Send success response
+        res.status(200).json({
+            success: true,
+            message: "Title generated successfully",
+            data: { title },
+        });
+    }
+    catch (error) {
+        // Handle errors
+        const errorMessage = error instanceof Error ? error.message : "Failed to generate title";
         res.status(500).json({
             success: false,
             message: "Internal server error",

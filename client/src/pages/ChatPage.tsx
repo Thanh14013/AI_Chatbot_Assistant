@@ -15,6 +15,7 @@ import Sidebar from "../components/Sidebar";
 import MessageList from "../components/MessageList";
 import ChatInput from "../components/ChatInput";
 import { ConversationSearch } from "../components/ConversationSearch";
+import { SettingsModal } from "../components";
 // ConversationForm not used anymore in new draft mode flow
 // import ConversationForm, {
 //   ConversationFormValues,
@@ -25,6 +26,7 @@ import {
   ConversationListItem,
   Message,
 } from "../types/chat.type";
+import { PendingMessage } from "../types/offline-message.type";
 import { websocketService } from "../services/websocket.service";
 import { NetworkStatus, TypingIndicator } from "../components";
 import { searchConversation } from "../services/searchService";
@@ -41,6 +43,10 @@ const { Title } = Typography;
 const ChatPage: React.FC = () => {
   const { message: antdMessage } = App.useApp();
   const { user } = useAuthContext();
+
+  // Settings modal state
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+
   // Search state
   const [searchQuery, setSearchQuery] = useState<string>("");
 
@@ -1227,7 +1233,9 @@ const ChatPage: React.FC = () => {
   };
 
   // Retry handler for failed messages
-  const handleRetryMessage = async (failedMessage: Message) => {
+  const handleRetryMessage = async (
+    failedMessage: Message | PendingMessage
+  ): Promise<void> => {
     if (!currentConversation) return;
     // mark pending
     setMessages((prev) =>
@@ -1511,6 +1519,7 @@ const ChatPage: React.FC = () => {
           onNewConversation={handleNewConversation}
           onHighlightMessage={handleSearchResultClick}
           unreadConversations={unreadConversations}
+          onSettingsClick={() => setSettingsModalOpen(true)}
         />
 
         {/* Main content area */}
@@ -1608,6 +1617,12 @@ const ChatPage: React.FC = () => {
         loading={isCreating}
       />
       */}
+
+      {/* Settings Modal */}
+      <SettingsModal
+        open={settingsModalOpen}
+        onCancel={() => setSettingsModalOpen(false)}
+      />
     </Layout>
   );
 };

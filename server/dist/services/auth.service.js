@@ -3,6 +3,8 @@ import RefreshToken from "../models/refresh-token.model.js";
 import { hashPassword, comparePassword } from "../utils/hashPassword.js";
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken, } from "../utils/generateToken.js";
 import { validateRegister, validateLogin, validateChangePassword } from "../utils/validateInput.js";
+import { cacheAside, CACHE_TTL, deleteCache } from "./cache.service.js";
+import { userByEmailKey, userByIdKey } from "../utils/cache-key.util.js";
 //Register a new user
 export const registerUser = async (registerData) => {
     // Validate and normalize input
@@ -25,8 +27,11 @@ export const registerUser = async (registerData) => {
 // Login user
 export const loginUser = async (loginData) => {
     const { email, password } = validateLogin(loginData.email, loginData.password);
-    // Find user by email
-    const user = await User.findByEmail(email);
+    console.log(`🔐 [AUTH] Login attempt for: ${email}`);
+    // Find user by email with cache
+    const cacheKey = userByEmailKey(email);
+    console.log(`🔑 [AUTH] Cache key: ${cacheKey}`);
+    const user = await cacheAside(cacheKey, () => User.findByEmail(email), CACHE_TTL.USER);
     if (!user) {
         // Standardized error message for wrong credentials
         throw new Error("Account or password is incorrect");
@@ -37,6 +42,7 @@ export const loginUser = async (loginData) => {
         // Standardized error message for wrong credentials
         throw new Error("Account or password is incorrect");
     }
+    console.log(`✅ [AUTH] Login successful for: ${email}`);
     // Generate new tokens
     const accessToken = generateAccessToken({ id: user.id, name: user.name, email: user.email });
     const refreshToken = generateRefreshToken({ id: user.id, name: user.name, email: user.email });
@@ -131,5 +137,9 @@ export const changePassword = async (email, data) => {
     const hashed = await hashPassword(newPassword);
     user.password = hashed;
     await user.save();
+    // Invalidate user cache after password change
+    console.log(`🗑️  [AUTH] Invalidating cache for user: ${email}`);
+    await deleteCache(userByEmailKey(email));
+    await deleteCache(userByIdKey(user.id));
     return { message: "Password changed successfully" };
 };

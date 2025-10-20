@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authenticateAccessToken } from "../middlewares/authJwt.js";
-import { create, getAll, getOne, update, remove } from "../controllers/conversation.controller.js";
+import { create, getAll, getOne, update, remove, generateTitle, } from "../controllers/conversation.controller.js";
 import { getMessages, sendMessageStream } from "../controllers/message.controller.js";
 import { semanticSearch } from "../controllers/semantic-search.controller.js";
 const router = Router();
@@ -9,6 +9,10 @@ router.use(authenticateAccessToken);
 /**
  * Conversation CRUD Routes
  */
+// Generate a smart title for a conversation based on message content
+// POST /api/conversations/generate-title
+// Body: { content: string }
+router.post("/generate-title", generateTitle);
 // Create a new conversation
 // POST /api/conversations
 router.post("/", create);

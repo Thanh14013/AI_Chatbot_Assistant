@@ -18,9 +18,11 @@ import { searchAllConversations, searchWithinConversation, } from "../services/g
  */
 export const globalSearch = async (req, res) => {
     try {
-        // Get user ID from authenticated request
-        const userId = req.user?.id;
-        if (!userId) {
+        // Helper: normalize user extraction (support decoded token with id or email)
+        const decoded = req.user || req.body?.user;
+        // Try to obtain user id directly; if only email present, look up id from DB in calling service
+        const userId = decoded?.id || decoded?.userId || null;
+        if (!userId && !decoded?.email) {
             res.status(401).json({
                 error: "Unauthorized",
                 message: "User not authenticated",
@@ -72,7 +74,9 @@ export const globalSearch = async (req, res) => {
             }
         }
         // Perform global search
-        const searchResult = await searchAllConversations(userId, {
+        // If userId not directly available, pass the decoded.email so the service layer can resolve it
+        const searchInputUser = userId || decoded?.email;
+        const searchResult = await searchAllConversations(searchInputUser, {
             query,
             limit,
             messagesPerConversation,
@@ -85,7 +89,6 @@ export const globalSearch = async (req, res) => {
         });
     }
     catch (error) {
-        console.error("Global search error:", error);
         // Handle specific errors
         if (error.message.includes("API key") || error.message.includes("not configured")) {
             res.status(503).json({
@@ -120,8 +123,9 @@ export const globalSearch = async (req, res) => {
 export const conversationSearchWithContext = async (req, res) => {
     try {
         const conversationId = req.params.id;
-        const userId = req.user?.id;
-        if (!userId) {
+        const decoded = req.user || req.body?.user;
+        const userId = decoded?.id || decoded?.userId || null;
+        if (!userId && !decoded?.email) {
             res.status(401).json({
                 error: "Unauthorized",
                 message: "User not authenticated",
@@ -137,7 +141,9 @@ export const conversationSearchWithContext = async (req, res) => {
             return;
         }
         // Perform search with context
-        const searchResult = await searchWithinConversation(conversationId, userId, {
+        // If userId not available, pass email to service and let it resolve
+        const searchInputUser = userId || decoded?.email;
+        const searchResult = await searchWithinConversation(conversationId, searchInputUser, {
             query,
             limit,
             contextMessages,
@@ -148,7 +154,6 @@ export const conversationSearchWithContext = async (req, res) => {
         });
     }
     catch (error) {
-        console.error("Conversation search error:", error);
         if (error.message.includes("not found")) {
             res.status(404).json({
                 error: "Not Found",

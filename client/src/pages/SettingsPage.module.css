@@ -1,0 +1,101 @@
+/**
+ * SettingsPage styles
+ */
+
+.container {
+  /* Fullscreen container */
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  padding: 40px 24px;
+  overflow-y: auto; /* Allow scrolling for longer forms */
+}
+
+.loadingContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+}
+
+.card {
+  width: 50%;
+  min-width: 500px;
+  max-width: 800px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 32px;
+  margin: 40px auto;
+}
+
+.header {
+  margin-bottom: 16px;
+}
+
+.icon {
+  font-size: 32px;
+  color: #1890ff;
+}
+
+.title {
+  margin-bottom: 4px;
+}
+
+.alert {
+  margin-bottom: 20px;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.labelDescription {
+  font-size: 13px;
+  font-weight: normal;
+}
+
+.hint {
+  margin-top: -8px;
+  margin-bottom: 24px;
+  font-size: 13px;
+}
+
+.submitButton {
+  margin-top: 16px;
+  margin-bottom: 0;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .container {
+    padding: 24px 12px;
+  }
+
+  .card {
+    width: 100%;
+    min-width: unset;
+    max-width: 100%;
+    padding: 24px;
+  }
+
+  .icon {
+    font-size: 28px;
+  }
+
+  .title {
+    font-size: 20px;
+  }
+}
+
+/* Tablet */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .card {
+    width: 70%;
+    min-width: 450px;
+  }
+}

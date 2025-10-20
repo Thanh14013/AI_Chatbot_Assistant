@@ -14,6 +14,12 @@ const extractToken = (req) => {
 export const authenticateAccessToken = (req, res, next) => {
     try {
         const accessToken = extractToken(req);
+        // Development-only logging to help trace auth issues
+        if (process.env.NODE_ENV === "development") {
+            try {
+            }
+            catch { }
+        }
         if (!accessToken) {
             res.status(401).json({ success: false, message: "Access token is required" });
             return;
@@ -33,6 +39,11 @@ export const authenticateAccessToken = (req, res, next) => {
         if (!req.body)
             req.body = {};
         req.body.user = accessResult.decoded;
+        if (process.env.NODE_ENV === "development") {
+            try {
+            }
+            catch { }
+        }
         next();
     }
     catch (err) {

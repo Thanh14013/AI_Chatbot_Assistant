@@ -4,6 +4,7 @@ import RefreshToken from "./refresh-token.model.js";
 import Conversation from "./conversation.model.js";
 import Message from "./message.model.js";
 import MessageEmbedding from "./message-embedding.model.js";
+import UserPreference from "./user-preference.model.js";
 // ============================================================================
 // Define Model Relationships
 // ============================================================================
@@ -113,5 +114,6 @@ export default {
     Conversation,
     Message,
     MessageEmbedding,
+    UserPreference,
     syncDatabase,
 };

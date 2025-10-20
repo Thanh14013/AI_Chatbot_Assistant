@@ -2,9 +2,12 @@ import { Router } from "express";
 import authRoutes from "./auth.route.js";
 import conversationRoutes from "./conversation.route.js";
 import searchRoutes from "./search.route.js";
+import userRoutes from "./user.route.js";
 const router = Router();
 // Authentication routes
 router.use("/auth", authRoutes);
+// User routes
+router.use("/users", userRoutes);
 // Conversation and message routes
 router.use("/conversations", conversationRoutes);
 // Global search routes

@@ -4,6 +4,8 @@ import Message from "../models/message.model.js";
 import MessageEmbedding from "../models/message-embedding.model.js";
 import Conversation from "../models/conversation.model.js";
 import { generateEmbedding } from "./embedding.service.js";
+import { cacheAside, CACHE_TTL } from "./cache.service.js";
+import { semanticSearchKey } from "../utils/cache-key.util.js";
 /**
  * Perform semantic search on messages within a conversation
  * Uses cosine similarity to find messages most similar to the query
@@ -20,41 +22,48 @@ import { generateEmbedding } from "./embedding.service.js";
  * @throws Error if conversation not found or user unauthorized
  */
 export async function searchConversationByEmbedding(conversationId, userId, searchParams) {
-  const { query, limit = 5, similarity_threshold = 0.37 } = searchParams;
-  // Validate input
-  if (!query || query.trim().length === 0) {
-    throw new Error("Search query cannot be empty");
-  }
-  // Verify conversation exists and user has access
-  const conversation = await Conversation.findOne({
-    where: {
-      id: conversationId,
-      deleted_at: null,
-    },
-  });
-  if (!conversation) {
-    throw new Error("Conversation not found");
-  }
-  if (conversation.user_id !== userId) {
-    throw new Error("Unauthorized access to conversation");
-  }
-  // Generate embedding for search query
-  const queryEmbedding = await generateEmbedding(query.trim());
-  // Convert embedding array to PostgreSQL vector format
-  // Format: '[1.0, 2.0, 3.0, ...]'
-  const vectorString = `[${queryEmbedding.join(",")}]`;
-  // Perform semantic search using PostgreSQL vector operations
-  // Cosine similarity operator: <=>
-  // Formula: 1 - cosine_distance = similarity (range: 0-1, where 1 is identical)
-  //
-  // This query:
-  // 1. Joins messages with their embeddings
-  // 2. Calculates cosine similarity between query and each message
-  // 3. Filters by conversation ID and similarity threshold
-  // 4. Orders by similarity (highest first)
-  // 5. Limits results
-  const results = await sequelize.query(
-    `
+    const { query, limit = 5, similarity_threshold = 0.37 } = searchParams;
+    // Validate input
+    if (!query || query.trim().length === 0) {
+        throw new Error("Search query cannot be empty");
+    }
+    console.log(`🔍 [SEMANTIC SEARCH] Query: "${query}" in conversation: ${conversationId}`);
+    // Use cache for semantic search results
+    const cacheKey = semanticSearchKey(conversationId, query, limit, similarity_threshold);
+    console.log(`🔑 [SEMANTIC SEARCH] Cache key: ${cacheKey}`);
+    const performSearch = async () => {
+        console.log(`🧮 [SEMANTIC SEARCH] Generating embedding for query...`);
+        // Verify conversation exists and user has access
+        const conversation = await Conversation.findOne({
+            where: {
+                id: conversationId,
+                deleted_at: null,
+            },
+        });
+        if (!conversation) {
+            throw new Error("Conversation not found");
+        }
+        if (conversation.user_id !== userId) {
+            throw new Error("Unauthorized access to conversation");
+        }
+        // Generate embedding for search query
+        const queryEmbedding = await generateEmbedding(query.trim());
+        // Convert embedding array to PostgreSQL vector format
+        // Format: '[1.0, 2.0, 3.0, ...]'
+        const vectorString = `[${queryEmbedding.join(",")}]`;
+        console.log(`📊 [SEMANTIC SEARCH] Performing vector similarity search in DB...`);
+        const searchStartTime = Date.now();
+        // Perform semantic search using PostgreSQL vector operations
+        // Cosine similarity operator: <=>
+        // Formula: 1 - cosine_distance = similarity (range: 0-1, where 1 is identical)
+        //
+        // This query:
+        // 1. Joins messages with their embeddings
+        // 2. Calculates cosine similarity between query and each message
+        // 3. Filters by conversation ID and similarity threshold
+        // 4. Orders by similarity (highest first)
+        // 5. Limits results
+        const results = await sequelize.query(`
     SELECT 
       m.id as message_id,
       m.conversation_id,
@@ -70,28 +79,30 @@ export async function searchConversationByEmbedding(conversationId, userId, sear
       AND (1 - (e.embedding <=> $1::vector)) >= $3
     ORDER BY e.embedding <=> $1::vector ASC
     LIMIT $4
-    `,
-    {
-      bind: [vectorString, conversationId, similarity_threshold, limit],
-      type: QueryTypes.SELECT,
-    }
-  );
-  // Map database results to SemanticSearchResult type
-  const searchResults = results.map((row) => ({
-    message_id: row.message_id,
-    conversation_id: row.conversation_id,
-    role: row.role,
-    content: row.content,
-    similarity: parseFloat(row.similarity) || 0,
-    tokens_used: row.tokens_used || 0,
-    model: row.model || "unknown",
-    createdAt: row.createdAt || new Date(),
-  }));
-  return {
-    query: query.trim(),
-    results: searchResults,
-    count: searchResults.length,
-  };
+    `, {
+            bind: [vectorString, conversationId, similarity_threshold, limit],
+            type: QueryTypes.SELECT,
+        });
+        const searchElapsed = Date.now() - searchStartTime;
+        console.log(`✅ [SEMANTIC SEARCH] Found ${results.length} results in ${searchElapsed}ms`);
+        // Map database results to SemanticSearchResult type
+        const searchResults = results.map((row) => ({
+            message_id: row.message_id,
+            conversation_id: row.conversation_id,
+            role: row.role,
+            content: row.content,
+            similarity: parseFloat(row.similarity) || 0,
+            tokens_used: row.tokens_used || 0,
+            model: row.model || "unknown",
+            createdAt: row.createdAt || new Date(),
+        }));
+        return {
+            query: query.trim(),
+            results: searchResults,
+            count: searchResults.length,
+        };
+    };
+    return await cacheAside(cacheKey, performSearch, CACHE_TTL.SEMANTIC_SEARCH);
 }
 /**
  * Get semantically relevant messages for context building
@@ -102,18 +113,13 @@ export async function searchConversationByEmbedding(conversationId, userId, sear
  * @param limit - Number of relevant messages to retrieve (default: 5)
  * @returns Promise with array of relevant messages
  */
-export async function getRelevantMessagesForContext(
-  conversationId,
-  currentMessageContent,
-  limit = 5
-) {
-  try {
-    // Generate embedding for current message
-    const queryEmbedding = await generateEmbedding(currentMessageContent);
-    const vectorString = `[${queryEmbedding.join(",")}]`;
-    // Find similar messages with lower threshold (0.6) to get more context
-    const results = await sequelize.query(
-      `
+export async function getRelevantMessagesForContext(conversationId, currentMessageContent, limit = 5) {
+    try {
+        // Generate embedding for current message
+        const queryEmbedding = await generateEmbedding(currentMessageContent);
+        const vectorString = `[${queryEmbedding.join(",")}]`;
+        // Find similar messages with lower threshold (0.6) to get more context
+        const results = await sequelize.query(`
       SELECT 
         m.id as message_id,
         m.conversation_id,
@@ -129,28 +135,27 @@ export async function getRelevantMessagesForContext(
         AND (1 - (e.embedding <=> $1::vector)) >= 0.6
       ORDER BY e.embedding <=> $1::vector ASC
       LIMIT $3
-      `,
-      {
-        bind: [vectorString, conversationId, limit],
-        type: QueryTypes.SELECT,
-      }
-    );
-    return results.map((row) => ({
-      message_id: row.message_id,
-      conversation_id: row.conversation_id,
-      role: row.role,
-      content: row.content,
-      similarity: parseFloat(row.similarity) || 0,
-      tokens_used: row.tokens_used || 0,
-      model: row.model || "unknown",
-      createdAt: row.createdAt || new Date(),
-    }));
-  } catch (error) {
-    // If semantic search fails, return empty array
-    // This ensures the app continues to work even if embeddings aren't available
-    console.error("Failed to get relevant messages for context:", error.message);
-    return [];
-  }
+      `, {
+            bind: [vectorString, conversationId, limit],
+            type: QueryTypes.SELECT,
+        });
+        return results.map((row) => ({
+            message_id: row.message_id,
+            conversation_id: row.conversation_id,
+            role: row.role,
+            content: row.content,
+            similarity: parseFloat(row.similarity) || 0,
+            tokens_used: row.tokens_used || 0,
+            model: row.model || "unknown",
+            createdAt: row.createdAt || new Date(),
+        }));
+    }
+    catch {
+        // If semantic search fails, return empty array
+        // This ensures the app continues to work even if embeddings aren't available
+        // logging removed
+        return [];
+    }
 }
 /**
  * Backfill embeddings for existing messages in a conversation
@@ -160,34 +165,32 @@ export async function getRelevantMessagesForContext(
  * @returns Promise with number of embeddings created
  */
 export async function backfillConversationEmbeddings(conversationId) {
-  // Get all messages without embeddings
-  const messages = await Message.findAll({
-    where: { conversation_id: conversationId },
-    include: [
-      {
-        model: MessageEmbedding,
-        as: "embedding",
-        required: false, // LEFT JOIN to find messages without embeddings
-      },
-    ],
-  });
-  // Filter messages that don't have embeddings
-  const messagesWithoutEmbeddings = messages.filter((msg) => !msg.embedding);
-  if (messagesWithoutEmbeddings.length === 0) {
-    return 0;
-  }
-  // Generate embeddings
-  const { batchGenerateEmbeddings } = await import("./embedding.service.js");
-  const embeddings = await batchGenerateEmbeddings(
-    messagesWithoutEmbeddings.map((msg) => ({
-      messageId: msg.id,
-      content: msg.content,
-    }))
-  );
-  return embeddings.length;
+    // Get all messages without embeddings
+    const messages = await Message.findAll({
+        where: { conversation_id: conversationId },
+        include: [
+            {
+                model: MessageEmbedding,
+                as: "embedding",
+                required: false, // LEFT JOIN to find messages without embeddings
+            },
+        ],
+    });
+    // Filter messages that don't have embeddings
+    const messagesWithoutEmbeddings = messages.filter((msg) => !msg.embedding);
+    if (messagesWithoutEmbeddings.length === 0) {
+        return 0;
+    }
+    // Generate embeddings
+    const { batchGenerateEmbeddings } = await import("./embedding.service.js");
+    const embeddings = await batchGenerateEmbeddings(messagesWithoutEmbeddings.map((msg) => ({
+        messageId: msg.id,
+        content: msg.content,
+    })));
+    return embeddings.length;
 }
 export default {
-  searchConversationByEmbedding,
-  getRelevantMessagesForContext,
-  backfillConversationEmbeddings,
+    searchConversationByEmbedding,
+    getRelevantMessagesForContext,
+    backfillConversationEmbeddings,
 };

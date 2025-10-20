@@ -3,7 +3,10 @@ import Conversation from "../models/conversation.model.js";
 import { estimateTokenCount } from "./openai.service.js";
 import { generateAndStoreEmbedding } from "./embedding.service.js";
 import { buildEnhancedContext } from "./context-builder.service.js";
+import { buildSystemPromptWithPreferences } from "./user-preference.service.js";
 import { Op } from "sequelize";
+import { cacheAside, CACHE_TTL, invalidateCachePattern } from "./cache.service.js";
+import { messageHistoryKey, messageHistoryPattern, contextPattern, conversationListPattern, } from "../utils/cache-key.util.js";
 /**
  * Create a new message
  *
@@ -15,6 +18,7 @@ export const createMessage = async (data) => {
     if (!data.conversation_id || !data.content || !data.role) {
         throw new Error("Conversation ID, content, and role are required");
     }
+    console.log(`💬 [MESSAGE] Creating new message in conversation: ${data.conversation_id}`);
     // Get conversation to retrieve model
     const conversation = await Conversation.findByPk(data.conversation_id);
     if (!conversation) {
@@ -34,11 +38,15 @@ export const createMessage = async (data) => {
     conversation.total_tokens_used += tokens_used;
     conversation.message_count += 1;
     await conversation.save();
+    // Invalidate related caches
+    console.log(`🗑️  [MESSAGE] Invalidating message & conversation cache`);
+    await invalidateCachePattern(messageHistoryPattern(data.conversation_id));
+    await invalidateCachePattern(contextPattern(data.conversation_id));
+    await invalidateCachePattern(conversationListPattern(conversation.user_id));
     // Generate and store embedding asynchronously (don't wait for it)
     // This runs in the background and doesn't block the response
-    generateAndStoreEmbedding(message.id, message.content).catch((error) => {
-        // Log error but don't fail the message creation
-        console.error(`Background embedding generation failed for message ${message.id}:`, error.message);
+    generateAndStoreEmbedding(message.id, message.content).catch(() => {
+        // logging removed: background embedding generation failed for message
     });
     // Return message response
     return {
@@ -61,50 +69,106 @@ export const createMessage = async (data) => {
  * @returns Array of messages with pagination info
  */
 export const getConversationMessages = async (conversationId, userId, page = 1, limit = 30, before) => {
-    // Verify conversation exists and user has access
-    const conversation = await Conversation.findOne({
-        where: {
-            id: conversationId,
-            deleted_at: null,
-        },
-    });
-    if (!conversation) {
-        throw new Error("Conversation not found");
-    }
-    if (conversation.user_id !== userId) {
-        throw new Error("Unauthorized access to conversation");
-    }
-    // Get total message count (useful for full pagination)
-    const total = await Message.count({
-        where: { conversation_id: conversationId },
-    });
-    const totalPages = Math.ceil(total / limit);
-    // If `before` provided, fetch messages older than the given message id
-    if (before) {
-        const beforeMsg = await Message.findByPk(before);
-        if (!beforeMsg || beforeMsg.conversation_id !== conversationId) {
-            throw new Error("Invalid 'before' message id");
-        }
-        const beforeDate = beforeMsg.createdAt;
-        const beforeId = beforeMsg.id;
-        // Find messages strictly older than the before message. If createdAt is equal,
-        // use id comparison to have deterministic ordering.
-        const olderMessages = await Message.findAll({
+    console.log(`📨 [MESSAGE] Fetching messages for conversation: ${conversationId} (page: ${page}, limit: ${limit})`);
+    // Use cache for message history
+    const cacheKey = messageHistoryKey(conversationId, page, limit, before);
+    console.log(`🔑 [MESSAGE] Cache key: ${cacheKey}`);
+    const fetchMessages = async () => {
+        // Verify conversation exists and user has access
+        const conversation = await Conversation.findOne({
             where: {
-                conversation_id: conversationId,
-                [Op.or]: [
-                    { createdAt: { [Op.lt]: beforeDate } },
-                    { createdAt: beforeDate, id: { [Op.lt]: beforeId } },
-                ],
+                id: conversationId,
+                deleted_at: null,
             },
+        });
+        if (!conversation) {
+            throw new Error("Conversation not found");
+        }
+        if (conversation.user_id !== userId) {
+            throw new Error("Unauthorized access to conversation");
+        }
+        // Get total message count (useful for full pagination)
+        const total = await Message.count({
+            where: { conversation_id: conversationId },
+        });
+        const totalPages = Math.ceil(total / limit);
+        // If `before` provided, fetch messages older than the given message id
+        if (before) {
+            const beforeMsg = await Message.findByPk(before);
+            if (!beforeMsg || beforeMsg.conversation_id !== conversationId) {
+                throw new Error("Invalid 'before' message id");
+            }
+            const beforeDate = beforeMsg.createdAt;
+            const beforeId = beforeMsg.id;
+            // Find messages strictly older than the before message. If createdAt is equal,
+            // use id comparison to have deterministic ordering.
+            const olderMessages = await Message.findAll({
+                where: {
+                    conversation_id: conversationId,
+                    [Op.or]: [
+                        { createdAt: { [Op.lt]: beforeDate } },
+                        { createdAt: beforeDate, id: { [Op.lt]: beforeId } },
+                    ],
+                },
+                order: [
+                    ["createdAt", "ASC"],
+                    ["id", "ASC"],
+                ],
+                limit,
+            });
+            // Map to response
+            const messageResponses = olderMessages.map((msg) => ({
+                id: msg.id,
+                conversation_id: msg.conversation_id,
+                role: msg.role,
+                content: msg.content,
+                tokens_used: msg.tokens_used,
+                model: msg.model,
+                createdAt: msg.createdAt,
+            }));
+            // Determine if there are more messages older than the first returned
+            let hasMore = false;
+            if (messageResponses.length > 0) {
+                const first = messageResponses[0];
+                const firstMsg = await Message.findByPk(first.id);
+                if (firstMsg) {
+                    const olderCount = await Message.count({
+                        where: {
+                            conversation_id: conversationId,
+                            [Op.or]: [
+                                { createdAt: { [Op.lt]: firstMsg.createdAt } },
+                                { createdAt: firstMsg.createdAt, id: { [Op.lt]: firstMsg.id } },
+                            ],
+                        },
+                    });
+                    hasMore = olderCount > 0;
+                }
+            }
+            return {
+                messages: messageResponses,
+                pagination: {
+                    page: 1,
+                    limit,
+                    total,
+                    totalPages,
+                    hasMore,
+                },
+            };
+        }
+        // Default behavior: page-based pagination from the end (latest messages)
+        // Get messages in chronological order (oldest first)
+        const allMessages = await Message.findAll({
+            where: { conversation_id: conversationId },
             order: [
                 ["createdAt", "ASC"],
                 ["id", "ASC"],
             ],
-            limit,
         });
-        // Map to response
-        const messageResponses = olderMessages.map((msg) => ({
+        // Page 1 shows the last `limit` messages, page 2 shows the previous `limit`, etc.
+        const startIndex = Math.max(0, total - page * limit);
+        const endIndex = total - (page - 1) * limit;
+        const paginatedMessages = allMessages.slice(startIndex, endIndex);
+        const messageResponses = paginatedMessages.map((msg) => ({
             id: msg.id,
             conversation_id: msg.conversation_id,
             role: msg.role,
@@ -113,67 +177,18 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
             model: msg.model,
             createdAt: msg.createdAt,
         }));
-        // Determine if there are more messages older than the first returned
-        let hasMore = false;
-        if (messageResponses.length > 0) {
-            const first = messageResponses[0];
-            const firstMsg = await Message.findByPk(first.id);
-            if (firstMsg) {
-                const olderCount = await Message.count({
-                    where: {
-                        conversation_id: conversationId,
-                        [Op.or]: [
-                            { createdAt: { [Op.lt]: firstMsg.createdAt } },
-                            { createdAt: firstMsg.createdAt, id: { [Op.lt]: firstMsg.id } },
-                        ],
-                    },
-                });
-                hasMore = olderCount > 0;
-            }
-        }
         return {
             messages: messageResponses,
             pagination: {
-                page: 1,
+                page,
                 limit,
                 total,
                 totalPages,
-                hasMore,
+                hasMore: startIndex > 0,
             },
         };
-    }
-    // Default behavior: page-based pagination from the end (latest messages)
-    // Get messages in chronological order (oldest first)
-    const allMessages = await Message.findAll({
-        where: { conversation_id: conversationId },
-        order: [
-            ["createdAt", "ASC"],
-            ["id", "ASC"],
-        ],
-    });
-    // Page 1 shows the last `limit` messages, page 2 shows the previous `limit`, etc.
-    const startIndex = Math.max(0, total - page * limit);
-    const endIndex = total - (page - 1) * limit;
-    const paginatedMessages = allMessages.slice(startIndex, endIndex);
-    const messageResponses = paginatedMessages.map((msg) => ({
-        id: msg.id,
-        conversation_id: msg.conversation_id,
-        role: msg.role,
-        content: msg.content,
-        tokens_used: msg.tokens_used,
-        model: msg.model,
-        createdAt: msg.createdAt,
-    }));
-    return {
-        messages: messageResponses,
-        pagination: {
-            page,
-            limit,
-            total,
-            totalPages,
-            hasMore: startIndex > 0,
-        },
     };
+    return await cacheAside(cacheKey, fetchMessages, CACHE_TTL.MESSAGE_HISTORY);
 };
 /**
  * Send a user message and get AI response
@@ -244,12 +259,19 @@ onUserMessageCreated) => {
     conversation.total_tokens_used += userTokens;
     conversation.message_count += 1;
     await conversation.save();
+    // Invalidate related caches
+    console.log(`🗑️  [MESSAGE] Invalidating cache after user message`);
+    await invalidateCachePattern(messageHistoryPattern(conversationId));
+    await invalidateCachePattern(contextPattern(conversationId));
+    await invalidateCachePattern(conversationListPattern(conversation.user_id));
     // Generate and store embedding for user message (async, non-blocking)
-    generateAndStoreEmbedding(userMessage.id, userMessage.content).catch((error) => {
-        console.error(`Background embedding generation failed for user message ${userMessage.id}:`, error.message);
+    generateAndStoreEmbedding(userMessage.id, userMessage.content).catch(() => {
+        // logging removed: background embedding generation failed for user message
     });
-    // Build context
-    const systemPrompt = "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.";
+    // Build context with user preferences
+    const baseSystemPrompt = "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.";
+    // Get system prompt with user preferences applied
+    const systemPrompt = await buildSystemPromptWithPreferences(userId, baseSystemPrompt);
     const disableContext = String(process.env.DISABLE_CONTEXT || "false").toLowerCase() === "true";
     const useSemanticContext = String(process.env.USE_SEMANTIC_CONTEXT || "false").toLowerCase() === "true";
     let contextMessages;
@@ -272,9 +294,9 @@ onUserMessageCreated) => {
             });
             contextMessages = enhancedContext;
         }
-        catch (error) {
+        catch {
             // If semantic context fails, fall back to simple recent messages
-            console.warn("Semantic context failed, using recent messages:", error.message);
+            // logging removed: semantic context failed, using recent messages
             // Fall through to simple context below
             const recentMessages = await Message.findAll({
                 where: { conversation_id: conversationId },
@@ -383,6 +405,11 @@ onUserMessageCreated) => {
         conversation.total_tokens_used += estimated_completion_tokens;
         conversation.message_count += 1;
         await conversation.save();
+        // Invalidate related caches for assistant message too
+        console.log(`🗑️  [MESSAGE] Invalidating cache after assistant message`);
+        await invalidateCachePattern(messageHistoryPattern(conversationId));
+        await invalidateCachePattern(contextPattern(conversationId));
+        await invalidateCachePattern(conversationListPattern(conversation.user_id));
         // Generate and store embedding for assistant message (async, non-blocking)
         generateAndStoreEmbedding(assistantMessage.id, assistantMessage.content).catch((error) => {
             console.error(`Background embedding generation failed for assistant message ${assistantMessage.id}:`, error.message);

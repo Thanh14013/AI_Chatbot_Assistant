@@ -3,6 +3,7 @@ import Conversation from "../models/conversation.model.js";
 import { getChatCompletion, buildContextArray, estimateTokenCount } from "./openai.service.js";
 import { generateAndStoreEmbedding } from "./embedding.service.js";
 import { buildEnhancedContext } from "./context-builder.service.js";
+import { buildSystemPromptWithPreferences } from "./user-preference.service.js";
 import { Op } from "sequelize";
 import type { CreateMessageInput, MessageResponse } from "../types/message.type.js";
 import { cacheAside, CACHE_TTL, invalidateCachePattern } from "./cache.service.js";
@@ -328,9 +329,13 @@ export const sendMessageAndStreamResponse = async (
     // logging removed: background embedding generation failed for user message
   });
 
-  // Build context
-  const systemPrompt =
+  // Build context with user preferences
+  const baseSystemPrompt =
     "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.";
+
+  // Get system prompt with user preferences applied
+  const systemPrompt = await buildSystemPromptWithPreferences(userId, baseSystemPrompt);
+
   const disableContext = String(process.env.DISABLE_CONTEXT || "false").toLowerCase() === "true";
   const useSemanticContext =
     String(process.env.USE_SEMANTIC_CONTEXT || "false").toLowerCase() === "true";

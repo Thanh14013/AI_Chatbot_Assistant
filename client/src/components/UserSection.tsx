@@ -14,11 +14,13 @@ import styles from "./UserSection.module.css";
 interface UserSectionProps {
   user: User | null;
   collapsed?: boolean;
+  onSettingsClick?: () => void; // Add callback for settings
 }
 
 const UserSection: React.FC<UserSectionProps> = ({
   user,
   collapsed = false,
+  onSettingsClick,
 }) => {
   const { logout } = useAuth();
 
@@ -28,7 +30,9 @@ const UserSection: React.FC<UserSectionProps> = ({
         // TODO: Navigate to profile page
         break;
       case "settings":
-        // TODO: Navigate to settings page
+        if (onSettingsClick) {
+          onSettingsClick();
+        }
         break;
       case "logout":
         try {

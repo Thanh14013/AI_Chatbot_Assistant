@@ -12,6 +12,7 @@ import fs from "fs";
 import path from "path";
 import { initializeSocketIO } from "./services/socket.service.js";
 import models from "./models/index.js";
+import { isRedisConnected } from "./config/redis.config.js";
 // Load swagger JSON at runtime to avoid import-assertion issues in some Node setups
 const swaggerPath = path.resolve(process.cwd(), "src", "swagger.json");
 const swaggerDocument = JSON.parse(fs.readFileSync(swaggerPath, "utf8"));
@@ -34,6 +35,27 @@ app.use(bodyParser.urlencoded({ extended: true }));
 const PORT = process.env.PORT || 3000;
 // Initialize Database Connection
 connectToDatabase();
+// Wait for Redis to be ready (with timeout)
+// This ensures we check the connection status AFTER Redis has attempted to connect
+(async () => {
+    try {
+        // Wait up to 4 seconds for Redis to become ready
+        const timeout = 4000;
+        const startTime = Date.now();
+        while (!isRedisConnected() && Date.now() - startTime < timeout) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        if (isRedisConnected()) {
+            console.log("✓ Redis cache is available");
+        }
+        else {
+            console.warn("⚠ Redis cache is not available - falling back to DB only");
+        }
+    }
+    catch (error) {
+        console.warn("⚠ Redis cache is not available - falling back to DB only");
+    }
+})();
 // Optionally synchronize models (non-destructive by default).
 // Only perform schema sync when DB_SYNC environment variable is explicitly set to 'true'.
 if (process.env.DB_SYNC === "true") {
