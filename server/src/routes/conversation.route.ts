@@ -10,6 +10,11 @@ import {
   getPopularTagsController,
 } from "../controllers/conversation.controller.js";
 import { getMessages, sendMessageStream } from "../controllers/message.controller.js";
+import {
+  pinMessage,
+  unpinMessage,
+  getPinnedMessages,
+} from "../controllers/message-pin.controller.js";
 import { semanticSearch } from "../controllers/semantic-search.controller.js";
 
 const router = Router();
@@ -58,9 +63,25 @@ router.delete("/:id", remove);
 // GET /api/conversations/:id/messages?page=1&limit=30
 router.get("/:id/messages", getMessages);
 
+// Get all pinned messages for a conversation
+// GET /api/conversations/:id/messages/pinned
+router.get("/:id/messages/pinned", getPinnedMessages);
+
 // Send a user message and stream AI response via Server-Sent Events (SSE)
 // POST /api/conversations/:id/messages/stream
 router.post("/:id/messages/stream", sendMessageStream);
+
+/**
+ * Message Pin/Unpin Routes
+ */
+
+// Pin a message
+// PATCH /api/messages/:messageId/pin
+router.patch("/messages/:messageId/pin", pinMessage);
+
+// Unpin a message
+// PATCH /api/messages/:messageId/unpin
+router.patch("/messages/:messageId/unpin", unpinMessage);
 
 /**
  * Semantic Search Route

@@ -27,10 +27,8 @@ export const registerUser = async (registerData) => {
 // Login user
 export const loginUser = async (loginData) => {
     const { email, password } = validateLogin(loginData.email, loginData.password);
-    console.log(`🔐 [AUTH] Login attempt for: ${email}`);
     // Find user by email with cache
     const cacheKey = userByEmailKey(email);
-    console.log(`🔑 [AUTH] Cache key: ${cacheKey}`);
     const user = await cacheAside(cacheKey, () => User.findByEmail(email), CACHE_TTL.USER);
     if (!user) {
         // Standardized error message for wrong credentials
@@ -42,7 +40,6 @@ export const loginUser = async (loginData) => {
         // Standardized error message for wrong credentials
         throw new Error("Account or password is incorrect");
     }
-    console.log(`✅ [AUTH] Login successful for: ${email}`);
     // Generate new tokens
     const accessToken = generateAccessToken({ id: user.id, name: user.name, email: user.email });
     const refreshToken = generateRefreshToken({ id: user.id, name: user.name, email: user.email });
@@ -60,6 +57,9 @@ export const loginUser = async (loginData) => {
         id: user.id,
         name: user.name,
         email: user.email,
+        username: user.username || null,
+        bio: user.bio || null,
+        avatarUrl: user.avatar_url || null,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
     };
@@ -138,7 +138,6 @@ export const changePassword = async (email, data) => {
     user.password = hashed;
     await user.save();
     // Invalidate user cache after password change
-    console.log(`🗑️  [AUTH] Invalidating cache for user: ${email}`);
     await deleteCache(userByEmailKey(email));
     await deleteCache(userByIdKey(user.id));
     return { message: "Password changed successfully" };

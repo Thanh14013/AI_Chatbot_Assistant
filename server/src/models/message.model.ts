@@ -8,10 +8,10 @@ type MessageAttributes = Omit<IMessage, "createdAt"> & {
 };
 
 // Define creation attributes (fields that can be omitted when creating a new message)
-// id, createdAt, tokens_used, model are auto-generated or have defaults
+// id, createdAt, tokens_used, model, pinned are auto-generated or have defaults
 type MessageCreationAttributes = Optional<
   MessageAttributes,
-  "id" | "createdAt" | "tokens_used" | "model"
+  "id" | "createdAt" | "tokens_used" | "model" | "pinned"
 >;
 
 /**
@@ -31,6 +31,7 @@ class Message
   public content!: string;
   public tokens_used!: number;
   public model!: string;
+  public pinned!: boolean;
 
   // Timestamp (automatically managed by Sequelize)
   public readonly createdAt!: Date;
@@ -93,6 +94,89 @@ class Message
       where: { conversation_id: conversationId },
     });
   }
+
+  /**
+   * Pin a message
+   * @param messageId - The message's ID
+   * @returns Promise with updated message
+   */
+  public static async pinMessage(messageId: string): Promise<Message> {
+    console.log(`📌 [MESSAGE_MODEL] Attempting to pin message: ${messageId}`);
+
+    const message = await Message.findByPk(messageId);
+    if (!message) {
+      console.error(`❌ [MESSAGE_MODEL] Message not found: ${messageId}`);
+      throw new Error("Message not found");
+    }
+
+    console.log(`📌 [MESSAGE_MODEL] Message found, current pinned status: ${message.pinned}`);
+
+    message.pinned = true;
+    await message.save();
+
+    console.log(`✅ [MESSAGE_MODEL] Message pinned successfully: ${messageId}`);
+    return message;
+  }
+
+  /**
+   * Unpin a message
+   * @param messageId - The message's ID
+   * @returns Promise with updated message
+   */
+  public static async unpinMessage(messageId: string): Promise<Message> {
+    console.log(`📌 [MESSAGE_MODEL] Attempting to unpin message: ${messageId}`);
+
+    const message = await Message.findByPk(messageId);
+    if (!message) {
+      console.error(`❌ [MESSAGE_MODEL] Message not found: ${messageId}`);
+      throw new Error("Message not found");
+    }
+
+    console.log(`📌 [MESSAGE_MODEL] Message found, current pinned status: ${message.pinned}`);
+
+    message.pinned = false;
+    await message.save();
+
+    console.log(`✅ [MESSAGE_MODEL] Message unpinned successfully: ${messageId}`);
+    return message;
+  }
+
+  /**
+   * Get all pinned messages for a conversation
+   * @param conversationId - The conversation's ID
+   * @returns Promise with array of pinned messages
+   */
+  public static async findPinnedMessages(conversationId: string): Promise<Message[]> {
+    console.log(`📌 [MESSAGE_MODEL] Fetching pinned messages for conversation: ${conversationId}`);
+
+    const messages = await Message.findAll({
+      where: {
+        conversation_id: conversationId,
+        pinned: true,
+      },
+      order: [["createdAt", "DESC"]], // Most recent first
+    });
+
+    console.log(`✅ [MESSAGE_MODEL] Found ${messages.length} pinned messages`);
+    return messages;
+  }
+
+  /**
+   * Count pinned messages in a conversation
+   * @param conversationId - The conversation's ID
+   * @returns Promise with pinned message count
+   */
+  public static async countPinnedByConversation(conversationId: string): Promise<number> {
+    const count = await Message.count({
+      where: {
+        conversation_id: conversationId,
+        pinned: true,
+      },
+    });
+
+    console.log(`📌 [MESSAGE_MODEL] Conversation ${conversationId} has ${count} pinned messages`);
+    return count;
+  }
 }
 
 // Initialize Message model with schema definition
@@ -148,6 +232,14 @@ Message.init(
       defaultValue: "gpt-3.5-turbo",
       comment: "AI model used for this message",
     },
+
+    // Whether the message is pinned
+    pinned: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      comment: "Whether the message is pinned for quick reference",
+    },
   },
   {
     sequelize, // Database connection instance
@@ -161,6 +253,7 @@ Message.init(
       { fields: ["conversation_id", "createdAt"] }, // Composite index for chronological queries
       { fields: ["createdAt"] }, // Index for sorting by creation date
       { fields: ["role"] }, // Index for filtering by role
+      { fields: ["conversation_id", "pinned", "createdAt"] }, // Index for pinned messages queries
     ],
   }
 );

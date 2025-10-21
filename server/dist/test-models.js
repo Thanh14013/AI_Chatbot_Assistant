@@ -25,6 +25,7 @@ async function testModels() {
             title: "Test Conversation",
             model: "gpt-3.5-turbo",
             context_window: 10,
+            tags: [], // Add required tags field
         });
         // created conversation
         // Add a user message

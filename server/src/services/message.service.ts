@@ -68,6 +68,7 @@ export const createMessage = async (data: CreateMessageInput): Promise<MessageRe
     content: message.content,
     tokens_used: message.tokens_used,
     model: message.model,
+    pinned: message.pinned,
     createdAt: message.createdAt,
   };
 };
@@ -158,6 +159,7 @@ export const getConversationMessages = async (
         content: msg.content,
         tokens_used: msg.tokens_used,
         model: msg.model,
+        pinned: msg.pinned,
         createdAt: msg.createdAt,
       }));
 
@@ -214,6 +216,7 @@ export const getConversationMessages = async (
       content: msg.content,
       tokens_used: msg.tokens_used,
       model: msg.model,
+      pinned: msg.pinned,
       createdAt: msg.createdAt,
     }));
 

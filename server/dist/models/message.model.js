@@ -55,6 +55,74 @@ class Message extends Model {
             where: { conversation_id: conversationId },
         });
     }
+    /**
+     * Pin a message
+     * @param messageId - The message's ID
+     * @returns Promise with updated message
+     */
+    static async pinMessage(messageId) {
+        console.log(`📌 [MESSAGE_MODEL] Attempting to pin message: ${messageId}`);
+        const message = await Message.findByPk(messageId);
+        if (!message) {
+            console.error(`❌ [MESSAGE_MODEL] Message not found: ${messageId}`);
+            throw new Error("Message not found");
+        }
+        console.log(`📌 [MESSAGE_MODEL] Message found, current pinned status: ${message.pinned}`);
+        message.pinned = true;
+        await message.save();
+        console.log(`✅ [MESSAGE_MODEL] Message pinned successfully: ${messageId}`);
+        return message;
+    }
+    /**
+     * Unpin a message
+     * @param messageId - The message's ID
+     * @returns Promise with updated message
+     */
+    static async unpinMessage(messageId) {
+        console.log(`📌 [MESSAGE_MODEL] Attempting to unpin message: ${messageId}`);
+        const message = await Message.findByPk(messageId);
+        if (!message) {
+            console.error(`❌ [MESSAGE_MODEL] Message not found: ${messageId}`);
+            throw new Error("Message not found");
+        }
+        console.log(`📌 [MESSAGE_MODEL] Message found, current pinned status: ${message.pinned}`);
+        message.pinned = false;
+        await message.save();
+        console.log(`✅ [MESSAGE_MODEL] Message unpinned successfully: ${messageId}`);
+        return message;
+    }
+    /**
+     * Get all pinned messages for a conversation
+     * @param conversationId - The conversation's ID
+     * @returns Promise with array of pinned messages
+     */
+    static async findPinnedMessages(conversationId) {
+        console.log(`📌 [MESSAGE_MODEL] Fetching pinned messages for conversation: ${conversationId}`);
+        const messages = await Message.findAll({
+            where: {
+                conversation_id: conversationId,
+                pinned: true,
+            },
+            order: [["createdAt", "DESC"]], // Most recent first
+        });
+        console.log(`✅ [MESSAGE_MODEL] Found ${messages.length} pinned messages`);
+        return messages;
+    }
+    /**
+     * Count pinned messages in a conversation
+     * @param conversationId - The conversation's ID
+     * @returns Promise with pinned message count
+     */
+    static async countPinnedByConversation(conversationId) {
+        const count = await Message.count({
+            where: {
+                conversation_id: conversationId,
+                pinned: true,
+            },
+        });
+        console.log(`📌 [MESSAGE_MODEL] Conversation ${conversationId} has ${count} pinned messages`);
+        return count;
+    }
 }
 // Initialize Message model with schema definition
 Message.init({
@@ -103,6 +171,13 @@ Message.init({
         defaultValue: "gpt-3.5-turbo",
         comment: "AI model used for this message",
     },
+    // Whether the message is pinned
+    pinned: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: "Whether the message is pinned for quick reference",
+    },
 }, {
     sequelize, // Database connection instance
     tableName: "messages",
@@ -115,6 +190,7 @@ Message.init({
         { fields: ["conversation_id", "createdAt"] }, // Composite index for chronological queries
         { fields: ["createdAt"] }, // Index for sorting by creation date
         { fields: ["role"] }, // Index for filtering by role
+        { fields: ["conversation_id", "pinned", "createdAt"] }, // Index for pinned messages queries
     ],
 });
 export default Message;

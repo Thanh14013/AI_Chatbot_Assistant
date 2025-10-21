@@ -6,6 +6,7 @@ export interface IMessage {
   content: string; // Message content/text
   tokens_used: number; // Number of tokens in this message
   model: string; // AI model used for this message
+  pinned: boolean; // Whether the message is pinned for quick reference
   createdAt: Date;
 }
 
@@ -26,6 +27,7 @@ export interface MessageResponse {
   content: string;
   tokens_used: number;
   model: string;
+  pinned: boolean; // Whether the message is pinned
   createdAt: Date;
 }
 // Streaming endpoint uses the same MessageResponse types; non-streaming wrappers removed

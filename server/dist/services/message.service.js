@@ -18,7 +18,6 @@ export const createMessage = async (data) => {
     if (!data.conversation_id || !data.content || !data.role) {
         throw new Error("Conversation ID, content, and role are required");
     }
-    console.log(`💬 [MESSAGE] Creating new message in conversation: ${data.conversation_id}`);
     // Get conversation to retrieve model
     const conversation = await Conversation.findByPk(data.conversation_id);
     if (!conversation) {
@@ -39,7 +38,6 @@ export const createMessage = async (data) => {
     conversation.message_count += 1;
     await conversation.save();
     // Invalidate related caches
-    console.log(`🗑️  [MESSAGE] Invalidating message & conversation cache`);
     await invalidateCachePattern(messageHistoryPattern(data.conversation_id));
     await invalidateCachePattern(contextPattern(data.conversation_id));
     await invalidateCachePattern(conversationListPattern(conversation.user_id));
@@ -56,6 +54,7 @@ export const createMessage = async (data) => {
         content: message.content,
         tokens_used: message.tokens_used,
         model: message.model,
+        pinned: message.pinned,
         createdAt: message.createdAt,
     };
 };
@@ -69,10 +68,8 @@ export const createMessage = async (data) => {
  * @returns Array of messages with pagination info
  */
 export const getConversationMessages = async (conversationId, userId, page = 1, limit = 30, before) => {
-    console.log(`📨 [MESSAGE] Fetching messages for conversation: ${conversationId} (page: ${page}, limit: ${limit})`);
     // Use cache for message history
     const cacheKey = messageHistoryKey(conversationId, page, limit, before);
-    console.log(`🔑 [MESSAGE] Cache key: ${cacheKey}`);
     const fetchMessages = async () => {
         // Verify conversation exists and user has access
         const conversation = await Conversation.findOne({
@@ -124,6 +121,7 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
                 content: msg.content,
                 tokens_used: msg.tokens_used,
                 model: msg.model,
+                pinned: msg.pinned,
                 createdAt: msg.createdAt,
             }));
             // Determine if there are more messages older than the first returned
@@ -175,6 +173,7 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
             content: msg.content,
             tokens_used: msg.tokens_used,
             model: msg.model,
+            pinned: msg.pinned,
             createdAt: msg.createdAt,
         }));
         return {
@@ -260,7 +259,6 @@ onUserMessageCreated) => {
     conversation.message_count += 1;
     await conversation.save();
     // Invalidate related caches
-    console.log(`🗑️  [MESSAGE] Invalidating cache after user message`);
     await invalidateCachePattern(messageHistoryPattern(conversationId));
     await invalidateCachePattern(contextPattern(conversationId));
     await invalidateCachePattern(conversationListPattern(conversation.user_id));
@@ -406,14 +404,11 @@ onUserMessageCreated) => {
         conversation.message_count += 1;
         await conversation.save();
         // Invalidate related caches for assistant message too
-        console.log(`🗑️  [MESSAGE] Invalidating cache after assistant message`);
         await invalidateCachePattern(messageHistoryPattern(conversationId));
         await invalidateCachePattern(contextPattern(conversationId));
         await invalidateCachePattern(conversationListPattern(conversation.user_id));
         // Generate and store embedding for assistant message (async, non-blocking)
-        generateAndStoreEmbedding(assistantMessage.id, assistantMessage.content).catch((error) => {
-            console.error(`Background embedding generation failed for assistant message ${assistantMessage.id}:`, error.message);
-        });
+        generateAndStoreEmbedding(assistantMessage.id, assistantMessage.content).catch((error) => { });
         // Return userMessage, assistantMessage, and updated conversation for client sync
         return {
             userMessage: {

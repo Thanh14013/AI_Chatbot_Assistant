@@ -1,5 +1,27 @@
 import UserPreference from "../models/user-preference.model.js";
 /**
+ * Sanitize HTML/script tags from string to prevent XSS
+ */
+const sanitizeInput = (input) => {
+    if (!input)
+        return null;
+    // Remove HTML tags and script content
+    const sanitized = input
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+        .replace(/<[^>]+>/g, "")
+        .trim();
+    return sanitized || null;
+};
+/**
+ * Trim and clean string input
+ */
+const cleanString = (input) => {
+    if (!input)
+        return null;
+    const trimmed = input.trim();
+    return trimmed.length > 0 ? trimmed : null;
+};
+/**
  * Get user preferences
  * If preferences don't exist, create default preferences
  *
@@ -7,26 +29,31 @@ import UserPreference from "../models/user-preference.model.js";
  * @returns User preferences
  */
 export const getUserPreferences = async (userId) => {
-  // Try to find existing preferences
-  let preferences = await UserPreference.findByUserId(userId);
-  // If preferences don't exist, create default preferences
-  if (!preferences) {
-    preferences = await UserPreference.create({
-      user_id: userId,
-      language: "en",
-      response_style: "balanced",
-      custom_instructions: null,
-    });
-  }
-  return {
-    id: preferences.id,
-    user_id: preferences.user_id,
-    language: preferences.language,
-    response_style: preferences.response_style,
-    custom_instructions: preferences.custom_instructions,
-    createdAt: preferences.createdAt,
-    updatedAt: preferences.updatedAt,
-  };
+    try {
+        // Try to find existing preferences
+        let preferences = await UserPreference.findByUserId(userId);
+        // If preferences don't exist, create default preferences
+        if (!preferences) {
+            preferences = await UserPreference.create({
+                user_id: userId,
+                language: "en",
+                response_style: "balanced",
+                custom_instructions: null,
+            });
+        }
+        return {
+            id: preferences.id,
+            user_id: preferences.user_id,
+            language: preferences.language,
+            response_style: preferences.response_style,
+            custom_instructions: preferences.custom_instructions,
+            createdAt: preferences.createdAt,
+            updatedAt: preferences.updatedAt,
+        };
+    }
+    catch (error) {
+        throw new Error("Failed to fetch user preferences. Please try again.");
+    }
 };
 /**
  * Update user preferences
@@ -36,31 +63,58 @@ export const getUserPreferences = async (userId) => {
  * @returns Updated user preferences
  */
 export const updateUserPreferences = async (userId, updates) => {
-  // Validate language if provided
-  const validLanguages = ["en", "vi", "es", "fr", "de", "ja", "ko", "zh"];
-  if (updates.language && !validLanguages.includes(updates.language)) {
-    throw new Error(`Invalid language code. Supported languages: ${validLanguages.join(", ")}`);
-  }
-  // Validate response_style if provided
-  const validStyles = ["concise", "detailed", "balanced", "casual", "professional"];
-  if (updates.response_style && !validStyles.includes(updates.response_style)) {
-    throw new Error(`Invalid response style. Supported styles: ${validStyles.join(", ")}`);
-  }
-  // Validate custom_instructions length if provided
-  if (updates.custom_instructions && updates.custom_instructions.length > 2000) {
-    throw new Error("Custom instructions cannot exceed 2000 characters");
-  }
-  // Use upsert to create or update preferences
-  const preferences = await UserPreference.upsertPreferences(userId, updates);
-  return {
-    id: preferences.id,
-    user_id: preferences.user_id,
-    language: preferences.language,
-    response_style: preferences.response_style,
-    custom_instructions: preferences.custom_instructions,
-    createdAt: preferences.createdAt,
-    updatedAt: preferences.updatedAt,
-  };
+    try {
+        // Clean and sanitize inputs
+        const cleanedUpdates = {};
+        if (updates.language !== undefined) {
+            cleanedUpdates.language = cleanString(updates.language) || undefined;
+        }
+        if (updates.response_style !== undefined) {
+            cleanedUpdates.response_style = cleanString(updates.response_style) || undefined;
+        }
+        if (updates.custom_instructions !== undefined) {
+            // Sanitize custom instructions to prevent XSS
+            const cleaned = cleanString(updates.custom_instructions);
+            cleanedUpdates.custom_instructions = cleaned ? sanitizeInput(cleaned) : null;
+        }
+        // Validate language if provided
+        const validLanguages = ["en", "vi", "es", "fr", "de", "ja", "ko", "zh"];
+        if (cleanedUpdates.language && !validLanguages.includes(cleanedUpdates.language)) {
+            throw new Error(`Invalid language code: "${cleanedUpdates.language}". Supported languages: ${validLanguages.join(", ")}`);
+        }
+        // Validate response_style if provided
+        const validStyles = ["concise", "detailed", "balanced", "casual", "professional"];
+        if (cleanedUpdates.response_style && !validStyles.includes(cleanedUpdates.response_style)) {
+            throw new Error(`Invalid response style: "${cleanedUpdates.response_style}". Supported styles: ${validStyles.join(", ")}`);
+        }
+        // Validate custom_instructions length if provided
+        if (cleanedUpdates.custom_instructions && cleanedUpdates.custom_instructions.length > 2000) {
+            throw new Error(`Custom instructions are too long (${cleanedUpdates.custom_instructions.length} characters). Maximum allowed: 2000 characters.`);
+        }
+        // Use upsert to create or update preferences
+        const preferences = await UserPreference.upsertPreferences(userId, cleanedUpdates);
+        return {
+            id: preferences.id,
+            user_id: preferences.user_id,
+            language: preferences.language,
+            response_style: preferences.response_style,
+            custom_instructions: preferences.custom_instructions,
+            createdAt: preferences.createdAt,
+            updatedAt: preferences.updatedAt,
+        };
+    }
+    catch (error) {
+        // Re-throw validation errors with original message
+        if (error instanceof Error && error.message.includes("Invalid")) {
+            throw error;
+        }
+        // Re-throw length validation errors
+        if (error instanceof Error && error.message.includes("too long")) {
+            throw error;
+        }
+        // Generic error for database issues
+        throw new Error("Failed to update preferences. Please try again.");
+    }
 };
 /**
  * Build system prompt with user preferences
@@ -70,49 +124,43 @@ export const updateUserPreferences = async (userId, updates) => {
  * @param basePrompt - Base system prompt (optional)
  * @returns Enhanced system prompt with user preferences
  */
-export const buildSystemPromptWithPreferences = async (
-  userId,
-  basePrompt = "You are a helpful AI assistant. Provide clear, accurate, and helpful responses."
-) => {
-  try {
-    const preferences = await getUserPreferences(userId);
-    let systemPrompt = basePrompt;
-    // Add language preference
-    if (preferences.language !== "en") {
-      const languageNames = {
-        vi: "Vietnamese",
-        es: "Spanish",
-        fr: "French",
-        de: "German",
-        ja: "Japanese",
-        ko: "Korean",
-        zh: "Chinese",
-      };
-      const languageName = languageNames[preferences.language] || preferences.language;
-      systemPrompt += `\n\nIMPORTANT: Respond in ${languageName} language.`;
+export const buildSystemPromptWithPreferences = async (userId, basePrompt = "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.") => {
+    try {
+        const preferences = await getUserPreferences(userId);
+        let systemPrompt = basePrompt;
+        // Add language preference
+        if (preferences.language !== "en") {
+            const languageNames = {
+                vi: "Vietnamese",
+                es: "Spanish",
+                fr: "French",
+                de: "German",
+                ja: "Japanese",
+                ko: "Korean",
+                zh: "Chinese",
+            };
+            const languageName = languageNames[preferences.language] || preferences.language;
+            systemPrompt += `\n\nIMPORTANT: Respond in ${languageName} language.`;
+        }
+        // Add response style preference
+        const styleInstructions = {
+            concise: "Keep your responses brief and to the point. Avoid unnecessary details.",
+            detailed: "Provide comprehensive and detailed responses. Include examples and explanations where appropriate.",
+            balanced: "Provide clear responses with appropriate level of detail. Balance brevity with completeness.",
+            casual: "Use a friendly, conversational tone. Feel free to use casual language and be personable.",
+            professional: "Maintain a professional and formal tone. Use proper terminology and structured responses.",
+        };
+        if (preferences.response_style && styleInstructions[preferences.response_style]) {
+            systemPrompt += `\n\nResponse Style: ${styleInstructions[preferences.response_style]}`;
+        }
+        // Add custom instructions if provided
+        if (preferences.custom_instructions && preferences.custom_instructions.trim()) {
+            systemPrompt += `\n\nAdditional Instructions: ${preferences.custom_instructions.trim()}`;
+        }
+        return systemPrompt;
     }
-    // Add response style preference
-    const styleInstructions = {
-      concise: "Keep your responses brief and to the point. Avoid unnecessary details.",
-      detailed:
-        "Provide comprehensive and detailed responses. Include examples and explanations where appropriate.",
-      balanced:
-        "Provide clear responses with appropriate level of detail. Balance brevity with completeness.",
-      casual:
-        "Use a friendly, conversational tone. Feel free to use casual language and be personable.",
-      professional:
-        "Maintain a professional and formal tone. Use proper terminology and structured responses.",
-    };
-    if (preferences.response_style && styleInstructions[preferences.response_style]) {
-      systemPrompt += `\n\nResponse Style: ${styleInstructions[preferences.response_style]}`;
+    catch (error) {
+        // If preferences fetch fails, return base prompt
+        return basePrompt;
     }
-    // Add custom instructions if provided
-    if (preferences.custom_instructions && preferences.custom_instructions.trim()) {
-      systemPrompt += `\n\nAdditional Instructions: ${preferences.custom_instructions.trim()}`;
-    }
-    return systemPrompt;
-  } catch (error) {
-    // If preferences fetch fails, return base prompt
-    return basePrompt;
-  }
 };

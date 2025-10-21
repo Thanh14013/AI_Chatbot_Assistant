@@ -27,12 +27,9 @@ export async function searchConversationByEmbedding(conversationId, userId, sear
     if (!query || query.trim().length === 0) {
         throw new Error("Search query cannot be empty");
     }
-    console.log(`🔍 [SEMANTIC SEARCH] Query: "${query}" in conversation: ${conversationId}`);
     // Use cache for semantic search results
     const cacheKey = semanticSearchKey(conversationId, query, limit, similarity_threshold);
-    console.log(`🔑 [SEMANTIC SEARCH] Cache key: ${cacheKey}`);
     const performSearch = async () => {
-        console.log(`🧮 [SEMANTIC SEARCH] Generating embedding for query...`);
         // Verify conversation exists and user has access
         const conversation = await Conversation.findOne({
             where: {
@@ -51,7 +48,6 @@ export async function searchConversationByEmbedding(conversationId, userId, sear
         // Convert embedding array to PostgreSQL vector format
         // Format: '[1.0, 2.0, 3.0, ...]'
         const vectorString = `[${queryEmbedding.join(",")}]`;
-        console.log(`📊 [SEMANTIC SEARCH] Performing vector similarity search in DB...`);
         const searchStartTime = Date.now();
         // Perform semantic search using PostgreSQL vector operations
         // Cosine similarity operator: <=>
@@ -84,7 +80,6 @@ export async function searchConversationByEmbedding(conversationId, userId, sear
             type: QueryTypes.SELECT,
         });
         const searchElapsed = Date.now() - searchStartTime;
-        console.log(`✅ [SEMANTIC SEARCH] Found ${results.length} results in ${searchElapsed}ms`);
         // Map database results to SemanticSearchResult type
         const searchResults = results.map((row) => ({
             message_id: row.message_id,

@@ -101,6 +101,12 @@ export function globalSearchKey(userId, query, page = 1) {
 export function globalSearchPattern(userId) {
     return `search:global:user:${userId}:*`;
 }
+/**
+ * Generate cache key for popular tags for a user
+ */
+export function popularTagsKey(userId) {
+    return `tags:popular:user:${userId}`;
+}
 export default {
     userByEmailKey,
     userByIdKey,
@@ -117,4 +123,5 @@ export default {
     conversationMetaPattern,
     globalSearchKey,
     globalSearchPattern,
+    popularTagsKey,
 };

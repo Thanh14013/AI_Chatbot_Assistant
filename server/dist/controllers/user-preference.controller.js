@@ -1,4 +1,4 @@
-import { getUserPreferences, updateUserPreferences, } from "../services/user-preference.service.js";
+import { getUserPreferences, updateUserPreferences } from "../services/user-preference.service.js";
 /**
  * Get user preferences
  * GET /api/users/preferences

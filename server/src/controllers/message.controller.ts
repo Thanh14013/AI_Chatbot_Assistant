@@ -5,6 +5,8 @@ import {
   deleteMessage,
 } from "../services/message.service.js";
 import User from "../models/user.model.js";
+import Message from "../models/message.model.js";
+import Conversation from "../models/conversation.model.js";
 
 /**
  * Helper function to get user ID from authenticated request

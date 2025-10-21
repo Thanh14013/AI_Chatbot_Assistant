@@ -120,6 +120,13 @@ Conversation.init({
         defaultValue: null,
         comment: "Soft delete timestamp (null if not deleted)",
     },
+    // Tags for organizing conversations
+    tags: {
+        type: DataTypes.ARRAY(DataTypes.TEXT),
+        allowNull: false,
+        defaultValue: [],
+        comment: "Tags for organizing conversations (max 4 tags, max 20 chars each)",
+    },
 }, {
     sequelize, // Database connection instance
     tableName: "conversations",
