@@ -7,6 +7,7 @@ import {
   update,
   remove,
   generateTitle,
+  getPopularTagsController,
 } from "../controllers/conversation.controller.js";
 import { getMessages, sendMessageStream } from "../controllers/message.controller.js";
 import { semanticSearch } from "../controllers/semantic-search.controller.js";
@@ -25,12 +26,16 @@ router.use(authenticateAccessToken);
 // Body: { content: string }
 router.post("/generate-title", generateTitle);
 
+// Get popular tags for user
+// GET /api/conversations/tags/popular
+router.get("/tags/popular", getPopularTagsController);
+
 // Create a new conversation
 // POST /api/conversations
 router.post("/", create);
 
 // Get all conversations for authenticated user (with pagination)
-// GET /api/conversations?page=1&limit=20
+// GET /api/conversations?page=1&limit=20&tags=work,urgent&tagMode=any
 router.get("/", getAll);
 
 // Get a specific conversation by ID

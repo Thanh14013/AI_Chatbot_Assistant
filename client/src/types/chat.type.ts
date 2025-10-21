@@ -48,6 +48,7 @@ export interface Conversation {
   context_window: number;
   total_tokens_used: number;
   message_count: number;
+  tags: string[];
   createdAt: string | Date;
   updatedAt: string | Date;
   deleted_at: string | Date | null;
@@ -60,6 +61,7 @@ export interface ConversationListItem {
   model?: string; // Added for edit functionality
   context_window?: number; // Added for edit functionality
   message_count: number;
+  tags?: string[]; // Tags for organizing conversations
   updatedAt: string | Date;
   // Client-side only field for unread tracking (multi-tab)
   hasUnread?: boolean;
@@ -71,6 +73,7 @@ export interface CreateConversationInput {
   title: string;
   model?: string;
   context_window?: number;
+  tags?: string[];
 }
 
 // Client UI state for chat

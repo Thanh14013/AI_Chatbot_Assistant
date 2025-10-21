@@ -7,6 +7,7 @@ export interface IConversation {
   context_window: number; // Number of messages to include in context
   total_tokens_used: number; // Total tokens consumed in this conversation
   message_count: number; // Total number of messages in conversation
+  tags: string[]; // Tags for organizing conversations (max 4, max 20 chars each)
   createdAt: Date;
   updatedAt: Date;
   deleted_at: Date | null; // Soft delete timestamp (null if not deleted)
@@ -18,6 +19,7 @@ export interface CreateConversationInput {
   title: string;
   model?: string; // Default: "gpt-3.5-turbo"
   context_window?: number; // Default: 10
+  tags?: string[]; // Default: []
 }
 
 // Interface for updating a conversation
@@ -25,6 +27,7 @@ export interface UpdateConversationInput {
   title?: string;
   model?: string;
   context_window?: number;
+  tags?: string[];
 }
 
 // Interface for conversation response (without sensitive data)
@@ -36,6 +39,7 @@ export interface ConversationResponse {
   context_window: number;
   total_tokens_used: number;
   message_count: number;
+  tags: string[];
   createdAt: Date;
   updatedAt: Date;
   deleted_at: Date | null;
@@ -48,5 +52,6 @@ export interface ConversationListItem {
   model: string; // Added for edit functionality
   context_window: number; // Added for edit functionality
   message_count: number;
+  tags: string[];
   updatedAt: Date;
 }

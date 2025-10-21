@@ -6,12 +6,14 @@ import {
   updateConversation,
   deleteConversation,
   generateConversationTitle,
+  getPopularTags,
 } from "../services/conversation.service.js";
 import User from "../models/user.model.js";
 import type {
   CreateConversationInput,
   UpdateConversationInput,
 } from "../types/conversation.type.js";
+import { validateAndNormalizeTags } from "../utils/tag.util.js";
 
 /**
  * Helper function to get user ID from authenticated request
@@ -41,7 +43,7 @@ export const create = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Extract conversation data from request body
-    const { title, model, context_window }: CreateConversationInput = req.body;
+    const { title, model, context_window, tags }: CreateConversationInput = req.body;
 
     // Validate required fields
     if (!title || title.trim().length === 0) {
@@ -52,12 +54,26 @@ export const create = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Validate tags if provided
+    if (tags !== undefined) {
+      const tagValidation = validateAndNormalizeTags(tags);
+      if (!tagValidation.isValid) {
+        res.status(400).json({
+          success: false,
+          message: "Invalid tags",
+          errors: tagValidation.errors,
+        });
+        return;
+      }
+    }
+
     // Create conversation
     const conversationData: CreateConversationInput = {
       user_id: userId,
       title: title.trim(),
       model: model || "gpt-5-nano",
       context_window: context_window || 10,
+      tags: tags || [],
     };
 
     const conversation = await createConversation(conversationData);
@@ -102,6 +118,16 @@ export const getAll = async (req: Request, res: Response): Promise<void> => {
     const limit = parseInt(req.query.limit as string) || 20;
     const search = req.query.search as string | undefined;
 
+    // Extract tag filtering params
+    const tagsParam = req.query.tags as string | undefined;
+    const tagMode = (req.query.tagMode as "any" | "all") || "any";
+    const tags = tagsParam
+      ? tagsParam
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean)
+      : undefined;
+
     // Validate pagination params
     if (page < 1 || limit < 1 || limit > 100) {
       res.status(400).json({
@@ -111,8 +137,29 @@ export const getAll = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Get conversations with optional search
-    const result = await getUserConversations(userId, page, limit, search);
+    // Validate tag mode
+    if (tagMode !== "any" && tagMode !== "all") {
+      res.status(400).json({
+        success: false,
+        message: "Invalid tagMode. Must be 'any' or 'all'",
+      });
+      return;
+    }
+
+    // Get conversations with optional search and tag filtering
+    const result = await getUserConversations(userId, page, limit, search, tags, tagMode);
+
+    console.log(
+      `[Conversation Controller] Sending response with ${result.conversations.length} conversations`
+    );
+    console.log(
+      `[Conversation Controller] First conversation in response:`,
+      result.conversations[0]
+    );
+    console.log(
+      `[Conversation Controller] First conversation tags:`,
+      result.conversations[0]?.tags
+    );
 
     // Send success response
     res.status(200).json({
@@ -226,10 +273,15 @@ export const update = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Extract update data from request body
-    const { title, model, context_window }: UpdateConversationInput = req.body;
+    const { title, model, context_window, tags }: UpdateConversationInput = req.body;
 
     // Validate at least one field to update
-    if (title === undefined && model === undefined && context_window === undefined) {
+    if (
+      title === undefined &&
+      model === undefined &&
+      context_window === undefined &&
+      tags === undefined
+    ) {
       res.status(400).json({
         success: false,
         message: "At least one field to update is required",
@@ -237,11 +289,25 @@ export const update = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Validate tags if provided
+    if (tags !== undefined) {
+      const tagValidation = validateAndNormalizeTags(tags);
+      if (!tagValidation.isValid) {
+        res.status(400).json({
+          success: false,
+          message: "Invalid tags",
+          errors: tagValidation.errors,
+        });
+        return;
+      }
+    }
+
     // Update conversation
     const updateData: UpdateConversationInput = {};
     if (title !== undefined) updateData.title = title.trim();
     if (model !== undefined) updateData.model = model;
     if (context_window !== undefined) updateData.context_window = context_window;
+    if (tags !== undefined) updateData.tags = tags;
 
     const conversation = await updateConversation(conversationId, userId, updateData);
 
@@ -393,6 +459,43 @@ export const generateTitle = async (req: Request, res: Response): Promise<void> 
   } catch (error) {
     // Handle errors
     const errorMessage = error instanceof Error ? error.message : "Failed to generate title";
+
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: errorMessage,
+    });
+  }
+};
+
+/**
+ * Get popular tags for authenticated user
+ * GET /api/conversations/tags/popular
+ */
+export const getPopularTagsController = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Get user ID from authenticated request
+    const userId = await getUserIdFromRequest(req);
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+      return;
+    }
+
+    // Get popular tags
+    const tags = await getPopularTags(userId);
+
+    // Send success response
+    res.status(200).json({
+      success: true,
+      message: "Popular tags retrieved successfully",
+      data: { tags },
+    });
+  } catch (error) {
+    // Handle errors
+    const errorMessage = error instanceof Error ? error.message : "Failed to get popular tags";
 
     res.status(500).json({
       success: false,

@@ -185,6 +185,14 @@
   border-radius: 50%;
 }
 
+/* Tags container */
+.tagsContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
 /* Focus state for accessibility */
 .conversationItem:focus {
   outline: 2px solid #1890ff;

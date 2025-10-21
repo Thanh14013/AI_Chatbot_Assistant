@@ -197,6 +197,20 @@
   color: rgba(0, 0, 0, 0.85);
 }
 
+.conversationTitleContainer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.headerTagsContainer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 /* Modal form footer styles */
 .modalFooter {
   display: flex;

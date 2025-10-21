@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from "react";
-import { Layout, Typography, App } from "antd";
+import { Layout, Typography, App, Tag } from "antd";
 import {
   createConversation as apiCreateConversation,
   generateConversationTitle as apiGenerateTitle,
@@ -32,6 +32,7 @@ import { NetworkStatus, TypingIndicator } from "../components";
 import { searchConversation } from "../services/searchService";
 import { useAuthContext } from "../hooks/useAuthContext";
 import { usePreferences } from "../stores/preferences.store";
+import { getTagColor } from "../utils/tag-colors.util";
 import styles from "./ChatPage.module.css";
 
 const { Content } = Layout;
@@ -1776,9 +1777,30 @@ const ChatPage: React.FC = () => {
               {/* Conversation header */}
               <div className={styles.conversationHeader}>
                 <div className={styles.conversationHeaderLeft}>
-                  <Title level={4} className={styles.conversationTitle}>
-                    {currentConversation.title}
-                  </Title>
+                  <div className={styles.conversationTitleContainer}>
+                    <Title level={4} className={styles.conversationTitle}>
+                      {currentConversation.title}
+                    </Title>
+                    {/* Tags - show all (max expected ~4); reduce size to fit */}
+                    {currentConversation.tags &&
+                      currentConversation.tags.length > 0 && (
+                        <div className={styles.headerTagsContainer}>
+                          {currentConversation.tags.map((tag) => (
+                            <Tag
+                              key={tag}
+                              color={getTagColor(tag)}
+                              style={{
+                                fontSize: "11px",
+                                margin: 0,
+                                padding: "2px 6px",
+                              }}
+                            >
+                              {tag}
+                            </Tag>
+                          ))}
+                        </div>
+                      )}
+                  </div>
                   <NetworkStatus position="inline" />
                 </div>
 

@@ -140,6 +140,13 @@
   flex-shrink: 0;
 }
 
+.tagsContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
 .itemActions {
   display: flex;
   align-items: center;

@@ -10,6 +10,7 @@ declare const styles: {
   readonly titleRow: string;
   readonly conversationTitle: string;
   readonly timeText: string;
+  readonly tagsContainer: string;
   readonly itemActions: string;
   readonly deleteMenuItem: string;
   readonly loadingState: string;

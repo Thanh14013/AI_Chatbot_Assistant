@@ -5,7 +5,7 @@
 
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Typography, Dropdown, Modal, Input, App } from "antd";
+import { Typography, Dropdown, Modal, Input, App, Tag } from "antd";
 import {
   MessageOutlined,
   MoreOutlined,
@@ -20,6 +20,7 @@ import {
 import { websocketService } from "../services/websocket.service";
 import ConversationForm, { ConversationFormValues } from "./ConversationForm";
 import styles from "./ConversationItem.module.css";
+import { getTagColor } from "../utils/tag-colors.util";
 
 const { Text } = Typography;
 
@@ -45,7 +46,19 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   const [isUpdating, setIsUpdating] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [fullConversation, setFullConversation] =
+    useState<ConversationListItem | null>(null);
   const navigate = useNavigate();
+
+  // Log conversation prop để debug tags
+  console.log("[ConversationItem] Received conversation prop:", {
+    id: conversation.id,
+    title: conversation.title,
+    tags: conversation.tags,
+    hasTags: "tags" in conversation,
+    conversationKeys: Object.keys(conversation),
+    fullConversation: conversation,
+  });
 
   /**
    * Format timestamp to relative time or date
@@ -99,18 +112,40 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   /**
    * Handle edit conversation
    */
-  const handleEditClick = (e: any) => {
+  const handleEditClick = async (e: any) => {
     e.domEvent.stopPropagation();
-    setIsEditModalOpen(true);
+
+    // Fetch full conversation details including tags
+    try {
+      console.log(
+        "[ConversationItem] Fetching full conversation for edit:",
+        conversation.id
+      );
+      const { getConversation } = await import("../services/chat.service");
+      const fullConv = await getConversation(conversation.id);
+      console.log("[ConversationItem] Fetched full conversation:", fullConv);
+      console.log("[ConversationItem] Full conversation tags:", fullConv.tags);
+
+      setFullConversation(fullConv as any);
+      setIsEditModalOpen(true);
+    } catch (error) {
+      console.error("[ConversationItem] Failed to fetch conversation:", error);
+      message.error("Failed to load conversation details");
+    }
   };
 
   /**
    * Handle edit form submission
    */
   const handleEditSubmit = async (values: ConversationFormValues) => {
+    console.log("[ConversationItem] Submitting edit with values:", values);
+    console.log("[ConversationItem] Original conversation:", conversation);
+
     setIsUpdating(true);
     try {
-      await updateConversation(conversation.id, values);
+      const result = await updateConversation(conversation.id, values);
+      console.log("[ConversationItem] Update response:", result);
+
       message.success("Conversation updated successfully");
       setIsEditModalOpen(false);
       onUpdate?.();
@@ -125,6 +160,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         } catch {}
       }
     } catch (error: any) {
+      console.error("[ConversationItem] Update failed:", error);
       message.error(
         error?.response?.data?.message || "Failed to update conversation"
       );
@@ -237,6 +273,34 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           {truncateText(conversation.title, 30)}
         </span>
 
+        {/* Tags */}
+        {(() => {
+          console.log("[ConversationItem] Rendering tags for conversation:", {
+            id: conversation.id,
+            title: conversation.title,
+            tags: conversation.tags,
+            hasTags: conversation.tags && conversation.tags.length > 0,
+          });
+          return conversation.tags && conversation.tags.length > 0 ? (
+            <div className={styles.tagsContainer}>
+              {conversation.tags.slice(0, 3).map((tag) => (
+                <Tag
+                  key={tag}
+                  color={getTagColor(tag)}
+                  style={{ fontSize: "11px", margin: 0 }}
+                >
+                  {tag}
+                </Tag>
+              ))}
+              {conversation.tags.length > 3 && (
+                <Tag style={{ fontSize: "11px", margin: 0 }}>
+                  +{conversation.tags.length - 3} more
+                </Tag>
+              )}
+            </div>
+          ) : null;
+        })()}
+
         {/* Message count and timestamp */}
         <div className={styles.metadata}>
           <span className={styles.messageCount}>
@@ -285,11 +349,32 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         loading={isUpdating}
         mode="edit"
         initialValues={{
-          title: conversation.title,
-          model: conversation.model || "gpt-5-nano",
-          context_window: conversation.context_window || 10,
+          title: fullConversation?.title || conversation.title,
+          model: fullConversation?.model || conversation.model || "gpt-5-nano",
+          context_window:
+            fullConversation?.context_window ||
+            conversation.context_window ||
+            10,
+          tags: fullConversation?.tags || conversation.tags || [],
         }}
       />
+
+      {/* Debug: Log conversation object before passing to form */}
+      {isEditModalOpen &&
+        (() => {
+          console.log(
+            "[ConversationItem] Opening edit modal with conversation:",
+            {
+              id: conversation.id,
+              title: conversation.title,
+              model: conversation.model,
+              context_window: conversation.context_window,
+              tags: conversation.tags,
+              fullConversation: conversation,
+            }
+          );
+          return null;
+        })()}
 
       {/* Active indicator */}
       {isActive && <div className={styles.activeIndicator} />}

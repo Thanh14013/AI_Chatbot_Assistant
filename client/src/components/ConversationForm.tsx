@@ -3,7 +3,7 @@
  * Form for creating a new conversation with customizable settings
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Modal,
   Form,
@@ -13,9 +13,15 @@ import {
   Typography,
   Space,
   Divider,
+  App,
 } from "antd";
-import { MessageOutlined, SettingOutlined } from "@ant-design/icons";
+import {
+  MessageOutlined,
+  SettingOutlined,
+  TagOutlined,
+} from "@ant-design/icons";
 import styles from "./ConversationForm.module.css";
+import { getPopularTags, type PopularTag } from "../services/chat.service";
 
 const { Text, Title } = Typography;
 const { Option } = Select;
@@ -33,6 +39,7 @@ export interface ConversationFormValues {
   title: string;
   model: string;
   context_window: number;
+  tags: string[];
 }
 
 /**
@@ -71,16 +78,61 @@ const ConversationForm: React.FC<ConversationFormProps> = ({
   mode = "create",
   initialValues,
 }) => {
+  const { message } = App.useApp();
   const [form] = Form.useForm<ConversationFormValues>();
   const [contextWindow, setContextWindow] = useState(
     initialValues?.context_window || 10
   );
+  const [popularTags, setPopularTags] = useState<PopularTag[]>([]);
+  const [loadingTags, setLoadingTags] = useState(false);
+
+  // Fetch popular tags when modal opens
+  useEffect(() => {
+    if (open) {
+      fetchPopularTags();
+    }
+  }, [open]);
+
+  // Fetch popular tags from server
+  const fetchPopularTags = async () => {
+    try {
+      setLoadingTags(true);
+      const tags = await getPopularTags();
+      setPopularTags(tags);
+    } catch (error) {
+      // Silently fail - tags are optional
+    } finally {
+      setLoadingTags(false);
+    }
+  };
 
   // Update form and state when initialValues change (for edit mode)
   React.useEffect(() => {
     if (mode === "edit" && initialValues) {
+      console.log(
+        "[ConversationForm] Setting initial values for edit mode:",
+        initialValues
+      );
+      console.log(
+        "[ConversationForm] Tags in initialValues:",
+        initialValues.tags
+      );
+      console.log(
+        "[ConversationForm] Tags is array?",
+        Array.isArray(initialValues.tags)
+      );
+
       form.setFieldsValue(initialValues);
       setContextWindow(initialValues.context_window);
+
+      console.log(
+        "[ConversationForm] Form values after set:",
+        form.getFieldsValue()
+      );
+      console.log(
+        "[ConversationForm] Tags field value:",
+        form.getFieldValue("tags")
+      );
     }
   }, [mode, initialValues, form]);
 
@@ -91,13 +143,19 @@ const ConversationForm: React.FC<ConversationFormProps> = ({
     form
       .validateFields()
       .then((values) => {
+        console.log(
+          "[ConversationForm] Form validated, submitting values:",
+          values
+        );
         onSubmit(values);
         if (mode === "create") {
           form.resetFields();
           setContextWindow(10); // Reset to default only for create mode
         }
       })
-      .catch((info) => {});
+      .catch((info) => {
+        console.error("[ConversationForm] Form validation failed:", info);
+      });
   };
 
   /**
@@ -148,6 +206,7 @@ const ConversationForm: React.FC<ConversationFormProps> = ({
           title: "",
           model: "gpt-5-nano",
           context_window: 10,
+          tags: [],
         }}
         className={styles.conversationForm}
       >
@@ -237,6 +296,57 @@ const ConversationForm: React.FC<ConversationFormProps> = ({
             tokens.
           </Text>
         </div>
+
+        {/* Tags */}
+        <Form.Item
+          name="tags"
+          label={
+            <Space>
+              <TagOutlined />
+              <span>Tags</span>
+            </Space>
+          }
+          help="Add up to 4 tags to organize your conversation (max 20 characters each)"
+          rules={[
+            {
+              type: "array",
+              max: 4,
+              message: "Maximum 4 tags allowed!",
+            },
+            {
+              validator: async (_, tags: string[]) => {
+                if (tags && tags.length > 0) {
+                  for (const tag of tags) {
+                    if (tag.length > 20) {
+                      throw new Error(
+                        `Tag "${tag}" is too long (max 20 characters)`
+                      );
+                    }
+                    if (tag.length < 1) {
+                      throw new Error("Tags cannot be empty");
+                    }
+                  }
+                }
+              },
+            },
+          ]}
+        >
+          <Select
+            mode="tags"
+            size="large"
+            placeholder="Add tags (e.g., work, study, personal...)"
+            loading={loadingTags}
+            maxTagCount={4}
+            maxTagTextLength={20}
+            tokenSeparators={[","]}
+          >
+            {popularTags.map((tag) => (
+              <Option key={tag.name} value={tag.name}>
+                {tag.name} ({tag.count})
+              </Option>
+            ))}
+          </Select>
+        </Form.Item>
       </Form>
     </Modal>
   );

@@ -12,6 +12,7 @@ import {
   Input,
   message,
   Tooltip,
+  Tag,
 } from "antd";
 import { useNavigate } from "react-router-dom";
 import {
@@ -27,6 +28,7 @@ import {
 import { websocketService } from "../services/websocket.service";
 import ConversationForm, { ConversationFormValues } from "./ConversationForm";
 import type { ConversationListItem } from "../types/chat.type";
+import { getTagColor } from "../utils/tag-colors.util";
 import styles from "./ConversationList.module.css";
 
 // Memoized item actions to avoid recreating menu items on every render
@@ -337,6 +339,26 @@ const ConversationList: React.FC<ConversationListProps> = ({
                           {formatTime(conversation.updatedAt)}
                         </span>
                       </div>
+
+                      {/* Tags - show all (expected small number, e.g., up to 4). Reduce spacing/size if needed */}
+                      {conversation.tags && conversation.tags.length > 0 && (
+                        <div className={styles.tagsContainer}>
+                          {conversation.tags.map((tag) => (
+                            <Tag
+                              key={tag}
+                              color={getTagColor(tag)}
+                              style={{
+                                fontSize: "11px",
+                                margin: 0,
+                                padding: "2px 6px",
+                              }}
+                            >
+                              {tag}
+                            </Tag>
+                          ))}
+                        </div>
+                      )}
+
                       {/* Removed message count as requested */}
                     </div>
 
@@ -394,6 +416,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
                 title: editModal.conversation.title,
                 model: editModal.conversation.model || "gpt-5-nano",
                 context_window: editModal.conversation.context_window || 10,
+                tags: editModal.conversation.tags || [],
               }
             : undefined
         }

@@ -10,6 +10,7 @@ export type CreateConversationPayload = {
   title: string;
   model?: string;
   context_window?: number;
+  tags?: string[];
 };
 
 export const createConversation = async (
@@ -39,6 +40,8 @@ export type GetConversationsParams = {
   page?: number;
   limit?: number;
   search?: string;
+  tags?: string[];
+  tagMode?: "any" | "all";
 };
 
 export type GetConversationsResult = {
@@ -54,7 +57,7 @@ export type GetConversationsResult = {
 export const getConversations = async (
   params: GetConversationsParams = {}
 ): Promise<GetConversationsResult> => {
-  const { page = 1, limit = 20, search } = params;
+  const { page = 1, limit = 20, search, tags, tagMode = "any" } = params;
 
   // Build query string
   const queryParams = new URLSearchParams({
@@ -66,8 +69,38 @@ export const getConversations = async (
     queryParams.append("search", search.trim());
   }
 
+  if (tags && tags.length > 0) {
+    queryParams.append("tags", tags.join(","));
+    queryParams.append("tagMode", tagMode);
+  }
+
   const resp = await axiosInstance.get(
     `/conversations?${queryParams.toString()}`
+  );
+
+  console.log("[Chat Service] getConversations RAW response:", resp.data);
+  console.log(
+    "[Chat Service] First conversation FULL:",
+    JSON.stringify(resp.data.data?.[0], null, 2)
+  );
+  console.log("[Chat Service] getConversations response:", {
+    count: resp.data.data?.length,
+    firstConversation: resp.data.data?.[0],
+    firstConversationKeys: Object.keys(resp.data.data?.[0] || {}),
+    firstConversationTags: resp.data.data?.[0]?.tags,
+    hasTagsField: "tags" in (resp.data.data?.[0] || {}),
+    pagination: resp.data.pagination,
+  });
+
+  // Check each conversation for tags
+  const conversationsWithTags =
+    resp.data.data?.filter(
+      (c: ConversationListItem) => c.tags && c.tags.length > 0
+    ) || [];
+  console.log(
+    "[Chat Service] Conversations with tags:",
+    conversationsWithTags.length,
+    conversationsWithTags
   );
 
   return {
@@ -81,6 +114,13 @@ export const getConversation = async (
   id: string
 ): Promise<ConversationType> => {
   const resp = await axiosInstance.get(`/conversations/${id}`);
+
+  console.log("[Chat Service] getConversation response for id:", id, {
+    conversation: resp.data.data,
+    tags: resp.data.data?.tags,
+    hasTagsField: "tags" in (resp.data.data || {}),
+  });
+
   return resp.data.data as ConversationType;
 };
 
@@ -283,16 +323,21 @@ export type UpdateConversationPayload = {
   title?: string;
   model?: string;
   context_window?: number;
+  tags?: string[];
 };
 
 export const updateConversation = async (
   conversationId: string,
   payload: UpdateConversationPayload
 ): Promise<ConversationType> => {
+  console.log("[Chat Service] Updating conversation:", conversationId, payload);
+
   const resp = await axiosInstance.patch(
     `/conversations/${conversationId}`,
     payload
   );
+
+  console.log("[Chat Service] Update response:", resp.data);
   return resp.data.data as ConversationType;
 };
 
@@ -306,6 +351,17 @@ export const deleteConversation = async (
     return resp.data.data as ConversationListItem[];
   }
   return;
+};
+
+/** Get popular tags for user */
+export type PopularTag = {
+  name: string;
+  count: number;
+};
+
+export const getPopularTags = async (): Promise<PopularTag[]> => {
+  const resp = await axiosInstance.get("/conversations/tags/popular");
+  return resp.data.data.tags as PopularTag[];
 };
 
 export default {

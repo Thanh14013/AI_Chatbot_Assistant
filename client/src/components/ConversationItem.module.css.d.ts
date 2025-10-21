@@ -13,3 +13,4 @@ export const messageCount: string;
 export const timestamp: string;
 export const activeIndicator: string;
 export const deleteMenuItem: string;
+export const tagsContainer: string;
