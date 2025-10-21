@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
 import Conversation from "../models/conversation.model.js";
+import { getSocketIOInstance } from "../services/socket.service.js";
 
 /**
  * Helper function to get user ID from authenticated request
@@ -119,6 +120,39 @@ export const pinMessage = async (req: Request, res: Response): Promise<void> => 
     const updatedMessage = await Message.pinMessage(messageId);
 
     console.log(`✅ [PIN_MESSAGE] Message pinned successfully: ${messageId}`);
+
+    // Emit socket event for real-time sync
+    try {
+      const io = getSocketIOInstance();
+      if (!io) {
+        console.warn(`⚠️ [PIN_MESSAGE] Socket.io instance not available`);
+      } else {
+        const roomName = `conversation:${message.conversation_id}`;
+
+        console.log(`📌 [PIN_MESSAGE] Emitting socket event to room: ${roomName}`);
+
+        io.to(roomName).emit("message:pinned", {
+          conversationId: message.conversation_id,
+          messageId: updatedMessage.id,
+          message: {
+            id: updatedMessage.id,
+            conversation_id: updatedMessage.conversation_id,
+            role: updatedMessage.role,
+            content: updatedMessage.content,
+            tokens_used: updatedMessage.tokens_used,
+            model: updatedMessage.model,
+            pinned: updatedMessage.pinned,
+            createdAt: updatedMessage.createdAt,
+          },
+        });
+
+        console.log(`✅ [PIN_MESSAGE] Socket event emitted successfully`);
+      }
+    } catch (socketError) {
+      console.error(`⚠️ [PIN_MESSAGE] Failed to emit socket event:`, socketError);
+      // Don't fail the request if socket emit fails
+    }
+
     console.log("📌 [PIN_MESSAGE] ===== Pin Message Request Completed =====");
 
     // Send success response
@@ -234,6 +268,29 @@ export const unpinMessage = async (req: Request, res: Response): Promise<void> =
     const updatedMessage = await Message.unpinMessage(messageId);
 
     console.log(`✅ [UNPIN_MESSAGE] Message unpinned successfully: ${messageId}`);
+
+    // Emit socket event for real-time sync
+    try {
+      const io = getSocketIOInstance();
+      if (!io) {
+        console.warn(`⚠️ [UNPIN_MESSAGE] Socket.io instance not available`);
+      } else {
+        const roomName = `conversation:${message.conversation_id}`;
+
+        console.log(`📌 [UNPIN_MESSAGE] Emitting socket event to room: ${roomName}`);
+
+        io.to(roomName).emit("message:unpinned", {
+          conversationId: message.conversation_id,
+          messageId: updatedMessage.id,
+        });
+
+        console.log(`✅ [UNPIN_MESSAGE] Socket event emitted successfully`);
+      }
+    } catch (socketError) {
+      console.error(`⚠️ [UNPIN_MESSAGE] Failed to emit socket event:`, socketError);
+      // Don't fail the request if socket emit fails
+    }
+
     console.log("📌 [UNPIN_MESSAGE] ===== Unpin Message Request Completed =====");
 
     // Send success response

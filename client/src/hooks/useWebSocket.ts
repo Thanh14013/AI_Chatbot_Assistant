@@ -50,7 +50,17 @@ interface UseWebSocketReturn {
   disconnect: () => void;
   joinConversation: (conversationId: string) => void;
   leaveConversation: (conversationId: string) => void;
-  sendMessage: (conversationId: string, content: string) => void;
+  sendMessage: (
+    conversationId: string,
+    content: string,
+    attachments?: Array<{
+      public_id: string;
+      secure_url: string;
+      resource_type: string;
+      format?: string;
+      extracted_text?: string;
+    }>
+  ) => void;
   startTyping: (conversationId: string) => void;
   stopTyping: (conversationId: string) => void;
   notifyConversationCreated: (conversation: ConversationListItem) => void;
@@ -175,9 +185,22 @@ export const useWebSocket = (
     websocketService.leaveConversation(conversationId);
   }, []);
 
-  const sendMessage = useCallback((conversationId: string, content: string) => {
-    websocketService.sendMessage(conversationId, content);
-  }, []);
+  const sendMessage = useCallback(
+    (
+      conversationId: string,
+      content: string,
+      attachments?: Array<{
+        public_id: string;
+        secure_url: string;
+        resource_type: string;
+        format?: string;
+        extracted_text?: string;
+      }>
+    ) => {
+      websocketService.sendMessage(conversationId, content, attachments);
+    },
+    []
+  );
 
   const startTyping = useCallback((conversationId: string) => {
     websocketService.startTyping(conversationId);

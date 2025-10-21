@@ -15,10 +15,13 @@ import {
   ClockCircleOutlined,
   SyncOutlined,
   WarningOutlined,
+  PushpinOutlined,
+  PushpinFilled,
 } from "@ant-design/icons";
 import { Message } from "../types/chat.type";
 import { PendingMessage } from "../types/offline-message.type";
 import styles from "./MessageBubble.module.css";
+import { pinMessage, unpinMessage } from "../services/chat.service";
 
 const { Text } = Typography;
 
@@ -30,6 +33,8 @@ interface MessageBubbleProps {
   onRequestFollowups?: (messageId: string, content: string) => void;
   // Optional handler for clicking a follow-up suggestion
   onFollowupClick?: (suggestion: string) => void;
+  // Optional handler for when a message is pinned/unpinned
+  onPinToggle?: (messageId: string, isPinned: boolean) => void;
 }
 
 /**
@@ -41,9 +46,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   onRetry,
   onRequestFollowups,
   onFollowupClick,
+  onPinToggle,
 }) => {
   const { message: antMessage } = App.useApp();
   const [isCopied, setIsCopied] = useState(false);
+  const [isPinning, setIsPinning] = useState(false);
   // Client-side streaming display (progressive reveal)
   const [displayedContent, setDisplayedContent] = useState<string>(
     message.content || ""
@@ -88,6 +95,52 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const isLoadingFollowups =
     !isPendingMessage(message) && (message.isLoadingFollowups || false);
   const isTyping = !isPendingMessage(message) && (message.isTyping || false);
+
+  // Pin status (only for Message type)
+  const isPinned = !isPendingMessage(message) && (message.pinned || false);
+
+  /**
+   * Handle pin/unpin toggle
+   */
+  const handlePinToggle = async () => {
+    if (isPendingMessage(message) || isPinning) return;
+
+    setIsPinning(true);
+    try {
+      console.log(
+        `[MessageBubble] ${isPinned ? "Unpinning" : "Pinning"} message: ${
+          message.id
+        }`
+      );
+
+      if (isPinned) {
+        await unpinMessage(message.id);
+        antMessage.success("Message unpinned");
+      } else {
+        await pinMessage(message.id);
+        antMessage.success("Message pinned");
+      }
+
+      // Notify parent component
+      if (onPinToggle) {
+        onPinToggle(message.id, !isPinned);
+      }
+    } catch (error: unknown) {
+      console.error(
+        `[MessageBubble] Failed to ${isPinned ? "unpin" : "pin"} message:`,
+        error
+      );
+      if (error instanceof Error) {
+        antMessage.error(
+          error.message || `Failed to ${isPinned ? "unpin" : "pin"} message`
+        );
+      } else {
+        antMessage.error(`Failed to ${isPinned ? "unpin" : "pin"} message`);
+      }
+    } finally {
+      setIsPinning(false);
+    }
+  };
 
   /**
    * Handle requesting follow-up suggestions
@@ -271,7 +324,26 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           )}
 
           {/* Message content bubble */}
-          <div className={styles.messageBubble}>
+          <div
+            className={`${styles.messageBubble} ${
+              isPinned ? styles.pinnedMessage : ""
+            }`}
+          >
+            {/* Pin button positioned in top-right corner */}
+            {!isPendingMessage(message) && message.content && (
+              <Button
+                type="text"
+                size="small"
+                icon={isPinned ? <PushpinFilled /> : <PushpinOutlined />}
+                onClick={handlePinToggle}
+                loading={isPinning}
+                className={`${styles.pinButtonCorner} ${
+                  isPinned ? styles.pinned : ""
+                }`}
+                title={isPinned ? "Unpin message" : "Pin message"}
+              />
+            )}
+
             {/* Follow-up button positioned in top-right corner for assistant messages */}
             {!isUser && !isTyping && message.content && (
               <Button
@@ -295,6 +367,57 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 renderContent(displayedContent)
               )}
             </div>
+
+            {/* Attachments display - show files attached to message */}
+            {!isPendingMessage(message) &&
+              message.attachments &&
+              message.attachments.length > 0 && (
+                <div className={styles.attachmentsContainer}>
+                  {message.attachments.map((attachment, index) => (
+                    <div key={index} className={styles.attachmentItem}>
+                      {attachment.resource_type === "image" ? (
+                        // Image preview
+                        <a
+                          href={attachment.secure_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={styles.imageAttachment}
+                        >
+                          <img
+                            src={
+                              attachment.thumbnail_url || attachment.secure_url
+                            }
+                            alt={attachment.original_filename || "Image"}
+                            className={styles.attachmentImage}
+                          />
+                        </a>
+                      ) : (
+                        // File link for non-image files
+                        <a
+                          href={attachment.secure_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={styles.fileAttachment}
+                        >
+                          <div className={styles.fileIcon}>📄</div>
+                          <div className={styles.fileInfo}>
+                            <div className={styles.fileName}>
+                              {attachment.original_filename || "File"}
+                            </div>
+                            <div className={styles.fileSize}>
+                              {attachment.format?.toUpperCase() || "FILE"}
+                              {attachment.size_bytes &&
+                                ` • ${(attachment.size_bytes / 1024).toFixed(
+                                  1
+                                )} KB`}
+                            </div>
+                          </div>
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
             {/* Message footer with timestamp and actions (copy + retry) */}
             <div className={styles.messageFooter}>

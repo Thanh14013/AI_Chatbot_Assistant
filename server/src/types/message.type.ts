@@ -29,5 +29,18 @@ export interface MessageResponse {
   model: string;
   pinned: boolean; // Whether the message is pinned
   createdAt: Date;
+  attachments?: Array<{
+    id?: number;
+    public_id: string;
+    secure_url: string;
+    resource_type: "image" | "video" | "raw";
+    format?: string;
+    original_filename?: string;
+    size_bytes?: number;
+    width?: number;
+    height?: number;
+    thumbnail_url?: string;
+    extracted_text?: string;
+  }>;
 }
 // Streaming endpoint uses the same MessageResponse types; non-streaming wrappers removed

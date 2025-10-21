@@ -133,9 +133,31 @@ export const sendMessageStream = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    const { content } = req.body;
+    const { content, attachments } = req.body;
     if (!content || typeof content !== "string" || content.trim().length === 0) {
       res.status(400).json({ success: false, message: "Message content is required" });
+      return;
+    }
+
+    // Log received attachments
+    console.log("[Controller] Received message request:", {
+      conversationId,
+      userId,
+      contentLength: content.length,
+      hasAttachments: !!attachments,
+      attachmentsCount: attachments?.length || 0,
+      attachmentsData: attachments?.map((att: any) => ({
+        public_id: att.public_id,
+        resource_type: att.resource_type,
+        secure_url: att.secure_url?.substring(0, 50) + "...",
+        format: att.format,
+        has_extracted_text: !!att.extracted_text,
+      })),
+    });
+
+    // Validate attachments if provided
+    if (attachments && !Array.isArray(attachments)) {
+      res.status(400).json({ success: false, message: "Attachments must be an array" });
       return;
     }
 
@@ -146,10 +168,17 @@ export const sendMessageStream = async (req: Request, res: Response): Promise<vo
     res.flushHeaders?.();
 
     // Call service to stream; service will invoke onChunk for each partial piece
-    await sendMessageAndStreamResponse(conversationId, userId, content, async (chunk) => {
-      // Send SSE data event with chunk
-      res.write(`data: ${JSON.stringify({ type: "chunk", text: chunk })}\n\n`);
-    })
+    // Pass attachments to the service
+    await sendMessageAndStreamResponse(
+      conversationId,
+      userId,
+      content,
+      async (chunk) => {
+        // Send SSE data event with chunk
+        res.write(`data: ${JSON.stringify({ type: "chunk", text: chunk })}\n\n`);
+      },
+      attachments
+    )
       .then((result) => {
         // Send final event with complete result (userMessage, assistantMessage, conversation)
         const doneEvent = { type: "done", ...result };

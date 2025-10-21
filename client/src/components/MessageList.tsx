@@ -26,6 +26,8 @@ interface MessageListProps {
   // Follow-up suggestion handlers
   onRequestFollowups?: (messageId: string, content: string) => void;
   onFollowupClick?: (suggestion: string) => void;
+  // Pin toggle handler
+  onPinToggle?: (messageId: string, isPinned: boolean) => void;
 }
 
 /**
@@ -44,6 +46,7 @@ const MessageList: React.FC<MessageListProps> = ({
   highlightedMessageId,
   onRequestFollowups,
   onFollowupClick,
+  onPinToggle,
 }) => {
   // Merge pending messages with real messages and sort by timestamp
   const allMessages = React.useMemo(() => {
@@ -353,6 +356,7 @@ const MessageList: React.FC<MessageListProps> = ({
               onRetry={onRetry}
               onRequestFollowups={onRequestFollowups}
               onFollowupClick={onFollowupClick}
+              onPinToggle={onPinToggle}
             />
           </div>
         ))}

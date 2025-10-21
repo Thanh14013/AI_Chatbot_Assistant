@@ -3,6 +3,7 @@ import authRoutes from "./auth.route.js";
 import conversationRoutes from "./conversation.route.js";
 import searchRoutes from "./search.route.js";
 import userRoutes from "./user.route.js";
+import fileUploadRoutes from "./fileUpload.routes.js";
 import { getChatCompletion } from "../services/openai.service.js";
 import openai from "../services/openai.service.js";
 
@@ -19,6 +20,9 @@ router.use("/conversations", conversationRoutes);
 
 // Global search routes
 router.use("/search", searchRoutes);
+
+// File upload routes
+router.use("/files", fileUploadRoutes);
 
 // Health check route
 router.get("/health", (req, res) => {

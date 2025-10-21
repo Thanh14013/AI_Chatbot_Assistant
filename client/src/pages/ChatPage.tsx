@@ -14,8 +14,13 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import MessageList from "../components/MessageList";
 import ChatInput from "../components/ChatInput";
+import type { FileAttachment } from "../types/file.types";
 import { ConversationSearch } from "../components/ConversationSearch";
-import { SettingsModal, ProfileModal } from "../components";
+import {
+  SettingsModal,
+  ProfileModal,
+  PinnedMessagesDropdown,
+} from "../components";
 // ConversationForm not used anymore in new draft mode flow
 // import ConversationForm, {
 //   ConversationFormValues,
@@ -110,6 +115,9 @@ const ChatPage: React.FC = () => {
   const [messagesHasMore, setMessagesHasMore] = useState<boolean>(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+
+  // Pinned messages refresh trigger
+  const [pinnedRefreshTrigger, setPinnedRefreshTrigger] = useState(0);
 
   // Unread tracking state (multi-tab)
   const [unreadConversations, setUnreadConversations] = useState<Set<string>>(
@@ -478,7 +486,21 @@ const ChatPage: React.FC = () => {
 
     const handleMessageComplete = (event: CustomEvent) => {
       const { userMessage, assistantMessage, conversation } = event.detail;
-      if (userMessage.conversation_id !== currentConversation.id) return;
+
+      console.log("[ChatPage] message:complete received:", {
+        userMessageId: userMessage?.id,
+        assistantMessageId: assistantMessage?.id,
+        conversationId: userMessage?.conversation_id,
+        currentConvId: currentConversation?.id,
+        hasUserAttachments: !!userMessage?.attachments,
+      });
+
+      if (userMessage.conversation_id !== currentConversation.id) {
+        console.log(
+          "[ChatPage] Ignoring message:complete - different conversation"
+        );
+        return;
+      }
 
       // Replace streaming message with final messages
       setMessages((prev) => {
@@ -498,6 +520,12 @@ const ChatPage: React.FC = () => {
             m.role === "user" &&
             m.conversation_id === userMessage.conversation_id
           ) {
+            console.log(
+              "[ChatPage] Replacing optimistic message:",
+              m.id,
+              "with server message:",
+              userMessage.id
+            );
             replaced = true;
             // mark the server id as existing
             existingIds.add(userMessage.id);
@@ -508,12 +536,16 @@ const ChatPage: React.FC = () => {
 
         // If no optimistic user message found to replace, append the server userMessage
         if (!replaced && userMessage && !existingIds.has(userMessage.id)) {
+          console.log(
+            "[ChatPage] No optimistic message found, appending user message"
+          );
           replacedList.push(userMessage);
           existingIds.add(userMessage.id);
         }
 
         // Append assistant message if present and not duplicate
         if (assistantMessage && !existingIds.has(assistantMessage.id)) {
+          console.log("[ChatPage] Adding assistant message");
           replacedList.push(assistantMessage);
         }
 
@@ -569,11 +601,29 @@ const ChatPage: React.FC = () => {
     );
     const handleMessageNew = (event: CustomEvent) => {
       const { conversationId, message } = event.detail;
-      if (conversationId !== currentConversation?.id) return;
+
+      console.log("[ChatPage] message:new received:", {
+        messageId: message.id,
+        conversationId,
+        role: message.role,
+        hasAttachments: !!message.attachments,
+        currentConvId: currentConversation?.id,
+      });
+
+      if (conversationId !== currentConversation?.id) {
+        console.log("[ChatPage] Ignoring message:new - different conversation");
+        return;
+      }
 
       setMessages((prev) => {
         // Avoid duplicates: if message id already exists, don't add
-        if (prev.some((m) => m.id === message.id)) return prev;
+        if (prev.some((m) => m.id === message.id)) {
+          console.log(
+            "[ChatPage] Duplicate message ID detected, skipping:",
+            message.id
+          );
+          return prev;
+        }
 
         // If there's an optimistic pending user message with the same content,
         // don't append the server user message here. It will be reconciled
@@ -587,9 +637,15 @@ const ChatPage: React.FC = () => {
             String(m.content || "").trim() ===
               String(message.content || "").trim()
         );
-        if (hasMatchingPending) return prev;
+        if (hasMatchingPending) {
+          console.log(
+            "[ChatPage] Matching pending message found, skipping broadcast"
+          );
+          return prev;
+        }
 
         // Otherwise append normally
+        console.log("[ChatPage] Adding message from broadcast");
         return [...prev, message];
       });
     };
@@ -738,7 +794,10 @@ const ChatPage: React.FC = () => {
   /**
    * Handle sending a message
    */
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (
+    content: string,
+    attachments?: FileAttachment[]
+  ) => {
     // Prevent sending if already sending
     if (isSendingMessage || isSendingRealtimeMessage) return;
 
@@ -755,35 +814,27 @@ const ChatPage: React.FC = () => {
       setIsSendingMessage(true);
 
       try {
-        // Step 1: Generate title với timeout
+        // Step 1: Generate title - nếu <= 4 từ thì dùng message, nếu > 4 từ thì dùng "New Chat"
         const wordCount = content.trim().split(/\s+/).length;
         let title: string;
 
-        if (wordCount <= 4 || content.length <= 50) {
+        if (wordCount <= 4) {
+          // Message ngắn: dùng trực tiếp làm title
           title = content.trim();
-          // logging removed: using content as title (short)
+          console.log("[ChatPage] Using short message as title:", title);
         } else {
-          try {
-            // logging removed: generating smart title for long message
-            const titlePromise = apiGenerateTitle(content);
-            const timeoutPromise = new Promise<string>((resolve) =>
-              setTimeout(() => {
-                // logging removed: title generation timeout
-                resolve(content.trim().slice(0, 50) + "...");
-              }, 3000)
-            );
-            title = await Promise.race([titlePromise, timeoutPromise]);
-            // logging removed: generated title
-          } catch (err) {
-            // logging removed: title generation error
-            title = content.trim().slice(0, 50) + "...";
-          }
+          // Message dài: dùng "New Chat"
+          title = "New Chat";
+          console.log(
+            "[ChatPage] Message too long, using default title:",
+            title
+          );
         }
 
         // Validate title before creating conversation
         if (!title || title.trim().length === 0) {
-          // logging removed: invalid title, using fallback
           title = "New Chat";
+          console.log("[ChatPage] Invalid title, using fallback:", title);
         }
 
         // Step 2: Create conversation
@@ -829,6 +880,19 @@ const ChatPage: React.FC = () => {
           model: newConversation.model,
           createdAt: new Date().toISOString(),
           localStatus: "pending",
+          attachments: attachments?.map((att) => ({
+            id: att.id,
+            public_id: att.public_id,
+            secure_url: att.secure_url,
+            resource_type: att.resource_type,
+            format: att.format,
+            original_filename: att.original_filename,
+            size_bytes: att.size_bytes,
+            width: att.width,
+            height: att.height,
+            thumbnail_url: att.thumbnail_url,
+            extracted_text: att.extracted_text,
+          })),
         };
         setMessages([userMsg]);
 
@@ -856,7 +920,17 @@ const ChatPage: React.FC = () => {
 
             // Send directly via websocketService instead of hook
             // (hook may not have updated conversation prop yet)
-            websocketService.sendMessage(newConversation.id, content);
+            websocketService.sendMessage(
+              newConversation.id,
+              content,
+              attachments?.map((att) => ({
+                public_id: att.public_id,
+                secure_url: att.secure_url,
+                resource_type: att.resource_type,
+                format: att.format,
+                extracted_text: att.extracted_text,
+              }))
+            );
 
             // logging removed: WebSocket send initiated
 
@@ -999,7 +1073,15 @@ const ChatPage: React.FC = () => {
               );
               // Remove typing indicator
               setMessages((prev) => prev.filter((m) => m.id !== typingId));
-            }
+            },
+            // attachments
+            attachments?.map((att) => ({
+              public_id: att.public_id,
+              secure_url: att.secure_url,
+              resource_type: att.resource_type,
+              format: att.format,
+              extracted_text: att.extracted_text,
+            }))
           );
         } catch (err) {
           antdMessage.error("Failed to send message");
@@ -1038,6 +1120,19 @@ const ChatPage: React.FC = () => {
         createdAt: new Date().toISOString(),
         localStatus: "sending",
         retryCount: 0,
+        attachments: attachments?.map((att) => ({
+          id: att.id,
+          public_id: att.public_id,
+          secure_url: att.secure_url,
+          resource_type: att.resource_type,
+          format: att.format,
+          original_filename: att.original_filename,
+          size_bytes: att.size_bytes,
+          width: att.width,
+          height: att.height,
+          thumbnail_url: att.thumbnail_url,
+          extracted_text: att.extracted_text,
+        })),
       };
       setMessages((prev) => [...prev, userMsg]);
 
@@ -1056,7 +1151,17 @@ const ChatPage: React.FC = () => {
           )
         );
 
-        await sendRealtimeMessage(content);
+        // Send with attachments
+        await sendRealtimeMessage(
+          content,
+          attachments?.map((att) => ({
+            public_id: att.public_id,
+            secure_url: att.secure_url,
+            resource_type: att.resource_type,
+            format: att.format,
+            extracted_text: att.extracted_text,
+          }))
+        );
 
         // Mark as sent on success
         setMessages((prev) =>
@@ -1125,6 +1230,19 @@ const ChatPage: React.FC = () => {
       model: currentConversation.model,
       createdAt: new Date().toISOString(),
       localStatus: "pending",
+      attachments: attachments?.map((att) => ({
+        id: att.id,
+        public_id: att.public_id,
+        secure_url: att.secure_url,
+        resource_type: att.resource_type,
+        format: att.format,
+        original_filename: att.original_filename,
+        size_bytes: att.size_bytes,
+        width: att.width,
+        height: att.height,
+        thumbnail_url: att.thumbnail_url,
+        extracted_text: att.extracted_text,
+      })),
     };
 
     setMessages((prev) => [...prev, userMsg]);
@@ -1264,12 +1382,22 @@ const ChatPage: React.FC = () => {
     conversation: Conversation,
     content: string,
     tempId: string,
-    userMsg: Message
+    userMsg: Message,
+    attachments?: FileAttachment[]
   ) => {
     // Try WebSocket first
     if (isConnected) {
       try {
-        await sendRealtimeMessage(content);
+        await sendRealtimeMessage(
+          content,
+          attachments?.map((att) => ({
+            public_id: att.public_id,
+            secure_url: att.secure_url,
+            resource_type: att.resource_type,
+            format: att.format,
+            extracted_text: att.extracted_text,
+          }))
+        );
         moveConversationToTop(conversation.id);
         await refreshConversations();
         return true;
@@ -1375,7 +1503,8 @@ const ChatPage: React.FC = () => {
         // Send via WebSocket
         websocketService.sendMessage(
           currentConversation.id,
-          failedMessage.content
+          failedMessage.content,
+          undefined // No attachments on retry (already uploaded previously)
         );
 
         // Success message will be handled by WebSocket event listeners
@@ -1721,6 +1850,98 @@ const ChatPage: React.FC = () => {
     });
   }, []);
 
+  /**
+   * Handle pin toggle from MessageBubble
+   */
+  const handlePinToggle = (messageId: string, isPinned: boolean) => {
+    console.log(`[ChatPage] Pin toggle: ${messageId}, isPinned: ${isPinned}`);
+
+    // Update local state
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId ? { ...msg, pinned: isPinned } : msg
+      )
+    );
+
+    // Trigger dropdown refresh
+    setPinnedRefreshTrigger((prev) => prev + 1);
+  };
+
+  // Listen for pin/unpin events from websocket (real-time sync)
+  useEffect(() => {
+    const handleMessagePinned = (event: CustomEvent) => {
+      const { conversationId: eventConvId, messageId, message } = event.detail;
+
+      console.log(
+        `[ChatPage] Message pinned event: convId=${eventConvId}, msgId=${messageId}`
+      );
+
+      // Only update if it's for the current conversation
+      if (eventConvId === currentConversation?.id) {
+        setMessages((prev) => {
+          // If message is provided, update it; otherwise just set pinned flag
+          if (message) {
+            const exists = prev.some((msg) => msg.id === messageId);
+            if (exists) {
+              return prev.map((msg) =>
+                msg.id === messageId ? { ...msg, pinned: true } : msg
+              );
+            }
+            // Message not in list, optionally add it
+            return prev;
+          } else {
+            return prev.map((msg) =>
+              msg.id === messageId ? { ...msg, pinned: true } : msg
+            );
+          }
+        });
+
+        // Trigger dropdown refresh
+        setPinnedRefreshTrigger((prev) => prev + 1);
+      }
+    };
+
+    const handleMessageUnpinned = (event: CustomEvent) => {
+      const { conversationId: eventConvId, messageId } = event.detail;
+
+      console.log(
+        `[ChatPage] Message unpinned event: convId=${eventConvId}, msgId=${messageId}`
+      );
+
+      // Only update if it's for the current conversation
+      if (eventConvId === currentConversation?.id) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === messageId ? { ...msg, pinned: false } : msg
+          )
+        );
+
+        // Trigger dropdown refresh
+        setPinnedRefreshTrigger((prev) => prev + 1);
+      }
+    };
+
+    window.addEventListener(
+      "message:pinned",
+      handleMessagePinned as EventListener
+    );
+    window.addEventListener(
+      "message:unpinned",
+      handleMessageUnpinned as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "message:pinned",
+        handleMessagePinned as EventListener
+      );
+      window.removeEventListener(
+        "message:unpinned",
+        handleMessageUnpinned as EventListener
+      );
+    };
+  }, [currentConversation?.id]);
+
   return (
     <Layout className={styles.chatPageLayout}>
       <Layout className={styles.mainLayout}>
@@ -1761,11 +1982,13 @@ const ChatPage: React.FC = () => {
                 highlightedMessageId={highlightedMessageId}
                 onRequestFollowups={handleRequestFollowups}
                 onFollowupClick={handleFollowupClick}
+                onPinToggle={handlePinToggle}
               />
 
               {/* Chat input for new conversation */}
               <ChatInput
                 onSendMessage={handleSendMessage}
+                conversationId={undefined}
                 disabled={isSendingMessage}
                 placeholder="Type your message to start a new conversation..."
                 onTypingStart={() => isConnected && startTyping()}
@@ -1810,6 +2033,12 @@ const ChatPage: React.FC = () => {
                     conversationId={currentConversation.id}
                     onResultClick={handleSearchResultClick}
                   />
+                  {/* Pinned Messages Dropdown */}
+                  <PinnedMessagesDropdown
+                    conversationId={currentConversation.id}
+                    onMessageClick={handleSearchResultClick}
+                    refreshTrigger={pinnedRefreshTrigger}
+                  />
                 </div>
               </div>
 
@@ -1825,11 +2054,13 @@ const ChatPage: React.FC = () => {
                 highlightedMessageId={highlightedMessageId}
                 onRequestFollowups={handleRequestFollowups}
                 onFollowupClick={handleFollowupClick}
+                onPinToggle={handlePinToggle}
               />
 
               {/* Chat input - disable while AI is typing to mirror sender tab behaviour */}
               <ChatInput
                 onSendMessage={handleSendMessage}
+                conversationId={currentConversation.id}
                 disabled={
                   isAITyping || isSendingMessage || isSendingRealtimeMessage
                 }

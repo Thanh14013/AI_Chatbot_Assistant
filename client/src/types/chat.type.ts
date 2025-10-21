@@ -14,7 +14,22 @@ export interface Message {
   content: string;
   tokens_used: number;
   model: string;
+  pinned?: boolean; // Whether the message is pinned (optional for client-side messages)
   createdAt: string | Date;
+  // File attachments linked to this message
+  attachments?: Array<{
+    id?: number;
+    public_id: string;
+    secure_url: string;
+    resource_type: "image" | "video" | "raw";
+    format?: string;
+    original_filename?: string;
+    size_bytes?: number;
+    width?: number;
+    height?: number;
+    thumbnail_url?: string;
+    extracted_text?: string;
+  }>;
   // Optional client-only fields used by the UI (not persisted to server)
   // localStatus: status for optimistic / retry flows
   localStatus?: "pending" | "failed" | "sent" | "sending";

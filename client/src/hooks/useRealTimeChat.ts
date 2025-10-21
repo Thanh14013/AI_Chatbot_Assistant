@@ -21,7 +21,16 @@ interface UseRealTimeChatOptions {
 interface UseRealTimeChatReturn {
   isConnected: boolean;
   isAITyping: boolean;
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (
+    content: string,
+    attachments?: Array<{
+      public_id: string;
+      secure_url: string;
+      resource_type: string;
+      format?: string;
+      extracted_text?: string;
+    }>
+  ) => Promise<void>;
   isSending: boolean;
   startTyping: () => void;
   stopTyping: () => void;
@@ -228,13 +237,29 @@ export const useRealTimeChat = (
 
   // Send message function using WebSocket
   const sendMessage = useCallback(
-    async (content: string): Promise<void> => {
+    async (
+      content: string,
+      attachments?: Array<{
+        public_id: string;
+        secure_url: string;
+        resource_type: string;
+        format?: string;
+        extracted_text?: string;
+      }>
+    ): Promise<void> => {
       if (!conversation || !websocket.isConnected || isSending) {
         antdMessage.warning(
           "Cannot send message. Please check your connection."
         );
         return;
       }
+
+      console.log("[useRealTimeChat] Sending message with attachments:", {
+        conversationId: conversation.id,
+        contentLength: content.length,
+        hasAttachments: !!attachments?.length,
+        attachmentsCount: attachments?.length || 0,
+      });
 
       try {
         setIsSending(true);
@@ -262,21 +287,10 @@ export const useRealTimeChat = (
           pendingClearTimeoutRef.current = null;
         }, 8000) as unknown as number;
 
-        // Send via WebSocket including messageId
-        // prefer explicit API that accepts messageId
-        const wsWithId = websocket as unknown as {
-          sendMessageWithId?: (
-            conversationId: string,
-            content: string,
-            messageId?: string
-          ) => void;
-        };
-        if (wsWithId.sendMessageWithId) {
-          wsWithId.sendMessageWithId(conversation.id, content, messageId);
-        } else {
-          // fallback for older implementations
-          websocket.sendMessage(conversation.id, content);
-        }
+        // Send via WebSocket with attachments
+        websocket.sendMessage(conversation.id, content, attachments);
+
+        console.log("[useRealTimeChat] Message sent via WebSocket");
 
         // Dispatch event for optimistic UI update
         window.dispatchEvent(
@@ -285,11 +299,12 @@ export const useRealTimeChat = (
               conversationId: conversation.id,
               content,
               messageId: pendingMessageIdRef.current,
+              attachments,
             },
           })
         );
       } catch (error) {
-        // error logging removed
+        console.error("[useRealTimeChat] Failed to send message:", error);
         setIsSending(false);
         setIsAITyping(false);
         antdMessage.error("Failed to send message. Please try again.");

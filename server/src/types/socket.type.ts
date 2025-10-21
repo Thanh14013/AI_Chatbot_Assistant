@@ -100,6 +100,9 @@ export interface ServerToClientEvents {
   "message:complete": (data: MessageCompleteData) => void;
   // New message notification (for other sockets to render immediate UX)
   "message:new": (data: { conversationId: string; message: any; messageId?: string }) => void;
+  // Pin/unpin events (for real-time sync across tabs)
+  "message:pinned": (data: { conversationId: string; messageId: string; message?: any }) => void;
+  "message:unpinned": (data: { conversationId: string; messageId: string }) => void;
 
   // Conversation events
   "conversation:joined": (data: { conversationId: string }) => void;

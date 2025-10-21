@@ -34,6 +34,17 @@ interface ServerToClientEvents {
   // Notification for a newly created/sent message (other sockets should render it)
   "message:new": (data: { conversationId: string; message: Message }) => void;
 
+  // Message pin events (multi-tab sync)
+  "message:pinned": (data: {
+    conversationId: string;
+    messageId: string;
+    message?: Message;
+  }) => void;
+  "message:unpinned": (data: {
+    conversationId: string;
+    messageId: string;
+  }) => void;
+
   // Typing events
   "ai:typing:start": (data: { conversationId: string }) => void;
   "ai:typing:stop": (data: { conversationId: string }) => void;
@@ -87,6 +98,13 @@ interface ClientToServerEvents {
     conversationId: string;
     content: string;
     messageId?: string;
+    attachments?: Array<{
+      public_id: string;
+      secure_url: string;
+      resource_type: string;
+      format?: string;
+      extracted_text?: string;
+    }>;
   }) => void;
 
   // Typing events
@@ -150,6 +168,16 @@ export interface WebSocketEventHandlers {
   onConversationDeleted?: (data: { conversationId: string }) => void;
   // New message notification handler (other sockets sending)
   onMessageNew?: (data: { conversationId: string; message: Message }) => void;
+  // Message pin handlers (multi-tab sync)
+  onMessagePinned?: (data: {
+    conversationId: string;
+    messageId: string;
+    message?: Message;
+  }) => void;
+  onMessageUnpinned?: (data: {
+    conversationId: string;
+    messageId: string;
+  }) => void;
   // New conversation activity handler (for conversation list refresh)
   onConversationActivity?: (data: {
     conversationId: string;
@@ -354,6 +382,43 @@ class WebSocketService {
         }
       });
 
+      // Message pin/unpin events (multi-tab sync)
+      this.socket.on("message:pinned", (data) => {
+        try {
+          console.log(
+            `[WebSocket] Message pinned event received: ${data.messageId}`
+          );
+          this.handlers.onMessagePinned?.(data);
+        } catch {
+          // logging removed
+        }
+        try {
+          window.dispatchEvent(
+            new CustomEvent("message:pinned", { detail: data })
+          );
+        } catch {
+          // logging removed
+        }
+      });
+
+      this.socket.on("message:unpinned", (data) => {
+        try {
+          console.log(
+            `[WebSocket] Message unpinned event received: ${data.messageId}`
+          );
+          this.handlers.onMessageUnpinned?.(data);
+        } catch {
+          // logging removed
+        }
+        try {
+          window.dispatchEvent(
+            new CustomEvent("message:unpinned", { detail: data })
+          );
+        } catch {
+          // logging removed
+        }
+      });
+
       // Conversation activity notification (for refreshing conversation list)
       this.socket.on("conversation:activity", (data) => {
         try {
@@ -462,7 +527,17 @@ class WebSocketService {
   /**
    * Send a message through WebSocket
    */
-  sendMessage(conversationId: string, content: string): void {
+  sendMessage(
+    conversationId: string,
+    content: string,
+    attachments?: Array<{
+      public_id: string;
+      secure_url: string;
+      resource_type: string;
+      format?: string;
+      extracted_text?: string;
+    }>
+  ): void {
     if (!this.socket?.connected) {
       const error = new Error("WebSocket not connected") as Error & {
         code?: string;
@@ -472,7 +547,11 @@ class WebSocketService {
     }
 
     try {
-      this.socket.emit("message:send", { conversationId, content });
+      this.socket.emit("message:send", {
+        conversationId,
+        content,
+        attachments,
+      });
     } catch (error) {
       const err = new Error("Failed to send message via WebSocket") as Error & {
         code?: string;

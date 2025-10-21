@@ -58,7 +58,13 @@ export async function testOpenAIConnection() {
 export interface ChatCompletionParams {
   messages: Array<{
     role: "system" | "user" | "assistant";
-    content: string;
+    content:
+      | string
+      | Array<{
+          type: "text" | "image_url";
+          text?: string;
+          image_url?: { url: string };
+        }>;
   }>;
   model?: string; // Default: "gpt-5-nano"
   temperature?: number; // Default: 0.7
@@ -202,7 +208,16 @@ export async function getChatCompletion(
  * @returns Promise with complete AI response
  */
 async function handleStreamingResponse(params: {
-  messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+  messages: Array<{
+    role: "system" | "user" | "assistant";
+    content:
+      | string
+      | Array<{
+          type: "text" | "image_url";
+          text?: string;
+          image_url?: { url: string };
+        }>;
+  }>;
   model: string;
   temperature: number;
   max_completion_tokens: number;
@@ -356,6 +371,147 @@ export function getRecentMessages<T>(allMessages: T[], count: number): T[] {
     return allMessages;
   }
   return allMessages.slice(-count);
+}
+
+/**
+ * Build message content with attachments for OpenAI multimodal API
+ * Supports images (vision) and document text content
+ *
+ * @param textContent - The text message content
+ * @param attachments - Array of file attachments
+ * @returns Message content formatted for OpenAI API
+ */
+export function buildMessageContentWithAttachments(
+  textContent: string,
+  attachments?: Array<{
+    secure_url: string;
+    resource_type: string;
+    extracted_text?: string;
+    format?: string;
+  }>
+): string | Array<{ type: "text" | "image_url"; text?: string; image_url?: { url: string } }> {
+  // If no attachments, return simple text
+  if (!attachments || attachments.length === 0) {
+    return textContent;
+  }
+
+  console.log("[OpenAI] Building message content with attachments:", {
+    count: attachments.length,
+    types: attachments.map((a) => a.resource_type),
+    hasText: attachments.some((a) => !!a.extracted_text),
+  });
+
+  // Check if any attachment is an image (requires vision API)
+  const hasImages = attachments.some((att) => att.resource_type === "image");
+
+  if (hasImages) {
+    // Build multimodal content array for vision API
+    const content: Array<{
+      type: "text" | "image_url";
+      text?: string;
+      image_url?: { url: string };
+    }> = [];
+
+    // Add text content first with file context
+    let mainText = textContent || "Please analyze the attached files.";
+
+    // Add file URLs as context for non-image files
+    const nonImageFiles = attachments.filter((att) => att.resource_type !== "image");
+    if (nonImageFiles.length > 0) {
+      mainText += "\n\n📎 Attached Files:\n";
+      nonImageFiles.forEach((att, idx) => {
+        const fileType = att.format?.toUpperCase() || att.resource_type.toUpperCase();
+        mainText += `${idx + 1}. [${fileType} File] - Access via URL: ${att.secure_url}\n`;
+      });
+      mainText += "\nYou can reference these file URLs in your response if needed.";
+    }
+
+    content.push({
+      type: "text",
+      text: mainText,
+    });
+
+    // Add images with context
+    const imageAttachments = attachments.filter((att) => att.resource_type === "image");
+    imageAttachments.forEach((att, idx) => {
+      content.push({
+        type: "image_url",
+        image_url: {
+          url: att.secure_url,
+        },
+      });
+      console.log(`[OpenAI] Added image ${idx + 1} for vision analysis:`, att.secure_url);
+    });
+
+    // Add extracted text from documents
+    attachments.forEach((att) => {
+      if (att.resource_type === "raw" && att.extracted_text) {
+        content.push({
+          type: "text",
+          text: `\n\n--- ${att.format?.toUpperCase()} Document Content (extracted) ---\n${att.extracted_text}\n--- End of ${att.format?.toUpperCase()} ---`,
+        });
+        console.log("[OpenAI] Added extracted text from document:", {
+          format: att.format,
+          textLength: att.extracted_text.length,
+        });
+      }
+    });
+
+    console.log("[OpenAI] Built multimodal content array:", {
+      totalItems: content.length,
+      textItems: content.filter((c) => c.type === "text").length,
+      imageItems: content.filter((c) => c.type === "image_url").length,
+      structure: content.map((c) => c.type),
+    });
+
+    return content;
+  } else {
+    // No images, just append document text and URLs to message
+    let fullContent = textContent || "Please analyze the attached files.";
+
+    // Add file URLs
+    fullContent += "\n\n📎 Attached Files:\n";
+    attachments.forEach((att, idx) => {
+      const fileType = att.format?.toUpperCase() || att.resource_type.toUpperCase();
+      fullContent += `${idx + 1}. [${fileType} File] - URL: ${att.secure_url}\n`;
+    });
+
+    // Add extracted text if available
+    attachments.forEach((att) => {
+      if (att.extracted_text) {
+        fullContent += `\n\n--- ${att.format?.toUpperCase()} Document Content (extracted) ---\n${att.extracted_text}\n--- End of ${att.format?.toUpperCase()} ---`;
+        console.log("[OpenAI] Added extracted text from document:", {
+          format: att.format,
+          textLength: att.extracted_text.length,
+        });
+      }
+    });
+
+    fullContent +=
+      "\n\nYou can reference these file URLs in your response if the user needs to access them.";
+
+    console.log("[OpenAI] Built text-only content with attachments:", {
+      totalLength: fullContent.length,
+      hasExtractedText: attachments.some((a) => !!a.extracted_text),
+    });
+
+    return fullContent;
+  }
+}
+
+/**
+ * Determine the appropriate OpenAI model based on message content
+ * Uses vision model if images are present, otherwise uses default
+ *
+ * @param hasImages - Whether the message contains images
+ * @returns Model name to use
+ */
+export function selectModelForContent(hasImages: boolean): string {
+  if (hasImages) {
+    // Use GPT-4 Vision for image analysis
+    return "gpt-4o"; // or 'gpt-4-vision-preview'
+  }
+  return "gpt-5-nano"; // Default model
 }
 
 export default openai;

@@ -169,7 +169,14 @@ export const sendMessageStream = async (
   content: string,
   onChunk: (text: string) => void,
   onDone: (assistantMessage: Message | Record<string, unknown>) => void,
-  onError?: (err: unknown) => void
+  onError?: (err: unknown) => void,
+  attachments?: Array<{
+    public_id: string;
+    secure_url: string;
+    resource_type: string;
+    format?: string;
+    extracted_text?: string;
+  }>
 ): Promise<{ abort: () => void }> => {
   const controller = new AbortController();
 
@@ -199,7 +206,7 @@ export const sendMessageStream = async (
       fetch(url, {
         method: "POST",
         headers,
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, attachments }),
         signal: controller.signal,
         credentials: "include", // Include cookies for potential refresh token
       });
@@ -364,6 +371,43 @@ export const getPopularTags = async (): Promise<PopularTag[]> => {
   return resp.data.data.tags as PopularTag[];
 };
 
+/**
+ * Pin a message
+ * @param messageId - ID of the message to pin
+ */
+export const pinMessage = async (messageId: string): Promise<void> => {
+  console.log(`[Chat Service] Pinning message: ${messageId}`);
+  await axiosInstance.patch(`/conversations/messages/${messageId}/pin`);
+  console.log(`[Chat Service] Message pinned successfully: ${messageId}`);
+};
+
+/**
+ * Unpin a message
+ * @param messageId - ID of the message to unpin
+ */
+export const unpinMessage = async (messageId: string): Promise<void> => {
+  console.log(`[Chat Service] Unpinning message: ${messageId}`);
+  await axiosInstance.patch(`/conversations/messages/${messageId}/unpin`);
+  console.log(`[Chat Service] Message unpinned successfully: ${messageId}`);
+};
+
+/**
+ * Get all pinned messages for a conversation
+ * @param conversationId - ID of the conversation
+ */
+export const getPinnedMessages = async (
+  conversationId: string
+): Promise<Message[]> => {
+  console.log(
+    `[Chat Service] Fetching pinned messages for conversation: ${conversationId}`
+  );
+  const resp = await axiosInstance.get(
+    `/conversations/${conversationId}/messages/pinned`
+  );
+  console.log(`[Chat Service] Found ${resp.data.count} pinned messages`);
+  return resp.data.messages as Message[];
+};
+
 export default {
   createConversation,
   getConversations,
@@ -371,4 +415,7 @@ export default {
   getMessages,
   updateConversation,
   deleteConversation,
+  pinMessage,
+  unpinMessage,
+  getPinnedMessages,
 };

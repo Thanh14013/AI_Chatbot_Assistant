@@ -335,16 +335,35 @@ export const initializeSocketIO = (
     // Handle message sending with streaming AI response
     socket.on("message:send", async (data) => {
       try {
-        const { conversationId, content, messageId } = data as {
+        const { conversationId, content, messageId, attachments } = data as {
           conversationId: string;
           content: string;
           messageId?: string;
+          attachments?: Array<{
+            public_id: string;
+            secure_url: string;
+            resource_type: string;
+            format?: string;
+            extracted_text?: string;
+          }>;
         };
 
         if (!conversationId || !content) {
           socket.emit("error", { message: "Conversation ID and content are required" });
           return;
         }
+
+        console.log("[Socket] message:send received:", {
+          conversationId,
+          contentLength: content.length,
+          hasAttachments: !!attachments,
+          attachmentsCount: attachments?.length || 0,
+          attachmentsData: attachments?.map((att) => ({
+            public_id: att.public_id,
+            resource_type: att.resource_type,
+            secure_url: att.secure_url?.substring(0, 50) + "...",
+          })),
+        });
 
         // incoming message received
 
@@ -373,12 +392,21 @@ export const initializeSocketIO = (
           // onUserMessageCreated - broadcast the persisted user message immediately so other tabs see it
           (userMessage) => {
             try {
+              console.log("[Socket] Broadcasting user message:", {
+                messageId: userMessage.id,
+                conversationId,
+                senderSocketId: socket.id,
+                userId: socket.userId,
+              });
+
               // Broadcast user message to other participants in the conversation (exclude sender socket)
               socket.to(`conversation:${conversationId}`).emit("message:new", {
                 conversationId,
                 message: userMessage,
                 messageId,
               });
+
+              console.log("[Socket] Broadcasted to room (excluding sender)");
 
               // Also notify other sockets of the same user that are NOT in the conversation room.
               // This avoids sending the same message twice to sockets that are already in the conversation room
@@ -389,13 +417,28 @@ export const initializeSocketIO = (
 
                 // getUserSockets is available in this module and returns all socket ids for the user
                 const userSocketIds = getUserSockets(socket.userId!);
+
+                console.log("[Socket] User's all sockets:", {
+                  userId: socket.userId,
+                  allSocketIds: userSocketIds,
+                  roomSocketIds: Array.from(roomSockets),
+                  senderSocketId: socket.id,
+                });
+
                 for (const sid of userSocketIds) {
                   // skip sender socket and any sockets already in the conversation room
-                  if (sid === socket.id) continue;
-                  if (roomSockets.has(sid)) continue;
+                  if (sid === socket.id) {
+                    console.log("[Socket] Skipping sender socket:", sid);
+                    continue;
+                  }
+                  if (roomSockets.has(sid)) {
+                    console.log("[Socket] Skipping socket already in room:", sid);
+                    continue;
+                  }
 
                   const target = io.sockets.sockets.get(sid);
                   if (target) {
+                    console.log("[Socket] Sending to user's other socket (not in room):", sid);
                     (target as any).emit("message:new", {
                       conversationId,
                       message: userMessage,
@@ -403,6 +446,7 @@ export const initializeSocketIO = (
                   }
                 }
               } catch (e) {
+                console.error("[Socket] Error notifying other user sockets:", e);
                 // ignore per-socket notify failures
               }
 
@@ -441,7 +485,8 @@ export const initializeSocketIO = (
             } catch (err) {
               // ignore
             }
-          }
+          },
+          attachments // Pass attachments as the last parameter
         );
 
         // Stop typing indicator for ALL users in conversation room (including sender) for sync
