@@ -464,10 +464,24 @@ class WebSocketService {
    */
   sendMessage(conversationId: string, content: string): void {
     if (!this.socket?.connected) {
-      throw new Error("WebSocket not connected");
+      const error = new Error("WebSocket not connected") as Error & {
+        code?: string;
+      };
+      error.code = "WEBSOCKET_DISCONNECTED";
+      throw error;
     }
 
-    this.socket.emit("message:send", { conversationId, content });
+    try {
+      this.socket.emit("message:send", { conversationId, content });
+    } catch (error) {
+      const err = new Error("Failed to send message via WebSocket") as Error & {
+        code?: string;
+        originalError?: unknown;
+      };
+      err.code = "WEBSOCKET_SEND_ERROR";
+      err.originalError = error;
+      throw err;
+    }
   }
 
   sendMessageWithId(
@@ -476,9 +490,24 @@ class WebSocketService {
     messageId?: string
   ): void {
     if (!this.socket?.connected) {
-      throw new Error("WebSocket not connected");
+      const error = new Error("WebSocket not connected") as Error & {
+        code?: string;
+      };
+      error.code = "WEBSOCKET_DISCONNECTED";
+      throw error;
     }
-    this.socket.emit("message:send", { conversationId, content, messageId });
+
+    try {
+      this.socket.emit("message:send", { conversationId, content, messageId });
+    } catch (error) {
+      const err = new Error("Failed to send message via WebSocket") as Error & {
+        code?: string;
+        originalError?: unknown;
+      };
+      err.code = "WEBSOCKET_SEND_ERROR";
+      err.originalError = error;
+      throw err;
+    }
   }
 
   /**

@@ -57,6 +57,9 @@ const ChatPage: React.FC = () => {
   // Search state
   const [searchQuery, setSearchQuery] = useState<string>("");
 
+  // Network status
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
   // Ref to store message DOM elements for scroll-to functionality
   const messageRefs = useRef<Map<string, HTMLElement>>(new Map());
   const [highlightedMessageId, setHighlightedMessageId] = useState<
@@ -256,6 +259,43 @@ const ChatPage: React.FC = () => {
   useEffect(() => {
     fetchPreferences().catch((err) => {});
   }, [fetchPreferences]);
+
+  // Network connectivity monitoring
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      antdMessage.success("Connection restored. You can now send messages.");
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      antdMessage.warning(
+        "Connection lost. Messages will be queued and sent when online."
+      );
+
+      // Mark all pending/sending messages as failed when going offline
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.localStatus === "pending" || msg.localStatus === "sending"
+            ? {
+                ...msg,
+                localStatus: "failed",
+                errorMessage: "Connection lost. Click retry when online.",
+                lastAttemptAt: new Date().toISOString(),
+              }
+            : msg
+        )
+      );
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [antdMessage]);
 
   useEffect(() => {
     const id = params.id;
@@ -701,6 +741,14 @@ const ChatPage: React.FC = () => {
     // Prevent sending if already sending
     if (isSendingMessage || isSendingRealtimeMessage) return;
 
+    // Check if offline
+    if (!isOnline) {
+      antdMessage.warning(
+        "You are offline. Please check your connection and try again."
+      );
+      return;
+    }
+
     // ============ NEW CONVERSATION FLOW ============
     if (!currentConversation) {
       setIsSendingMessage(true);
@@ -977,30 +1025,42 @@ const ChatPage: React.FC = () => {
     }
 
     // ============ EXISTING CONVERSATION FLOW ============
-    // (Giữ nguyên code cũ cho phần này)
     if (isConnected) {
-      try {
-        const tempId = `temp_${Date.now()}`;
-        const userMsg: Message = {
-          id: tempId,
-          conversation_id: currentConversation.id,
-          role: "user",
-          content,
-          tokens_used: 0,
-          model: currentConversation.model,
-          createdAt: new Date().toISOString(),
-          localStatus: "pending",
-        };
-        setMessages((prev) => [...prev, userMsg]);
+      const tempId = `temp_${Date.now()}`;
+      const userMsg: Message = {
+        id: tempId,
+        conversation_id: currentConversation.id,
+        role: "user",
+        content,
+        tokens_used: 0,
+        model: currentConversation.model,
+        createdAt: new Date().toISOString(),
+        localStatus: "sending",
+        retryCount: 0,
+      };
+      setMessages((prev) => [...prev, userMsg]);
 
-        try {
-          setTimeout(
-            () => window.dispatchEvent(new Event("messages:scrollToBottom")),
-            40
-          );
-        } catch {}
+      try {
+        setTimeout(
+          () => window.dispatchEvent(new Event("messages:scrollToBottom")),
+          40
+        );
+      } catch {}
+
+      try {
+        // Mark as pending while sending
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === tempId ? { ...m, localStatus: "pending" } : m
+          )
+        );
 
         await sendRealtimeMessage(content);
+
+        // Mark as sent on success
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? { ...m, localStatus: "sent" } : m))
+        );
 
         try {
           moveConversationToTop(currentConversation.id);
@@ -1013,12 +1073,28 @@ const ChatPage: React.FC = () => {
         } catch {}
 
         return;
-      } catch (err) {
+      } catch (err: unknown) {
+        const error = err as Error & { code?: string };
+        const errorMsg =
+          error.code === "WEBSOCKET_DISCONNECTED"
+            ? "Connection lost. Message will be retried."
+            : error.message || "Failed to send message";
+
+        // Mark message as failed with error details
         setMessages((prev) =>
-          prev.filter(
-            (msg) => !msg.localStatus || msg.localStatus !== "pending"
+          prev.map((m) =>
+            m.id === tempId
+              ? {
+                  ...m,
+                  localStatus: "failed",
+                  errorMessage: errorMsg,
+                  lastAttemptAt: new Date().toISOString(),
+                }
+              : m
           )
         );
+
+        // Remove typing indicators
         setMessages((prev) => prev.filter((msg) => !msg.isTyping));
 
         try {
@@ -1028,6 +1104,12 @@ const ChatPage: React.FC = () => {
             })
           );
         } catch {}
+
+        antdMessage.error(
+          `Failed to send message: ${errorMsg}. Click retry to try again.`
+        );
+
+        // Don't return - continue to HTTP fallback
       }
     }
 
@@ -1241,18 +1323,86 @@ const ChatPage: React.FC = () => {
     }
   };
 
-  // Retry handler for failed messages
+  // Retry handler for failed messages with exponential backoff
   const handleRetryMessage = async (
     failedMessage: Message | PendingMessage
   ): Promise<void> => {
     if (!currentConversation) return;
-    // mark pending
+
+    const retryCount = (failedMessage as Message).retryCount || 0;
+    const maxRetries = 3;
+
+    // Check if max retries reached
+    if (retryCount >= maxRetries) {
+      antdMessage.error(`Maximum retry attempts (${maxRetries}) reached`);
+      return;
+    }
+
+    // Calculate exponential backoff delay: 1s, 2s, 4s
+    const backoffDelay = Math.pow(2, retryCount) * 1000;
+
+    // Mark as sending (show loading state)
     setMessages((prev) =>
       prev.map((m) =>
-        m.id === failedMessage.id ? { ...m, localStatus: "pending" } : m
+        m.id === failedMessage.id
+          ? {
+              ...m,
+              localStatus: "sending",
+              retryCount: retryCount + 1,
+              lastAttemptAt: new Date().toISOString(),
+            }
+          : m
       )
     );
-    // add typing placeholder
+
+    // Wait for backoff delay
+    if (retryCount > 0) {
+      antdMessage.info(`Retrying in ${backoffDelay / 1000} seconds...`);
+      await new Promise((resolve) => setTimeout(resolve, backoffDelay));
+    }
+
+    // Try WebSocket first if connected
+    if (isConnected) {
+      try {
+        // Mark as pending for WebSocket attempt
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === failedMessage.id ? { ...m, localStatus: "pending" } : m
+          )
+        );
+
+        // Send via WebSocket
+        websocketService.sendMessage(
+          currentConversation.id,
+          failedMessage.content
+        );
+
+        // Success message will be handled by WebSocket event listeners
+        antdMessage.success("Message sent successfully");
+        return;
+      } catch (error: unknown) {
+        const err = error as Error & { code?: string };
+        // WebSocket failed, fallback to HTTP
+        antdMessage.warning("WebSocket failed, trying HTTP...");
+
+        // Mark with error for potential retry
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === failedMessage.id
+              ? {
+                  ...m,
+                  errorMessage:
+                    err.code === "WEBSOCKET_DISCONNECTED"
+                      ? "Connection lost"
+                      : "Failed to send",
+                }
+              : m
+          )
+        );
+      }
+    }
+
+    // HTTP fallback
     const typingId = `typing_retry_${Date.now()}`;
     const typingMsg: Message = {
       id: typingId,
@@ -1282,45 +1432,54 @@ const ChatPage: React.FC = () => {
             )
           );
         },
-        (result: any) => {
-          const userMsg = result?.userMessage;
-          const assistantMsg = result?.assistantMessage;
+        (result: unknown) => {
+          const res = result as {
+            userMessage?: Message;
+            assistantMessage?: Message;
+            conversation?: {
+              total_tokens_used: number;
+              message_count: number;
+            };
+          };
+          const userMsg = res?.userMessage;
+          const assistantMsg = res?.assistantMessage;
 
           setMessages((prev) => {
             const withoutTyping = prev.filter((m) => m.id !== typingId);
             const replaced = withoutTyping.map((m) =>
-              m.id === failedMessage.id && userMsg ? userMsg : m
+              m.id === failedMessage.id && userMsg
+                ? { ...userMsg, localStatus: "sent" as const }
+                : m
             );
             if (assistantMsg) return [...replaced, assistantMsg];
             return replaced;
           });
 
-          if (result?.conversation) {
+          if (res?.conversation) {
             setCurrentConversation((prev) =>
-              prev
+              prev && res.conversation
                 ? {
                     ...prev,
-                    total_tokens_used: result.conversation.total_tokens_used,
-                    message_count: result.conversation.message_count,
+                    total_tokens_used: res.conversation.total_tokens_used,
+                    message_count: res.conversation.message_count,
                   }
                 : prev
             );
 
-            // Optimistically move conversation to top
             moveConversationToTop(currentConversation.id);
             updateConversationOptimistic(currentConversation.id, {
-              message_count: result.conversation.message_count,
+              message_count: res.conversation.message_count,
               updatedAt: new Date().toISOString(),
             });
 
-            // Notify sidebar and background sync
             try {
               window.dispatchEvent(new Event("message:sent"));
             } catch {}
             refreshConversations().catch(() => {});
           }
 
-          // Dispatch ai:typing:stop to reset isAITyping state (for retry success)
+          antdMessage.success("Message sent successfully");
+
           try {
             window.dispatchEvent(
               new CustomEvent("ai:typing:stop", {
@@ -1329,15 +1488,39 @@ const ChatPage: React.FC = () => {
             );
           } catch {}
         },
-        (err) => {
-          antdMessage.error("Retry failed");
+        (err: unknown) => {
+          const error = err as Error;
+          const errorMsg =
+            error.message || "Failed to send message. Please try again.";
+
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === failedMessage.id ? { ...m, localStatus: "failed" } : m
+              m.id === failedMessage.id
+                ? {
+                    ...m,
+                    localStatus: "failed",
+                    errorMessage: errorMsg,
+                    lastAttemptAt: new Date().toISOString(),
+                  }
+                : m
             )
           );
 
-          // Dispatch ai:typing:stop to reset isAITyping state (for retry error)
+          setMessages((prev) => prev.filter((m) => m.id !== typingId));
+
+          // Show specific error message
+          if (retryCount + 1 >= maxRetries) {
+            antdMessage.error(
+              `Failed after ${maxRetries} attempts. Please check your connection.`
+            );
+          } else {
+            antdMessage.error(
+              `Retry ${retryCount + 1} failed. ${
+                maxRetries - retryCount - 1
+              } attempts remaining.`
+            );
+          }
+
           try {
             window.dispatchEvent(
               new CustomEvent("ai:typing:stop", {
@@ -1347,15 +1530,34 @@ const ChatPage: React.FC = () => {
           } catch {}
         }
       );
-    } catch (err) {
-      antdMessage.error("Retry failed");
+    } catch (err: unknown) {
+      const error = err as Error;
+      const errorMsg =
+        error.message || "Network error. Please check your connection.";
+
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === failedMessage.id ? { ...m, localStatus: "failed" } : m
+          m.id === failedMessage.id
+            ? {
+                ...m,
+                localStatus: "failed",
+                errorMessage: errorMsg,
+                lastAttemptAt: new Date().toISOString(),
+              }
+            : m
         )
       );
 
-      // Dispatch ai:typing:stop to reset isAITyping state (for retry catch error)
+      setMessages((prev) => prev.filter((m) => m.id !== typingId));
+
+      if (retryCount + 1 >= maxRetries) {
+        antdMessage.error(
+          `Failed after ${maxRetries} attempts. Please try again later.`
+        );
+      } else {
+        antdMessage.error(`Retry ${retryCount + 1} failed. You can try again.`);
+      }
+
       try {
         window.dispatchEvent(
           new CustomEvent("ai:typing:stop", {

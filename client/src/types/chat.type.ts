@@ -17,13 +17,17 @@ export interface Message {
   createdAt: string | Date;
   // Optional client-only fields used by the UI (not persisted to server)
   // localStatus: status for optimistic / retry flows
-  localStatus?: "pending" | "failed" | "sent";
+  localStatus?: "pending" | "failed" | "sent" | "sending";
   // isTyping: mark an assistant typing placeholder
   isTyping?: boolean;
   // followupSuggestions: cached follow-up suggestions for this message
   followupSuggestions?: string[];
   // isLoadingFollowups: whether suggestions are currently being generated
   isLoadingFollowups?: boolean;
+  // Retry metadata
+  retryCount?: number;
+  errorMessage?: string;
+  lastAttemptAt?: string | Date;
 }
 
 // Payload to create a new message (client -> server)

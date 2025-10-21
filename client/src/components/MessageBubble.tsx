@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from "react";
-import { Avatar, Typography, Button, App, Tag } from "antd";
+import { Avatar, Typography, Button, App } from "antd";
 import {
   UserOutlined,
   RobotOutlined,
@@ -14,10 +14,9 @@ import {
   BulbOutlined,
   ClockCircleOutlined,
   SyncOutlined,
-  CheckCircleOutlined,
   WarningOutlined,
 } from "@ant-design/icons";
-import { Message, MessageRole } from "../types/chat.type";
+import { Message } from "../types/chat.type";
 import { PendingMessage } from "../types/offline-message.type";
 import styles from "./MessageBubble.module.css";
 
@@ -71,6 +70,15 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const isFailed = messageStatus === "failed";
   const isPending = messageStatus === "pending";
   const isSending = messageStatus === "sending";
+
+  // Retry metadata
+  const retryCount = !isPendingMessage(message)
+    ? (message as Message).retryCount || 0
+    : 0;
+  const errorMessage = !isPendingMessage(message)
+    ? (message as Message).errorMessage
+    : undefined;
+  const maxRetries = 3;
 
   // Follow-up suggestions state (only for Message type)
   const hasFollowups =
@@ -129,7 +137,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       setTimeout(() => {
         setIsCopied(false);
       }, 2000);
-    } catch (error) {
+    } catch {
+      // Copy failed - silently ignore
       antMessage.error("Failed to copy message");
     }
   };
@@ -171,7 +180,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     if (isTyping) {
       try {
         // streaming chunk debug removed
-      } catch {}
+      } catch {
+        // Ignore debug logging errors
+      }
       setDisplayedContent(full);
       // No token timer while streaming via chunks
       return;
@@ -211,7 +222,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     // Debug logging to help trace streaming behavior in browser console
     try {
       // streaming start debug removed
-    } catch {}
+    } catch {
+      // Ignore debug logging errors
+    }
 
     const timer = setInterval(() => {
       idx += 1;
@@ -219,7 +232,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       setDisplayedContent((prev) => prev + token);
       try {
         // append token debug removed
-      } catch {}
+      } catch {
+        // Ignore debug logging errors
+      }
       if (idx >= tokens.length) {
         clearInterval(timer);
       }
@@ -295,6 +310,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                   icon={isCopied ? <CheckOutlined /> : <CopyOutlined />}
                   onClick={handleCopy}
                   className={styles.copyButton}
+                  disabled={isSending}
                 />
 
                 {/* Retry button shown for failed messages, placed next to copy */}
@@ -305,10 +321,39 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                     icon={<ReloadOutlined />}
                     onClick={() => onRetry && onRetry(message)}
                     className={styles.retryButton}
+                    disabled={isSending || retryCount >= maxRetries}
+                    title={
+                      retryCount >= maxRetries
+                        ? `Maximum retry attempts (${maxRetries}) reached`
+                        : `Retry (${retryCount}/${maxRetries} attempts)`
+                    }
                   />
                 )}
               </div>
             </div>
+
+            {/* Error message display for failed messages */}
+            {isFailed && errorMessage && (
+              <div className={styles.errorMessageContainer}>
+                <WarningOutlined className={styles.errorIcon} />
+                <Text className={styles.errorText}>
+                  {errorMessage}
+                  {retryCount > 0 && ` (Attempt ${retryCount}/${maxRetries})`}
+                </Text>
+              </div>
+            )}
+
+            {/* Sending status display */}
+            {isSending && (
+              <div className={styles.sendingStatusContainer}>
+                <SyncOutlined spin className={styles.sendingIcon} />
+                <Text className={styles.sendingText}>
+                  {retryCount > 0
+                    ? `Retrying (${retryCount}/${maxRetries})...`
+                    : "Sending..."}
+                </Text>
+              </div>
+            )}
 
             {/* Follow-up suggestions displayed below the message with animation */}
             {!isUser && hasFollowups && (
