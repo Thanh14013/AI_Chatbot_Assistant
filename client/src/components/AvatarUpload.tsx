@@ -15,12 +15,14 @@ import styles from "./AvatarUpload.module.css";
 
 interface AvatarUploadProps {
   currentAvatarUrl?: string | null;
-  onFileSelect: (file: File | null, action: "upload" | "remove") => void;
+  onFileSelect?: (file: File | null, action: "upload" | "remove") => void;
+  onAvatarChange?: (newAvatarUrl: string | null) => void;
 }
 
 export const AvatarUpload: React.FC<AvatarUploadProps> = ({
   currentAvatarUrl,
   onFileSelect,
+  onAvatarChange,
 }) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(
     currentAvatarUrl || null
@@ -61,20 +63,25 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
     // Create local preview
     const reader = new FileReader();
     reader.onload = (e) => {
-      setPreviewUrl(e.target?.result as string);
+      const previewUrl = e.target?.result as string;
+      setPreviewUrl(previewUrl);
       setHasLocalChange(true);
+      // Notify parent with new avatar URL
+      onAvatarChange?.(previewUrl);
     };
     reader.readAsDataURL(file);
 
     // Notify parent with file
-    onFileSelect(file, "upload");
+    onFileSelect?.(file, "upload");
   };
 
   // Handle remove avatar (mark for removal on save)
   const handleRemove = () => {
     setPreviewUrl(null);
     setHasLocalChange(true);
-    onFileSelect(null, "remove");
+    onFileSelect?.(null, "remove");
+    // Notify parent that avatar was removed
+    onAvatarChange?.(null);
   };
 
   // Upload props for Ant Design Upload component

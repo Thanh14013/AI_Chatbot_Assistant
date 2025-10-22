@@ -11,6 +11,7 @@ declare const styles: {
   readonly styleOption: string;
   readonly styleDescription: string;
   readonly hint: string;
+  readonly loadingSkeleton: string;
 };
 
 export default styles;
