@@ -84,13 +84,12 @@ export const useAuth = () => {
       await authService.logout();
       setUser(null);
       setAuthenticated(false);
-      navigate("/login"); // Redirect to login after logout
-    } catch (error) {
+      navigate("/login");
+    } catch {
       // Even if API call fails, clear local state
       setUser(null);
       setAuthenticated(false);
       navigate("/login");
-      throw error;
     } finally {
       setLoading(false);
     }

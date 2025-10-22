@@ -59,6 +59,12 @@
   border-radius: 8px;
 }
 
+/* Search container */
+.searchContainer {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
 .conversationsList {
   flex: 1;
   overflow-y: auto;
@@ -71,6 +77,19 @@
   color: rgba(0, 0, 0, 0.45);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.emptySearchResult {
+  text-align: center;
+  padding: 32px 20px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.loadMoreContainer {
+  margin-top: 12px;
+  padding: 0 4px;
 }
 
 .loadingContainer {
@@ -108,6 +127,27 @@
   height: 100%;
 }
 
+/* Desktop toggle sidebar button */
+.desktopToggleBtn {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  background-color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d9d9d9; /* Thêm border */
+  transition: all 0.3s ease; /* Hiệu ứng chuyển đổi */
+}
+
+.desktopToggleBtn:hover {
+  background-color: #f0f0f0; /* Hiệu ứng hover */
+  border-color: #1890ff; /* Border đổi màu khi hover */
+}
+
 /* Mobile menu button */
 .mobileMenuBtn {
   display: none;
@@ -118,6 +158,13 @@
   background-color: white;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   border-radius: 8px;
+  border: 1px solid #d9d9d9; /* Thêm border */
+  transition: all 0.3s ease; /* Hiệu ứng chuyển đổi */
+}
+
+.mobileMenuBtn:hover {
+  background-color: #f0f0f0; /* Hiệu ứng hover */
+  border-color: #1890ff; /* Border đổi màu khi hover */
 }
 
 /* Conversation header */
@@ -126,12 +173,52 @@
   border-bottom: 1px solid #f0f0f0;
   background-color: white;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.conversationHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+}
+
+.conversationSearchContainer {
+  max-width: 400px;
+  min-width: 300px;
 }
 
 .conversationTitle {
   margin: 0 !important;
   font-size: 18px !important;
   color: rgba(0, 0, 0, 0.85);
+}
+
+.conversationTitleContainer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.headerTagsContainer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Modal form footer styles */
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.modalCancel {
+  margin-right: 8px;
 }
 
 /* Responsive design for tablets */
@@ -153,7 +240,11 @@
     display: block;
   }
 
-  /* Show mobile menu button */
+  /* Hide desktop toggle, show mobile menu button */
+  .desktopToggleBtn {
+    display: none !important;
+  }
+
   .mobileMenuBtn {
     display: flex;
   }
@@ -189,4 +280,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Modal form footer styles */
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modalCancel {
+  margin-right: 0;
 }

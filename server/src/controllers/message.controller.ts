@@ -1,10 +1,12 @@
 import { Request, Response } from "express";
 import {
   getConversationMessages,
-  sendMessageAndGetResponse,
+  sendMessageAndStreamResponse,
   deleteMessage,
 } from "../services/message.service.js";
 import User from "../models/user.model.js";
+import Message from "../models/message.model.js";
+import Conversation from "../models/conversation.model.js";
 
 /**
  * Helper function to get user ID from authenticated request
@@ -48,6 +50,8 @@ export const getMessages = async (req: Request, res: Response): Promise<void> =>
     // Extract pagination params
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 30;
+    // Optional: load messages before a specific message id (infinite scroll)
+    const before = req.query.before as string | undefined;
 
     // Validate pagination params
     if (page < 1 || limit < 1 || limit > 100) {
@@ -59,7 +63,7 @@ export const getMessages = async (req: Request, res: Response): Promise<void> =>
     }
 
     // Get messages
-    const result = await getConversationMessages(conversationId, userId, page, limit);
+    const result = await getConversationMessages(conversationId, userId, page, limit, before);
 
     // Send success response
     res.status(200).json({
@@ -103,84 +107,80 @@ export const getMessages = async (req: Request, res: Response): Promise<void> =>
  * Body: { content: string }
  */
 export const sendMessage = async (req: Request, res: Response): Promise<void> => {
+  // sendMessage removed: streaming API (sendMessageStream) is used instead
+  res
+    .status(410)
+    .json({ success: false, message: "Deprecated: use streaming endpoint /messages/stream" });
+};
+
+/**
+ * Send message and stream AI response back to client via SSE
++
+ * POST /api/conversations/:id/messages/stream
++
+ */
+export const sendMessageStream = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Get user ID from authenticated request
     const userId = await getUserIdFromRequest(req);
     if (!userId) {
-      res.status(401).json({
-        success: false,
-        message: "Authentication required",
-      });
+      res.status(401).json({ success: false, message: "Authentication required" });
       return;
     }
 
-    // Extract conversation ID from params
     const conversationId = req.params.id;
-
     if (!conversationId) {
-      res.status(400).json({
-        success: false,
-        message: "Conversation ID is required",
-      });
+      res.status(400).json({ success: false, message: "Conversation ID is required" });
       return;
     }
 
-    // Extract message content from request body
-    const { content } = req.body;
-
-    // Validate content
+    const { content, attachments } = req.body;
     if (!content || typeof content !== "string" || content.trim().length === 0) {
-      res.status(400).json({
-        success: false,
-        message: "Message content is required",
-      });
+      res.status(400).json({ success: false, message: "Message content is required" });
       return;
     }
 
-    // Send message and get AI response
-    const result = await sendMessageAndGetResponse(conversationId, userId, content);
+    // Log received attachments
 
-    // Send success response with both messages
-    res.status(201).json({
-      success: true,
-      message: "Message sent successfully",
-      data: result,
-    });
-  } catch (error) {
-    // Handle errors
-    const errorMessage = error instanceof Error ? error.message : "Failed to send message";
-
-    // Check for specific error types
-    if (errorMessage.includes("not found")) {
-      res.status(404).json({
-        success: false,
-        message: errorMessage,
-      });
+    // Validate attachments if provided
+    if (attachments && !Array.isArray(attachments)) {
+      res.status(400).json({ success: false, message: "Attachments must be an array" });
       return;
     }
 
-    if (errorMessage.includes("Unauthorized")) {
-      res.status(403).json({
-        success: false,
-        message: errorMessage,
-      });
-      return;
-    }
+    // Set headers for SSE
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders?.();
 
-    if (errorMessage.includes("OpenAI") || errorMessage.includes("AI response")) {
-      res.status(503).json({
-        success: false,
-        message: "AI service temporarily unavailable",
-        error: errorMessage,
+    // Call service to stream; service will invoke onChunk for each partial piece
+    // Pass attachments to the service
+    await sendMessageAndStreamResponse(
+      conversationId,
+      userId,
+      content,
+      async (chunk) => {
+        // Send SSE data event with chunk
+        res.write(`data: ${JSON.stringify({ type: "chunk", text: chunk })}\n\n`);
+      },
+      attachments
+    )
+      .then((result) => {
+        // Send final event with complete result (userMessage, assistantMessage, conversation)
+        const doneEvent = { type: "done", ...result };
+        res.write(`data: ${JSON.stringify(doneEvent)}\n\n`);
+        // Close the stream
+        res.end();
+      })
+      .catch((err) => {
+        res.write(
+          `data: ${JSON.stringify({ type: "error", message: err.message || String(err) })}\n\n`
+        );
+        res.end();
       });
-      return;
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: errorMessage,
-    });
+  } catch (error: any) {
+    const message = error?.message || "Failed to stream message";
+    res.status(500).json({ success: false, message });
   }
 };
 

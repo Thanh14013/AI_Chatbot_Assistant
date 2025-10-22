@@ -1,0 +1,108 @@
+/* MessageStatus.module.css */
+.messageStatus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.retryButton {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.retryButton:hover {
+  transform: scale(1.1);
+}
+
+.retryButton:focus {
+  outline: 2px solid var(--ant-color-primary);
+  outline-offset: 2px;
+}
+
+/* Size variations */
+.small {
+  font-size: 12px;
+}
+
+.medium {
+  font-size: 14px;
+}
+
+.large {
+  font-size: 16px;
+}
+
+/* Status styles */
+.sending {
+  color: var(--ant-color-text-tertiary);
+}
+
+.sent {
+  color: var(--ant-color-success);
+}
+
+.error {
+  color: var(--ant-color-error);
+}
+
+.pending {
+  color: var(--ant-color-warning);
+}
+
+/* Animations */
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Hover effects for interactive elements */
+.error.retryButton:hover {
+  color: var(--ant-color-error-hover);
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .spinning {
+    animation: none;
+  }
+
+  .messageStatus {
+    transition: none;
+  }
+
+  .retryButton {
+    transition: none;
+  }
+}
+
+/* Dark mode support */
+[data-theme="dark"] .sending {
+  color: var(--ant-color-text-quaternary);
+}
+
+[data-theme="dark"] .sent {
+  color: var(--ant-color-success);
+}
+
+[data-theme="dark"] .error {
+  color: var(--ant-color-error);
+}
+
+[data-theme="dark"] .pending {
+  color: var(--ant-color-warning);
+}

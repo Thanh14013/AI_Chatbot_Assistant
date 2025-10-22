@@ -4,14 +4,17 @@
  */
 
 import axiosInstance from "./axios.service";
+import axios from "axios";
 import type {
   LoginRequest,
   RegisterRequest,
   AuthResponse,
   RefreshTokenResponse,
   ApiResponse,
+  GetCurrentUserResponse,
 } from "../types";
 import { setTokens, clearTokens } from "../utils/token.util";
+import { websocketService } from "./websocket.service";
 
 /**
  * Register a new user
@@ -51,8 +54,12 @@ export const login = async (data: LoginRequest): Promise<AuthResponse> => {
  */
 export const refreshAccessToken = async (): Promise<RefreshTokenResponse> => {
   // Call refresh endpoint without body. Server reads refresh token from HttpOnly cookie and returns new access token.
-  const response = await axiosInstance.post<RefreshTokenResponse>(
-    "/auth/refresh",
+  // Use the plain axios client here to avoid triggering axiosInstance interceptors
+  // (which may attempt to refresh again and cause recursion). The plain axios
+  // call still sends cookies when withCredentials is true.
+  const refreshUrl = `/api/auth/refresh`;
+  const response = await axios.post<RefreshTokenResponse>(
+    refreshUrl,
     {},
     { withCredentials: true }
   );
@@ -61,6 +68,13 @@ export const refreshAccessToken = async (): Promise<RefreshTokenResponse> => {
     const { accessToken } = response.data.data;
     // Persist new access token locally
     setTokens(accessToken);
+
+    // If a WebSocket connection exists, tell it to reconnect with the new token
+    try {
+      websocketService.updateToken();
+    } catch {
+      // Removed console.error logging for websocket updates
+    }
   }
 
   return response.data;
@@ -71,19 +85,16 @@ export const refreshAccessToken = async (): Promise<RefreshTokenResponse> => {
  */
 export const logout = async (): Promise<ApiResponse> => {
   try {
-    // Logout endpoint clears the refresh token cookie server-side. We still call it to revoke the token in DB.
     const response = await axiosInstance.post<ApiResponse>(
       "/auth/logout",
       {},
       { withCredentials: true }
     );
 
-    // Clear local access token
     clearTokens();
 
     return response.data;
   } catch (error) {
-    // Even if API call fails, clear local tokens
     clearTokens();
     throw error;
   }
@@ -97,4 +108,13 @@ export const isAuthenticated = (): boolean => {
   const accessToken =
     typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
   return !!accessToken;
+};
+
+/**
+ * Get current user
+ */
+export const getCurrentUser = async (): Promise<GetCurrentUserResponse> => {
+  const response = await axiosInstance.get<GetCurrentUserResponse>("/auth/me");
+
+  return response.data;
 };

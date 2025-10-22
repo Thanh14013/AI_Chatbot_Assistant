@@ -3,6 +3,8 @@ import User from "./user.model.js";
 import RefreshToken from "./refresh-token.model.js";
 import Conversation from "./conversation.model.js";
 import Message from "./message.model.js";
+import MessageEmbedding from "./message-embedding.model.js";
+import UserPreference from "./user-preference.model.js";
 
 // ============================================================================
 // Define Model Relationships
@@ -68,6 +70,26 @@ Message.belongsTo(Conversation, {
   onUpdate: "CASCADE",
 });
 
+// ----------------------------------------------------------------------------
+// Message <-> MessageEmbedding Relationships
+// ----------------------------------------------------------------------------
+
+// Message has one MessageEmbedding (one-to-one relationship)
+Message.hasOne(MessageEmbedding, {
+  foreignKey: "message_id",
+  as: "embedding", // Alias for accessing embedding from message instance
+  onDelete: "CASCADE", // Delete embedding when message is deleted
+  onUpdate: "CASCADE",
+});
+
+// MessageEmbedding belongs to Message (one-to-one relationship)
+MessageEmbedding.belongsTo(Message, {
+  foreignKey: "message_id",
+  as: "message", // Alias for accessing message from embedding instance
+  onDelete: "CASCADE",
+  onUpdate: "CASCADE",
+});
+
 // ============================================================================
 // Database Synchronization
 // ============================================================================
@@ -82,9 +104,16 @@ export const syncDatabase = async (force: boolean = false): Promise<void> => {
     // force: true will drop tables and recreate them (DANGEROUS - data loss!)
     // force: false will create tables only if they don't exist
     await sequelize.sync({ force, alter: !force });
-    console.log("Database synchronized successfully");
+    // Database synchronized (log suppressed)
   } catch (error) {
-    console.error("Error synchronizing database:", error);
+    // Log only a concise message to avoid verbose stack traces in normal dev output
+    try {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.warn("Database synchronization failed:", msg);
+    } catch {
+      console.warn("Database synchronization failed");
+    }
+    // Re-throw so callers can decide how to handle (we keep behavior unchanged)
     throw error;
   }
 };
@@ -99,5 +128,7 @@ export default {
   RefreshToken,
   Conversation,
   Message,
+  MessageEmbedding,
+  UserPreference,
   syncDatabase,
 };

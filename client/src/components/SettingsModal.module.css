@@ -1,0 +1,316 @@
+/**
+ * SettingsModal Styles - Modern & Beautiful Design
+ */
+
+/* Modal Container */
+.settingsModal :global(.ant-modal-header) {
+  background: white;
+  border-bottom: none;
+  padding: 20px 24px;
+  border-radius: 8px 8px 0 0;
+}
+
+.settingsModal :global(.ant-modal-title) {
+  color: #0b0000ff;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.settingsModal :global(.ant-modal-title) :global(.anticon) {
+  color: #ffffff;
+  font-size: 20px;
+}
+
+.settingsModal :global(.ant-modal-close) {
+  color: rgba(14, 0, 0, 0.85);
+  transition: all 0.3s ease;
+}
+
+.settingsModal :global(.ant-modal-close):hover {
+  color: #343333ff;
+  background-color: rgba(52, 50, 50, 0.15);
+  border-radius: 4px;
+}
+
+.settingsModal :global(.ant-modal-body) {
+  padding: 24px;
+  background-color: #fafafa;
+}
+
+.settingsModal :global(.ant-modal-footer) {
+  border-top: 1px solid #e8e8e8;
+  padding: 16px 24px;
+  background-color: #ffffff;
+  border-radius: 0 0 8px 8px;
+}
+
+.settingsModal :global(.ant-btn-primary) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  height: 38px;
+  padding: 0 24px;
+  font-weight: 500;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s ease;
+}
+
+.settingsModal :global(.ant-btn-primary):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.settingsModal :global(.ant-btn-default) {
+  height: 38px;
+  padding: 0 20px;
+  border-radius: 6px;
+  border-color: #d9d9d9;
+  transition: all 0.3s ease;
+}
+
+.settingsModal :global(.ant-btn-default):hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+/* Description */
+.modalDescription {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+  border-radius: 8px;
+  border-left: 4px solid #667eea;
+}
+
+.modalDescription span {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #5a6c7d;
+}
+
+/* Alert */
+.alert {
+  margin-bottom: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Form */
+.settingsForm {
+  margin-top: 0;
+}
+
+/* Section Card */
+.section {
+  margin-bottom: 24px;
+  padding: 20px;
+  background-color: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #e8e8e8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+}
+
+.section:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border-color: #d0d0d0;
+}
+
+/* Section Header */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.sectionIcon {
+  font-size: 22px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.sectionTitle {
+  margin: 0 !important;
+  font-size: 17px;
+  font-weight: 600;
+  color: #2c3e50;
+  letter-spacing: 0.2px;
+}
+
+/* Divider */
+.divider {
+  margin: 28px 0;
+  border-color: #e0e0e0;
+}
+
+/* Form Items */
+.settingsForm :global(.ant-form-item) {
+  margin-bottom: 20px;
+}
+
+.settingsForm :global(.ant-form-item-label) > label {
+  font-weight: 500;
+  color: #3a3a3a;
+  font-size: 14px;
+}
+
+.settingsForm :global(.ant-form-item-explain) {
+  font-size: 13px;
+  color: #8c8c8c;
+  margin-top: 6px;
+}
+
+.settingsForm :global(.ant-form-item-explain-error) {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+/* Select Dropdown */
+.settingsForm :global(.ant-select) {
+  border-radius: 8px;
+}
+
+.settingsForm :global(.ant-select-selector) {
+  border-radius: 8px !important;
+  border: 1.5px solid #e0e0e0 !important;
+  transition: all 0.3s ease !important;
+  min-height: 42px !important;
+  padding: 4px 11px !important;
+}
+
+.settingsForm :global(.ant-select-selector):hover {
+  border-color: #667eea !important;
+}
+
+.settingsForm :global(.ant-select-focused) :global(.ant-select-selector) {
+  border-color: #667eea !important;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1) !important;
+}
+
+/* Dropdown menu styling */
+.settingsForm :global(.ant-select-item-option-content) {
+  padding: 4px 0;
+}
+
+.settingsForm :global(.ant-select-item) {
+  padding: 8px 12px !important;
+}
+
+.settingsForm :global(.ant-select-item-option-content) strong,
+.settingsForm :global(.ant-select-item-option-content) span {
+  text-decoration: none !important;
+}
+
+/* Style Option in Dropdown */
+.styleOption {
+  padding: 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.styleOption strong {
+  font-size: 14px;
+  color: #2c3e50;
+  font-weight: 600;
+  line-height: 1.4;
+  text-decoration: none;
+}
+
+.styleDescription {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #8c8c8c;
+  text-decoration: none;
+  margin-top: 2px;
+}
+
+/* TextArea */
+.settingsForm :global(.ant-input-textarea) {
+  border-radius: 8px;
+}
+
+.settingsForm :global(.ant-input) {
+  border-radius: 8px;
+  border: 1.5px solid #e0e0e0;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  padding: 8px 12px;
+}
+
+.settingsForm :global(.ant-input):hover {
+  border-color: #667eea;
+}
+
+.settingsForm :global(.ant-input):focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.settingsForm :global(.ant-input-textarea-show-count)::after {
+  color: #8c8c8c;
+  font-size: 12px;
+}
+
+/* Hint Box */
+.hint {
+  margin-top: 12px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #fff9e6 0%, #fff4d6 100%);
+  border-radius: 8px;
+  border-left: 4px solid #faad14;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #6b5d00;
+  box-shadow: 0 2px 6px rgba(250, 173, 20, 0.1);
+}
+
+.hint strong {
+  font-weight: 600;
+  color: #ad6800;
+}
+
+/* Loading Skeleton */
+.loadingSkeleton {
+  padding: 20px 0;
+}
+
+.loadingSkeleton :global(.ant-skeleton) {
+  margin-bottom: 24px;
+}
+
+.settingsForm :global(.ant-select-disabled) :global(.ant-select-selector) {
+  background-color: #f9f9f9 !important;
+  cursor: not-allowed;
+}
+
+.settingsForm :global(.ant-input-disabled) {
+  background-color: #f9f9f9;
+  cursor: not-allowed;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .settingsModal :global(.ant-modal) {
+    max-width: calc(100vw - 32px);
+    margin: 16px;
+  }
+
+  .section {
+    padding: 16px;
+  }
+
+  .sectionIcon {
+    font-size: 20px;
+  }
+
+  .sectionTitle {
+    font-size: 16px;
+  }
+}

@@ -1,0 +1,50 @@
+services:
+  db:
+    # Postgres image with pgvector preinstalled
+    image: ankane/pgvector
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: thanh123
+      POSTGRES_DB: chatbot
+    ports:
+      - "5433:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  redis:
+    # Redis for caching (development - no password)
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  server:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    environment:
+      # Allow overriding OpenAI key from host env when using docker-compose up
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      DATABASE_URL: ${DATABASE_URL}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - .:/app:delegated
+
+volumes:
+  db-data:
+  redis-data:

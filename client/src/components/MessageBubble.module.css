@@ -36,6 +36,14 @@
   margin-top: 4px;
 }
 
+/* smaller avatar to reduce visual bulk */
+.avatar,
+.avatar .ant-avatar {
+  width: 36px;
+  height: 36px;
+  line-height: 36px;
+}
+
 .userAvatar {
   background-color: #1890ff;
 }
@@ -47,11 +55,12 @@
 /* Message bubble container */
 .messageBubble {
   max-width: 70%;
-  min-width: 100px;
-  padding: 12px 16px;
+  min-width: 80px;
+  padding: 10px 14px;
   border-radius: 12px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   position: relative;
+  padding-top: 32px; /* Make room for corner button */
 }
 
 /* User message bubble styling */
@@ -62,13 +71,15 @@
 
 /* Assistant message bubble styling */
 .assistantMessage .messageBubble {
-  background-color: #f0f0f0;
-  color: rgba(0, 0, 0, 0.85);
+  background-color: #ffffff;
+  color: rgba(0, 0, 0, 0.87);
+  max-width: 62%;
+  padding: 9px 12px;
 }
 
 /* Message content */
 .messageContent {
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.6;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -98,7 +109,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 8px;
+  margin-top: 6px;
   gap: 8px;
 }
 
@@ -130,7 +141,7 @@
 }
 
 .assistantMessage .copyButton {
-  color: rgba(0, 0, 0, 0.45);
+  color: rgba(249, 246, 246, 0.45);
 }
 
 /* Show copy button on hover */
@@ -142,10 +153,442 @@
   opacity: 1 !important;
 }
 
+/* Footer actions wrapper to hold copy + retry buttons */
+.footerActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Ensure retry button is visible even when copy is hidden (for failed messages) */
+.retryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  opacity: 1;
+}
+
+/* Retry button for failed messages */
+.retryButton {
+  color: #ff4d4f;
+  font-size: 12px;
+  padding: 0;
+  height: auto;
+}
+
+.retryButton:hover {
+  color: #ff7875;
+}
+
+/* Follow-up button positioned in top-right corner */
+.followupButtonCorner {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  opacity: 0;
+  transition: all 0.3s ease;
+  padding: 4px;
+  height: 24px;
+  width: 24px;
+  min-width: auto;
+  color: rgba(0, 0, 0, 0.35);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  z-index: 2;
+}
+
+/* Pin button positioned in top-right corner (next to followup button) */
+.pinButtonCorner {
+  position: absolute;
+  top: 6px;
+  right: 36px; /* Position to the left of followup button */
+  opacity: 0;
+  transition: all 0.3s ease;
+  padding: 4px;
+  height: 24px;
+  width: 24px;
+  min-width: auto;
+  color: rgba(0, 0, 0, 0.35);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  z-index: 2;
+}
+
+/* Show pin button on hover */
+.messageBubble:hover .pinButtonCorner {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.pinButtonCorner:hover {
+  opacity: 1 !important;
+  color: #faad14;
+  background: rgba(255, 255, 255, 1);
+  box-shadow: 0 2px 6px rgba(250, 173, 20, 0.3);
+}
+
+/* Pinned state - always visible */
+.pinButtonCorner.pinned {
+  opacity: 1;
+  color: #faad14;
+  background: rgba(255, 244, 224, 1);
+}
+
+/* Pinned message styling - highlight with golden border */
+.messageBubble.pinnedMessage {
+  border: 2px solid #faad14;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 244, 224, 0.3) 0%,
+    rgba(255, 244, 224, 0.1) 50%,
+    transparent 100%
+  );
+  box-shadow: 0 2px 8px rgba(250, 173, 20, 0.2);
+}
+
+/* User message pinned styling */
+.userMessage .messageBubble.pinnedMessage {
+  border-color: #ffd666;
+  background: #1890ff;
+}
+
+/* Show follow-up button on hover */
+.assistantMessage .messageBubble:hover .followupButtonCorner {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.followupButtonCorner:hover {
+  opacity: 1 !important;
+  color: #1890ff;
+  background: rgba(255, 255, 255, 1);
+  box-shadow: 0 2px 6px rgba(24, 144, 255, 0.3);
+}
+
+/* Follow-up suggestions card container with animation */
+.followupSuggestionsCard {
+  margin-top: 12px;
+  animation: slideInUp 0.4s ease-out;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Suggestion chips container */
+.suggestionChips {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* Individual suggestion chip */
+.suggestionChip {
+  cursor: pointer;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: #2f54eb;
+  padding: 8px 14px;
+  font-size: 13px;
+  border-radius: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  position: relative;
+  overflow: hidden;
+  animation: chipFadeIn 0.5s ease-out forwards;
+  opacity: 0;
+}
+
+@keyframes chipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Stagger animation for chips */
+.suggestionChip:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.suggestionChip:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.suggestionChip:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.suggestionChip::before {
+  content: "💬";
+  margin-right: 6px;
+  font-size: 14px;
+}
+
+.suggestionChip:hover {
+  background: linear-gradient(135deg, #e6f4ff 0%, #d6e4ff 100%);
+  border-color: #597ef7;
+  color: #1d39c4;
+  transform: translateX(4px) scale(1.02);
+  box-shadow: 0 4px 12px rgba(47, 84, 235, 0.15);
+}
+
+.suggestionChip:active {
+  transform: translateX(4px) scale(0.98);
+}
+
+/* Loading indicator for follow-up suggestions */
+.followupLoading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: rgba(240, 245, 255, 0.5);
+  border-radius: 8px;
+  animation: fadeIn 0.3s ease-out;
+  color: black;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.loadingDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #1890ff;
+  animation: loadingBounce 1.4s infinite ease-in-out;
+}
+
+.loadingDot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.loadingDot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.loadingDot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes loadingBounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-8px);
+  }
+}
+
+.loadingText {
+  font-size: 12px;
+  color: #000;
+  font-style: italic;
+}
+
+/* Empty assistant message styling */
+.emptyAssistant {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 13px;
+}
+
+/* Typing indicator row */
+.typingRow {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Typing placeholder container */
+.typingPlaceholder {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+}
+
+/* Typing dots animation */
+.typingDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: rgba(3, 0, 0, 0.4);
+  animation: typingBounce 1.4s infinite ease-in-out;
+}
+
+.typingDot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typingDot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typingDot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typingBounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Dev-only debug badge shown in corner of bubble when present */
+.debugBadge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* Message status badge - show next to user avatar */
+.messageStatusBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 6px;
+  font-size: 16px;
+}
+
+/* Error message container for failed messages */
+.errorMessageContainer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: rgba(255, 77, 79, 0.1);
+  border-left: 3px solid #ff4d4f;
+  border-radius: 4px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.errorIcon {
+  color: #ff4d4f;
+  font-size: 14px;
+}
+
+.errorText {
+  font-size: 12px;
+  color: #ff4d4f;
+  flex: 1;
+}
+
+/* Sending status container */
+.sendingStatusContainer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: rgba(24, 144, 255, 0.1);
+  border-left: 3px solid #1890ff;
+  border-radius: 4px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.sendingIcon {
+  color: #1890ff;
+  font-size: 14px;
+}
+
+.sendingText {
+  font-size: 12px;
+  color: #1890ff;
+  flex: 1;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .assistantMessage .messageBubble {
+    background-color: #fdfdfdff;
+    color: rgba(6, 0, 0, 0.85);
+  }
+
+  .followupButtonCorner {
+    color: rgba(6, 0, 0, 0.65);
+    background: rgba(254, 252, 252, 0.4);
+  }
+
+  .followupButtonCorner:hover {
+    color: #69c0ff;
+    background: rgba(247, 244, 244, 0.6);
+    box-shadow: 0 2px 6px rgba(105, 192, 255, 0.3);
+  }
+
+  .suggestionChips {
+    background: white;
+    border-color: rgba(105, 192, 255, 0.2);
+  }
+
+  .suggestionChip {
+    background: linear-gradient(135deg, #2a2a2a 0%, #1f3a5f 100%);
+    border-color: #4a7ba7;
+    color: #91caff;
+  }
+
+  .suggestionChip:hover {
+    background: linear-gradient(135deg, #1f3a5f 0%, #4a7ba7 100%);
+    border-color: #69c0ff;
+    color: #bae0ff;
+  }
+
+  .followupLoading {
+    background: rgba(24, 144, 255, 0.1);
+  }
+
+  .loadingText {
+    color: rgba(7, 0, 0, 0.55);
+  }
+}
+
 /* Responsive design for mobile */
 @media (max-width: 768px) {
   .messageBubble {
     max-width: 85%;
+    padding-top: 28px;
   }
 
   .messageContent {
@@ -154,5 +597,143 @@
 
   .copyButton {
     opacity: 1;
+  }
+
+  .followupButtonCorner {
+    opacity: 0.7;
+    top: 4px;
+    right: 4px;
+  }
+
+  .suggestionChip {
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+}
+
+/* Attachments display */
+.attachmentsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.userMessage .attachmentsContainer {
+  border-top-color: rgba(255, 255, 255, 0.2);
+}
+
+.attachmentItem {
+  display: block;
+}
+
+/* Image attachment styling */
+.imageAttachment {
+  display: block;
+  max-width: 300px;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.imageAttachment:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.attachmentImage {
+  width: 100%;
+  height: auto;
+  max-height: 250px;
+  object-fit: cover;
+  display: block;
+}
+
+/* File attachment styling */
+.fileAttachment {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.fileAttachment:hover {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
+}
+
+.userMessage .fileAttachment {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: white;
+}
+
+.userMessage .fileAttachment:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.fileIcon {
+  font-size: 28px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.fileInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fileName {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileSize {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+@media (max-width: 768px) {
+  .imageAttachment {
+    max-width: 100%;
+  }
+
+  .attachmentImage {
+    max-height: 200px;
+  }
+
+  .fileAttachment {
+    padding: 8px 10px;
+  }
+
+  .fileIcon {
+    font-size: 24px;
+  }
+
+  .fileName {
+    font-size: 12px;
+  }
+
+  .fileSize {
+    font-size: 10px;
   }
 }

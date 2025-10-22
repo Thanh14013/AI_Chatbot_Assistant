@@ -1,0 +1,86 @@
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.title {
+  margin: 0 !important;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #262626;
+}
+
+.card {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.section {
+  margin-bottom: 0;
+}
+
+.sectionTitle {
+  margin-bottom: 16px !important;
+  color: #595959;
+  font-size: 16px !important;
+}
+
+.form {
+  margin-top: 0;
+}
+
+.readonlyHint {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.passwordRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: #fafafa;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .container {
+    padding: 16px;
+  }
+
+  .passwordRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .passwordRow button {
+    width: 100%;
+  }
+
+  .actions {
+    flex-direction: column-reverse;
+  }
+
+  .actions button {
+    width: 100%;
+  }
+}

@@ -13,6 +13,8 @@ import type {
   ChangePasswordInput,
 } from "../types/user.type.js";
 import { validateRegister, validateLogin, validateChangePassword } from "../utils/validateInput.js";
+import { cacheAside, CACHE_TTL, deleteCache, setCache } from "./cache.service.js";
+import { userByEmailKey, userByIdKey } from "../utils/cache-key.util.js";
 
 //Register a new user
 export const registerUser = async (registerData: RegisterInput) => {
@@ -44,9 +46,10 @@ export const registerUser = async (registerData: RegisterInput) => {
 // Login user
 export const loginUser = async (loginData: LoginInput) => {
   const { email, password } = validateLogin(loginData.email, loginData.password);
+  // Find user by email with cache
+  const cacheKey = userByEmailKey(email);
+  const user = await cacheAside(cacheKey, () => User.findByEmail(email), CACHE_TTL.USER);
 
-  // Find user by email
-  const user = await User.findByEmail(email);
   if (!user) {
     // Standardized error message for wrong credentials
     throw new Error("Account or password is incorrect");
@@ -58,10 +61,9 @@ export const loginUser = async (loginData: LoginInput) => {
     // Standardized error message for wrong credentials
     throw new Error("Account or password is incorrect");
   }
-
   // Generate new tokens
-  const accessToken = generateAccessToken({ name: user.name, email: user.email });
-  const refreshToken = generateRefreshToken({ name: user.name, email: user.email });
+  const accessToken = generateAccessToken({ id: user.id, name: user.name, email: user.email });
+  const refreshToken = generateRefreshToken({ id: user.id, name: user.name, email: user.email });
 
   // Store refresh token in database
   const expiresAt = new Date();
@@ -79,6 +81,9 @@ export const loginUser = async (loginData: LoginInput) => {
     id: user.id,
     name: user.name,
     email: user.email,
+    username: user.username || null,
+    bio: user.bio || null,
+    avatarUrl: user.avatar_url || null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -120,26 +125,37 @@ export const refreshAccessToken = async (token: string) => {
     throw new Error("User not found");
   }
   // Generate new access token only
-  const newAccessToken = generateAccessToken({ name: user.name, email: user.email });
+  const newAccessToken = generateAccessToken({ id: user.id, name: user.name, email: user.email });
 
   return {
     accessToken: newAccessToken,
   };
 };
 
-// Logout user by revoking all refresh tokens for the user
+// Logout user by revoking the specific refresh token
 export const logoutUser = async (token: string) => {
   // Find token in database to identify the user
   const storedToken = await RefreshToken.findByToken(token);
+
+  // If token not found, treat logout as idempotent success (token may have been removed already)
   if (!storedToken) {
-    throw new Error("Refresh token not found");
+    console.debug && console.debug(`logoutUser: token not found`);
+    return { message: "Logout successful" };
   }
 
-  // Revoke all tokens for this user (logout from all devices)
-  const revokedCount = await RefreshToken.revokeAllUserTokens(storedToken.user_id);
+  // If already revoked, nothing to do
+  if (storedToken.is_revoked) {
+    console.debug && console.debug(`logoutUser: token already revoked id=${storedToken.id}`);
+    return { message: "Logout successful" };
+  }
+
+  // Revoke only this specific token (logout from current device)
+  storedToken.is_revoked = true;
+  await storedToken.save();
+  // refresh token revoked log removed
 
   return {
-    message: `Logout successful, revoked ${revokedCount} token(s)`,
+    message: "Logout successful",
   };
 };
 
@@ -163,6 +179,10 @@ export const changePassword = async (email: string, data: ChangePasswordInput) =
   const hashed = await hashPassword(newPassword);
   user.password = hashed;
   await user.save();
+
+  // Invalidate user cache after password change
+  await deleteCache(userByEmailKey(email));
+  await deleteCache(userByIdKey(user.id));
 
   return { message: "Password changed successfully" };
 };

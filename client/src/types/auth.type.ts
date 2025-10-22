@@ -7,6 +7,8 @@ export interface User {
   id: number;
   email: string;
   name?: string;
+  username?: string | null;
+  avatarUrl?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -52,4 +54,10 @@ export interface ApiError {
   success: false;
   message: string;
   error?: string;
+}
+
+// Get current user response
+export interface GetCurrentUserResponse {
+  success: boolean;
+  data: User;
 }

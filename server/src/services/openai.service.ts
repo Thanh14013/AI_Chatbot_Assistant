@@ -34,9 +34,7 @@ try {
 // Test connection function (safe: doesn't throw when API key is missing)
 export async function testOpenAIConnection() {
   if (!apiKey) {
-    console.warn(
-      "⚠️  OPENAI_API_KEY not set — skipping OpenAI connection test. Set OPENAI_API_KEY in your .env or environment to enable this test."
-    );
+    // OPENAI_API_KEY not set — skip connection test in silent mode
     return;
   }
 
@@ -47,11 +45,10 @@ export async function testOpenAIConnection() {
     });
 
     const text = response?.choices?.[0]?.message?.content;
-    console.log("✅ OpenAI connected successfully!");
-    console.log("Response:", text ?? JSON.stringify(response));
+    // Connection succeeded — intentionally silent (no console output)
   } catch (error: any) {
-    // Log the full error object (some SDK errors are objects, not plain Error)
-    console.error("❌ OpenAI connection failed:", error?.message ?? error);
+    // Re-throw the error so callers can handle/report it via configured logging
+    throw error;
   }
 }
 
@@ -61,12 +58,18 @@ export async function testOpenAIConnection() {
 export interface ChatCompletionParams {
   messages: Array<{
     role: "system" | "user" | "assistant";
-    content: string;
+    content:
+      | string
+      | Array<{
+          type: "text" | "image_url";
+          text?: string;
+          image_url?: { url: string };
+        }>;
   }>;
   model?: string; // Default: "gpt-5-nano"
   temperature?: number; // Default: 0.7
   // Use newer OpenAI parameter name expected by some models
-  max_completion_tokens?: number; // Default: 1000
+  max_completion_tokens?: number; // Default: 2000
   stream?: boolean; // Default: false
 }
 
@@ -78,6 +81,9 @@ export interface ChatCompletionResponse {
   tokens_used: number;
   model: string;
   finish_reason: string;
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
 }
 
 /**
@@ -102,7 +108,7 @@ export async function getChatCompletion(
     messages,
     model = "gpt-5-nano",
     temperature = 0.7,
-    max_completion_tokens = 1000,
+    max_completion_tokens = 2000,
     stream = false,
   } = params;
 
@@ -152,16 +158,29 @@ export async function getChatCompletion(
     // Non-streaming response
     const response = await openai.chat.completions.create(requestPayload);
 
-    // Extract response data
+    // Extract response data and token breakdown when available
     const content = response.choices[0]?.message?.content || "";
-    const tokens_used = response.usage?.total_tokens || 0;
+    const prompt_tokens = response.usage?.prompt_tokens || 0;
+    const completion_tokens = response.usage?.completion_tokens || 0;
+    const total_tokens = response.usage?.total_tokens || prompt_tokens + completion_tokens || 0;
+
+    // If OpenAI returned an empty string for content, treat as an error so
+    // callers won't persist empty assistant messages. This can happen when
+    // the model or SDK returns an incomplete response.
+    if (!content || (typeof content === "string" && content.trim() === "")) {
+      throw new Error("OpenAI returned empty content");
+    }
+
     const finish_reason = response.choices[0]?.finish_reason || "stop";
 
     return {
       content,
-      tokens_used,
+      tokens_used: total_tokens,
       model,
       finish_reason,
+      prompt_tokens,
+      completion_tokens,
+      total_tokens,
     };
   } catch (error: any) {
     // Handle different types of errors
@@ -189,7 +208,16 @@ export async function getChatCompletion(
  * @returns Promise with complete AI response
  */
 async function handleStreamingResponse(params: {
-  messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+  messages: Array<{
+    role: "system" | "user" | "assistant";
+    content:
+      | string
+      | Array<{
+          type: "text" | "image_url";
+          text?: string;
+          image_url?: { url: string };
+        }>;
+  }>;
   model: string;
   temperature: number;
   max_completion_tokens: number;
@@ -235,15 +263,23 @@ async function handleStreamingResponse(params: {
     }
 
     // Estimate token usage (rough approximation: 1 token ≈ 4 characters)
-    tokens_used =
-      estimateTokenCount(fullContent) +
-      estimateTokenCount(messages.map((m) => m.content).join(" "));
+    const estimated_completion_tokens = estimateTokenCount(fullContent);
+    const estimated_prompt_tokens = estimateTokenCount(messages.map((m) => m.content).join(" "));
+    tokens_used = estimated_completion_tokens + estimated_prompt_tokens;
+
+    // If streaming produced no content, treat as an error
+    if (!fullContent || fullContent.trim() === "") {
+      throw new Error("OpenAI streaming returned empty content");
+    }
 
     return {
       content: fullContent,
       tokens_used,
       model,
       finish_reason,
+      prompt_tokens: estimated_prompt_tokens,
+      completion_tokens: estimated_completion_tokens,
+      total_tokens: tokens_used,
     };
   } catch (error: any) {
     throw new Error(`Streaming error: ${error?.message || "Unknown error"}`);
@@ -335,6 +371,120 @@ export function getRecentMessages<T>(allMessages: T[], count: number): T[] {
     return allMessages;
   }
   return allMessages.slice(-count);
+}
+
+/**
+ * Build message content with attachments for OpenAI multimodal API
+ * Supports images (vision) and document text content
+ *
+ * @param textContent - The text message content
+ * @param attachments - Array of file attachments
+ * @returns Message content formatted for OpenAI API
+ */
+export function buildMessageContentWithAttachments(
+  textContent: string,
+  attachments?: Array<{
+    secure_url: string;
+    resource_type: string;
+    extracted_text?: string;
+    format?: string;
+  }>
+): string | Array<{ type: "text" | "image_url"; text?: string; image_url?: { url: string } }> {
+  // If no attachments, return simple text
+  if (!attachments || attachments.length === 0) {
+    return textContent;
+  }
+
+  // Check if any attachment is an image (requires vision API)
+  const hasImages = attachments.some((att) => att.resource_type === "image");
+
+  if (hasImages) {
+    // Build multimodal content array for vision API
+    const content: Array<{
+      type: "text" | "image_url";
+      text?: string;
+      image_url?: { url: string };
+    }> = [];
+
+    // Add text content first with file context
+    let mainText = textContent || "Please analyze the attached files.";
+
+    // Add file URLs as context for non-image files
+    const nonImageFiles = attachments.filter((att) => att.resource_type !== "image");
+    if (nonImageFiles.length > 0) {
+      mainText += "\n\n📎 Attached Files:\n";
+      nonImageFiles.forEach((att, idx) => {
+        const fileType = att.format?.toUpperCase() || att.resource_type.toUpperCase();
+        mainText += `${idx + 1}. [${fileType} File] - Access via URL: ${att.secure_url}\n`;
+      });
+      mainText += "\nYou can reference these file URLs in your response if needed.";
+    }
+
+    content.push({
+      type: "text",
+      text: mainText,
+    });
+
+    // Add images with context
+    const imageAttachments = attachments.filter((att) => att.resource_type === "image");
+    imageAttachments.forEach((att, idx) => {
+      content.push({
+        type: "image_url",
+        image_url: {
+          url: att.secure_url,
+        },
+      });
+    });
+
+    // Add extracted text from documents
+    attachments.forEach((att) => {
+      if (att.resource_type === "raw" && att.extracted_text) {
+        content.push({
+          type: "text",
+          text: `\n\n--- ${att.format?.toUpperCase()} Document Content (extracted) ---\n${att.extracted_text}\n--- End of ${att.format?.toUpperCase()} ---`,
+        });
+      }
+    });
+
+    return content;
+  } else {
+    // No images, just append document text and URLs to message
+    let fullContent = textContent || "Please analyze the attached files.";
+
+    // Add file URLs
+    fullContent += "\n\n📎 Attached Files:\n";
+    attachments.forEach((att, idx) => {
+      const fileType = att.format?.toUpperCase() || att.resource_type.toUpperCase();
+      fullContent += `${idx + 1}. [${fileType} File] - URL: ${att.secure_url}\n`;
+    });
+
+    // Add extracted text if available
+    attachments.forEach((att) => {
+      if (att.extracted_text) {
+        fullContent += `\n\n--- ${att.format?.toUpperCase()} Document Content (extracted) ---\n${att.extracted_text}\n--- End of ${att.format?.toUpperCase()} ---`;
+      }
+    });
+
+    fullContent +=
+      "\n\nYou can reference these file URLs in your response if the user needs to access them.";
+
+    return fullContent;
+  }
+}
+
+/**
+ * Determine the appropriate OpenAI model based on message content
+ * Uses vision model if images are present, otherwise uses default
+ *
+ * @param hasImages - Whether the message contains images
+ * @returns Model name to use
+ */
+export function selectModelForContent(hasImages: boolean): string {
+  if (hasImages) {
+    // Use GPT-4 Vision for image analysis
+    return "gpt-4o"; // or 'gpt-4-vision-preview'
+  }
+  return "gpt-5-nano"; // Default model
 }
 
 export default openai;

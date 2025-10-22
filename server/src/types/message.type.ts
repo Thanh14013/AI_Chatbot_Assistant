@@ -6,6 +6,7 @@ export interface IMessage {
   content: string; // Message content/text
   tokens_used: number; // Number of tokens in this message
   model: string; // AI model used for this message
+  pinned: boolean; // Whether the message is pinned for quick reference
   createdAt: Date;
 }
 
@@ -26,22 +27,20 @@ export interface MessageResponse {
   content: string;
   tokens_used: number;
   model: string;
+  pinned: boolean; // Whether the message is pinned
   createdAt: Date;
+  attachments?: Array<{
+    id?: number;
+    public_id: string;
+    secure_url: string;
+    resource_type: "image" | "video" | "raw";
+    format?: string;
+    original_filename?: string;
+    size_bytes?: number;
+    width?: number;
+    height?: number;
+    thumbnail_url?: string;
+    extracted_text?: string;
+  }>;
 }
-
-// Interface for sending a message and getting AI response
-export interface SendMessageInput {
-  conversation_id: string;
-  content: string;
-}
-
-// Interface for AI response with both user message and assistant reply
-export interface SendMessageResponse {
-  userMessage: MessageResponse;
-  assistantMessage: MessageResponse;
-  conversation: {
-    id: string;
-    total_tokens_used: number;
-    message_count: number;
-  };
-}
+// Streaming endpoint uses the same MessageResponse types; non-streaming wrappers removed

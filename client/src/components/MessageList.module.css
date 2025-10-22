@@ -9,6 +9,8 @@
   background-color: #fafafa;
 }
 
+/* load earlier button removed: message list auto-loads when scrolled near top */
+
 .messageList {
   flex: 1;
   overflow-y: auto;
@@ -103,6 +105,51 @@
   color: rgba(0, 0, 0, 0.65);
 }
 
+/* Highlighted message for semantic search / pinned message */
+.highlighted {
+  animation: highlight 0.8s ease-in-out;
+}
+
+@keyframes highlight {
+  0% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.02);
+  }
+  50% {
+    transform: scale(1.01);
+  }
+  75% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Keep original message bubble colors, just add visual emphasis */
+.highlighted > div {
+  border: 4px solid #ffffff !important;
+  box-shadow: 0 0 0 2px #ffc107, 0 0 25px rgba(255, 193, 7, 0.8),
+    0 6px 20px rgba(0, 0, 0, 0.25) !important;
+  position: relative;
+  animation: highlightGlow 2s ease-in-out infinite;
+}
+
+/* Optional: add a subtle pulse glow effect */
+@keyframes highlightGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px #ffc107, 0 0 25px rgba(255, 193, 7, 0.8),
+      0 6px 20px rgba(0, 0, 0, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 3px #ffc107, 0 0 35px rgba(255, 193, 7, 1),
+      0 8px 24px rgba(0, 0, 0, 0.3);
+  }
+}
+
 /* Responsive design for mobile */
 @media (max-width: 768px) {
   .messageList {
@@ -116,5 +163,25 @@
 
   .loadingIndicator {
     bottom: 16px;
+  }
+}
+
+/* Empty state placeholder */
+.emptyPlaceholder {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 48px;
+  font-weight: 300;
+  color: rgba(0, 0, 0, 0.15);
+  user-select: none;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .emptyPlaceholder {
+    font-size: 36px;
   }
 }

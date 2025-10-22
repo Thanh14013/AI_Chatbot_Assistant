@@ -2,16 +2,43 @@
   "openapi": "3.0.0",
   "info": {
     "title": "AI Chatbot Assistant API",
-    "version": "1.0.0",
-    "description": "API documentation for authentication, conversations, and messaging endpoints (Chat API)"
+    "version": "2.0.0",
+    "description": "Comprehensive API documentation for AI Chatbot Assistant including authentication, conversations, real-time messaging (HTTP REST + WebSocket), semantic search, user preferences, and profile management.\n\n## Key Features\n- **Authentication**: JWT-based auth with refresh tokens\n- **Real-time Chat**: WebSocket/Socket.IO for instant messaging and streaming AI responses\n- **Semantic Search**: Vector embeddings for intelligent message search across conversations\n- **User Preferences**: Customizable AI behavior, themes, and settings\n- **Profile Management**: Avatar uploads, bio, password changes\n- **Redis Caching**: High-performance caching for preferences and frequent queries\n- **Multi-tab Sync**: Real-time synchronization across browser tabs\n- **Unread Tracking**: Smart notification system for new messages\n- **Follow-up Suggestions**: AI-generated contextual follow-up questions\n- **Infinite Scroll**: Pagination for conversations and messages\n- **Streaming Responses**: Server-Sent Events (SSE) for real-time AI responses\n\n## Base URLs\n- HTTP API: `http://localhost:3000/api`\n- WebSocket: `ws://localhost:3000`\n\n## Authentication\nMost endpoints require JWT authentication. Include the access token in the Authorization header:\n```\nAuthorization: Bearer <access-token>\n```\n\nFor WebSocket connections, provide the token via:\n- Auth header: `socket.handshake.headers.authorization = 'Bearer <token>'`\n- Query parameter: `ws://localhost:3000?token=<token>`\n- Handshake auth: `socket.auth({ token: '<token>' })`"
   },
   "servers": [
     {
       "url": "http://localhost:3000/api",
-      "description": "Local development server"
+      "description": "Local development server (HTTP API)"
+    },
+    {
+      "url": "ws://localhost:3000",
+      "description": "Local development server (WebSocket)"
     }
   ],
   "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health check endpoint",
+        "description": "Check API server health status",
+        "tags": ["Health"],
+        "responses": {
+          "200": {
+            "description": "Server is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "OK" },
+                    "timestamp": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/register": {
       "post": {
         "summary": "Register a new user",
@@ -197,8 +224,24 @@
         "tags": ["Conversations"],
         "security": [{ "bearerAuth": [] }],
         "parameters": [
-          { "in": "query", "name": "page", "schema": { "type": "integer", "default": 1 } },
-          { "in": "query", "name": "limit", "schema": { "type": "integer", "default": 20 } }
+          {
+            "in": "query",
+            "name": "page",
+            "schema": { "type": "integer", "default": 1 },
+            "description": "Page number for pagination"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": { "type": "integer", "default": 20 },
+            "description": "Number of conversations per page"
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": { "type": "string" },
+            "description": "Search query to filter conversations by title"
+          }
         ],
         "responses": {
           "200": {
@@ -308,38 +351,6 @@
           "401": { "description": "Unauthorized" },
           "404": { "description": "Conversation not found" }
         }
-      },
-      "post": {
-        "summary": "Send a message and get AI response",
-        "tags": ["Messages"],
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": { "type": "string", "format": "uuid" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": { "schema": { "$ref": "#/components/schemas/SendMessage" } }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "User and assistant messages returned",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/SendMessageResponse" }
-              }
-            }
-          },
-          "400": { "description": "Bad request" },
-          "401": { "description": "Unauthorized" },
-          "503": { "description": "OpenAI service unavailable" }
-        }
       }
     },
     "/messages/{messageId}": {
@@ -359,6 +370,539 @@
           "200": { "description": "Deleted" },
           "401": { "description": "Unauthorized" },
           "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/conversations/generate-title": {
+      "post": {
+        "summary": "Generate a smart conversation title from message content",
+        "tags": ["Conversations"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "type": "string",
+                    "example": "How do I implement authentication in Express.js?",
+                    "description": "Message content to generate title from"
+                  }
+                },
+                "required": ["content"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Generated title",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "title": { "type": "string", "example": "Express.js Authentication Guide" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "400": { "description": "Invalid request" }
+        }
+      }
+    },
+    "/conversations/{id}/messages/stream": {
+      "post": {
+        "summary": "Send a message and stream AI response (SSE)",
+        "description": "Send a user message and receive streaming AI response via Server-Sent Events",
+        "tags": ["Messages"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "Conversation ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "type": "string",
+                    "example": "Hello! How are you?",
+                    "description": "Message content"
+                  }
+                },
+                "required": ["content"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Streaming response (Server-Sent Events)",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "description": "SSE stream with events: 'chunk' for streaming text, 'done' with final data"
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Conversation not found" },
+          "500": { "description": "Streaming error" }
+        }
+      }
+    },
+    "/conversations/{id}/search": {
+      "post": {
+        "summary": "Semantic search within a conversation",
+        "description": "Search messages within a conversation using semantic similarity",
+        "tags": ["Search"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "Conversation ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "example": "authentication implementation",
+                    "description": "Search query"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "default": 10,
+                    "description": "Maximum number of results"
+                  },
+                  "similarity_threshold": {
+                    "type": "number",
+                    "default": 0.3,
+                    "description": "Minimum similarity score (0-1)"
+                  }
+                },
+                "required": ["query"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search results with similarity scores",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "message_id": { "type": "string", "format": "uuid" },
+                          "content": { "type": "string" },
+                          "role": { "type": "string" },
+                          "similarity": { "type": "number" },
+                          "createdAt": { "type": "string", "format": "date-time" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Conversation not found" }
+        }
+      }
+    },
+    "/search/all": {
+      "post": {
+        "summary": "Global semantic search across all conversations",
+        "description": "Search across all user's conversations using semantic similarity with best match highlighting",
+        "tags": ["Search"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "example": "how to deploy on AWS",
+                    "description": "Search query"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "default": 5,
+                    "description": "Maximum number of conversations to return"
+                  },
+                  "messagesPerConversation": {
+                    "type": "integer",
+                    "default": 3,
+                    "description": "Number of matching messages per conversation"
+                  },
+                  "similarity_threshold": {
+                    "type": "number",
+                    "default": 0.3,
+                    "description": "Minimum similarity score (0-1)"
+                  }
+                },
+                "required": ["query"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search results grouped by conversation with best match",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bestMatch": {
+                      "type": "object",
+                      "description": "Highest scoring result across all conversations",
+                      "properties": {
+                        "conversation_id": { "type": "string", "format": "uuid" },
+                        "conversation_title": { "type": "string" },
+                        "message_id": { "type": "string", "format": "uuid" },
+                        "content": { "type": "string" },
+                        "role": { "type": "string" },
+                        "similarity": { "type": "number" },
+                        "createdAt": { "type": "string", "format": "date-time" }
+                      }
+                    },
+                    "conversations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "conversation": {
+                            "type": "object",
+                            "properties": {
+                              "id": { "type": "string", "format": "uuid" },
+                              "title": { "type": "string" },
+                              "updatedAt": { "type": "string", "format": "date-time" }
+                            }
+                          },
+                          "matches": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "message_id": { "type": "string", "format": "uuid" },
+                                "content": { "type": "string" },
+                                "role": { "type": "string" },
+                                "similarity": { "type": "number" },
+                                "createdAt": { "type": "string", "format": "date-time" }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "400": { "description": "Invalid query" }
+        }
+      }
+    },
+    "/search/conversation/{id}": {
+      "post": {
+        "summary": "Search conversation with context messages",
+        "description": "Search within a specific conversation with surrounding context messages",
+        "tags": ["Search"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "Conversation ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "example": "error handling",
+                    "description": "Search query"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "default": 5,
+                    "description": "Maximum number of results"
+                  },
+                  "contextMessages": {
+                    "type": "integer",
+                    "default": 2,
+                    "description": "Number of context messages before/after match"
+                  }
+                },
+                "required": ["query"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search results with context messages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bestMatch": {
+                      "type": "object",
+                      "properties": {
+                        "message_id": { "type": "string", "format": "uuid" },
+                        "content": { "type": "string" },
+                        "role": { "type": "string" },
+                        "similarity": { "type": "number" },
+                        "createdAt": { "type": "string", "format": "date-time" }
+                      }
+                    },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "message": {
+                            "type": "object",
+                            "description": "Matching message"
+                          },
+                          "context": {
+                            "type": "array",
+                            "description": "Surrounding context messages",
+                            "items": { "type": "object" }
+                          },
+                          "similarity": { "type": "number" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Conversation not found" }
+        }
+      }
+    },
+    "/users/preferences": {
+      "get": {
+        "summary": "Get user preferences",
+        "description": "Retrieve user's chat preferences (auto-creates if doesn't exist)",
+        "tags": ["User"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "User preferences",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserPreferences" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        }
+      },
+      "put": {
+        "summary": "Update user preferences",
+        "description": "Update user's chat preferences with validation",
+        "tags": ["User"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateUserPreferences" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated preferences",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserPreferences" }
+              }
+            }
+          },
+          "400": { "description": "Validation error" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/users/profile": {
+      "get": {
+        "summary": "Get user profile",
+        "description": "Retrieve authenticated user's profile information",
+        "tags": ["User"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "User profile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserProfile" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        }
+      },
+      "put": {
+        "summary": "Update user profile",
+        "description": "Update user's name and bio",
+        "tags": ["User"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "example": "John Doe" },
+                  "bio": { "type": "string", "example": "Software developer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated profile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserProfile" }
+              }
+            }
+          },
+          "400": { "description": "Validation error" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/users/avatar": {
+      "post": {
+        "summary": "Upload user avatar",
+        "description": "Upload avatar image (max 5MB, jpg/png/gif/webp)",
+        "tags": ["User"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "avatar": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Avatar image file"
+                  }
+                },
+                "required": ["avatar"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Avatar uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "avatar_url": { "type": "string", "example": "/uploads/avatars/user-123.jpg" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid file or size limit exceeded" },
+          "401": { "description": "Unauthorized" }
+        }
+      },
+      "delete": {
+        "summary": "Remove user avatar",
+        "description": "Delete user's avatar and revert to default",
+        "tags": ["User"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Avatar removed successfully" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/users/change-password": {
+      "put": {
+        "summary": "Change user password",
+        "description": "Change authenticated user's password",
+        "tags": ["User"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "currentPassword": { "type": "string", "example": "oldpass123" },
+                  "newPassword": { "type": "string", "example": "newpass456" },
+                  "confirmPassword": { "type": "string", "example": "newpass456" }
+                },
+                "required": ["currentPassword", "newPassword", "confirmPassword"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Password changed successfully" },
+          "400": { "description": "Validation error or passwords don't match" },
+          "401": { "description": "Unauthorized or incorrect current password" }
         }
       }
     }
@@ -445,28 +989,451 @@
           }
         }
       },
-      "SendMessage": {
+      "UserPreferences": {
         "type": "object",
         "properties": {
-          "content": { "type": "string" }
-        },
-        "required": ["content"]
+          "id": { "type": "string", "format": "uuid" },
+          "user_id": { "type": "string", "format": "uuid" },
+          "default_model": { "type": "string", "example": "gpt-5-nano" },
+          "default_context_window": { "type": "integer", "example": 10 },
+          "theme": { "type": "string", "enum": ["light", "dark", "system"], "example": "system" },
+          "language": { "type": "string", "example": "en" },
+          "response_style": {
+            "type": "string",
+            "example": "You are a helpful AI assistant. Be concise and clear."
+          },
+          "enable_streaming": { "type": "boolean", "example": true },
+          "enable_notifications": { "type": "boolean", "example": true },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
       },
-      "SendMessageResponse": {
+      "UpdateUserPreferences": {
         "type": "object",
         "properties": {
-          "userMessage": { "$ref": "#/components/schemas/Message" },
-          "assistantMessage": { "$ref": "#/components/schemas/Message" },
-          "conversation": {
-            "type": "object",
-            "properties": {
-              "id": { "type": "string" },
-              "total_tokens_used": { "type": "integer" },
-              "message_count": { "type": "integer" }
+          "default_model": { "type": "string", "example": "gpt-5-nano" },
+          "default_context_window": { "type": "integer", "minimum": 1, "maximum": 50 },
+          "theme": { "type": "string", "enum": ["light", "dark", "system"] },
+          "language": { "type": "string" },
+          "response_style": { "type": "string", "maxLength": 1000 },
+          "enable_streaming": { "type": "boolean" },
+          "enable_notifications": { "type": "boolean" }
+        }
+      },
+      "UserProfile": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string", "example": "John Doe" },
+          "email": { "type": "string", "format": "email", "example": "john@example.com" },
+          "bio": { "type": "string", "example": "Software developer" },
+          "avatar_url": { "type": "string", "example": "/uploads/avatars/user-123.jpg" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  },
+  "x-socket-events": {
+    "description": "WebSocket/Socket.IO Real-time Events Documentation",
+    "authentication": {
+      "description": "All WebSocket connections require JWT authentication via token in auth header, query parameter, or handshake auth",
+      "token": "Bearer <access-token>",
+      "example": "socket.auth({ token: 'your-jwt-token' })"
+    },
+    "connection": {
+      "url": "ws://localhost:3000",
+      "description": "WebSocket connection endpoint with Socket.IO",
+      "authentication_required": true,
+      "events": {
+        "connection": {
+          "description": "Client connects to WebSocket server",
+          "direction": "client->server",
+          "authentication": "Required"
+        },
+        "disconnect": {
+          "description": "Client disconnects from WebSocket server",
+          "direction": "client->server"
+        }
+      }
+    },
+    "client-to-server-events": {
+      "join:conversation": {
+        "summary": "Join a conversation room for real-time updates",
+        "description": "Client joins a conversation room to receive real-time messages and updates",
+        "parameters": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Conversation ID to join",
+            "required": true
+          }
+        },
+        "responses": {
+          "conversation:joined": {
+            "description": "Confirmation that client joined the conversation",
+            "data": {
+              "conversationId": "string"
             }
           }
         }
+      },
+      "leave:conversation": {
+        "summary": "Leave a conversation room",
+        "description": "Client leaves a conversation room",
+        "parameters": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Conversation ID to leave",
+            "required": true
+          }
+        },
+        "responses": {
+          "conversation:left": {
+            "description": "Confirmation that client left the conversation",
+            "data": {
+              "conversationId": "string"
+            }
+          }
+        }
+      },
+      "message:send": {
+        "summary": "Send a message and stream AI response",
+        "description": "Send a user message and receive streaming AI response in real-time",
+        "parameters": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Conversation ID",
+            "required": true
+          },
+          "content": {
+            "type": "string",
+            "description": "Message content",
+            "required": true
+          }
+        },
+        "responses": {
+          "message:chunk": {
+            "description": "Streaming AI response chunks",
+            "data": {
+              "conversationId": "string",
+              "chunk": "string",
+              "content": "string (accumulated)"
+            }
+          },
+          "message:complete": {
+            "description": "Complete message data after streaming finishes",
+            "data": {
+              "userMessage": "Message object",
+              "assistantMessage": "Message object",
+              "conversation": "Conversation object"
+            }
+          }
+        }
+      },
+      "conversation:create": {
+        "summary": "Broadcast conversation creation",
+        "description": "Notify other client instances about new conversation creation",
+        "parameters": {
+          "conversation": {
+            "type": "object",
+            "description": "Complete conversation object",
+            "required": true
+          }
+        }
+      },
+      "conversation:update": {
+        "summary": "Broadcast conversation updates",
+        "description": "Notify other client instances about conversation updates",
+        "parameters": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid",
+            "required": true
+          },
+          "update": {
+            "type": "object",
+            "description": "Update data (title, model, etc.)",
+            "required": true
+          }
+        }
+      },
+      "conversation:delete": {
+        "summary": "Broadcast conversation deletion",
+        "description": "Notify other client instances about conversation deletion",
+        "parameters": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid",
+            "required": true
+          }
+        }
+      },
+      "typing:start": {
+        "summary": "Start typing indicator",
+        "description": "Notify other users that this user is typing",
+        "parameters": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid",
+            "required": true
+          }
+        }
+      },
+      "typing:stop": {
+        "summary": "Stop typing indicator",
+        "description": "Notify other users that this user stopped typing",
+        "parameters": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid",
+            "required": true
+          }
+        }
+      },
+      "conversation:view": {
+        "summary": "Mark conversation as being viewed",
+        "description": "Track that user is actively viewing a conversation (for unread tracking)",
+        "parameters": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid",
+            "required": true
+          }
+        }
+      },
+      "conversation:leave_view": {
+        "summary": "Leave conversation view",
+        "description": "Stop tracking conversation view (unread tracking)",
+        "parameters": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid",
+            "required": true
+          }
+        }
+      },
+      "request_followups": {
+        "summary": "Request AI-generated follow-up suggestions",
+        "description": "Generate smart follow-up question suggestions based on conversation context",
+        "parameters": {
+          "sessionId": {
+            "type": "string",
+            "description": "User session ID for multi-tab sync",
+            "required": true
+          },
+          "messageId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Message ID to generate suggestions for",
+            "required": true
+          },
+          "lastUserMessage": {
+            "type": "string",
+            "description": "Last user message for context",
+            "required": true
+          },
+          "lastBotMessage": {
+            "type": "string",
+            "description": "Last bot response for context",
+            "required": true
+          }
+        },
+        "responses": {
+          "followups_response": {
+            "description": "Generated follow-up suggestions",
+            "data": {
+              "messageId": "string",
+              "suggestions": ["string", "string", "string"]
+            }
+          },
+          "followups_error": {
+            "description": "Error generating suggestions",
+            "data": {
+              "messageId": "string",
+              "error": "string"
+            }
+          }
+        }
+      },
+      "ping": {
+        "summary": "Connection health check",
+        "description": "Send ping to check connection health",
+        "responses": {
+          "pong": {
+            "description": "Server responds with pong"
+          }
+        }
       }
+    },
+    "server-to-client-events": {
+      "message:chunk": {
+        "summary": "AI response streaming chunks",
+        "description": "Real-time streaming of AI response chunks",
+        "data": {
+          "conversationId": "string",
+          "chunk": "string",
+          "content": "string (accumulated content)"
+        }
+      },
+      "message:new": {
+        "summary": "New message notification",
+        "description": "Notify about new messages from other users/devices",
+        "data": {
+          "conversationId": "string",
+          "message": "Message object"
+        }
+      },
+      "message:complete": {
+        "summary": "Complete message data",
+        "description": "Final message data after streaming completes",
+        "data": {
+          "userMessage": "Message object",
+          "assistantMessage": "Message object",
+          "conversation": "Conversation object"
+        }
+      },
+      "conversation:joined": {
+        "summary": "Conversation join confirmation",
+        "description": "Confirm client successfully joined conversation room",
+        "data": {
+          "conversationId": "string"
+        }
+      },
+      "conversation:left": {
+        "summary": "Conversation leave confirmation",
+        "description": "Confirm client successfully left conversation room",
+        "data": {
+          "conversationId": "string"
+        }
+      },
+      "conversation:created": {
+        "summary": "Conversation creation notification",
+        "description": "Notify about new conversation creation",
+        "data": "Conversation object"
+      },
+      "conversation:updated": {
+        "summary": "Conversation update notification",
+        "description": "Notify about conversation updates",
+        "data": {
+          "conversationId": "string",
+          "update": "object"
+        }
+      },
+      "conversation:deleted": {
+        "summary": "Conversation deletion notification",
+        "description": "Notify about conversation deletion",
+        "data": {
+          "conversationId": "string"
+        }
+      },
+      "conversation:activity": {
+        "summary": "Conversation activity update",
+        "description": "Update conversation activity for list refresh",
+        "data": {
+          "conversationId": "string",
+          "lastActivity": "string",
+          "messageCount": "number",
+          "totalTokens": "number"
+        }
+      },
+      "user:typing:start": {
+        "summary": "User typing indicator start",
+        "description": "Show typing indicator for other users",
+        "data": {
+          "userId": "string",
+          "conversationId": "string"
+        }
+      },
+      "user:typing:stop": {
+        "summary": "User typing indicator stop",
+        "description": "Hide typing indicator for other users",
+        "data": {
+          "userId": "string",
+          "conversationId": "string"
+        }
+      },
+      "ai:typing:start": {
+        "summary": "AI typing indicator start",
+        "description": "Show AI is generating response",
+        "data": {
+          "conversationId": "string"
+        }
+      },
+      "ai:typing:stop": {
+        "summary": "AI typing indicator stop",
+        "description": "Hide AI typing indicator",
+        "data": {
+          "conversationId": "string"
+        }
+      },
+      "conversation:unread_status": {
+        "summary": "Unread status update",
+        "description": "Notify about unread conversation status (multi-tab sync)",
+        "data": {
+          "conversationId": "string",
+          "hasUnread": "boolean",
+          "socketId": "string (optional, for tracking sender)"
+        }
+      },
+      "followups_response": {
+        "summary": "Follow-up suggestions response",
+        "description": "AI-generated follow-up question suggestions",
+        "data": {
+          "messageId": "string",
+          "suggestions": "array of strings (3 suggestions)"
+        }
+      },
+      "followups_error": {
+        "summary": "Follow-up generation error",
+        "description": "Error occurred while generating follow-up suggestions",
+        "data": {
+          "messageId": "string",
+          "error": "string"
+        }
+      },
+      "error": {
+        "summary": "Error notification",
+        "description": "Server error notifications",
+        "data": {
+          "message": "string",
+          "type": "string (optional)"
+        }
+      },
+      "pong": {
+        "summary": "Connection health response",
+        "description": "Response to ping for connection health check"
+      }
+    },
+    "rooms": {
+      "description": "Socket.IO rooms for organizing connections",
+      "user-rooms": {
+        "pattern": "user:{userId}",
+        "description": "Personal room for each user (for cross-tab synchronization)"
+      },
+      "conversation-rooms": {
+        "pattern": "conversation:{conversationId}",
+        "description": "Room for all participants in a conversation"
+      }
+    },
+    "websocket-auth": {
+      "description": "WebSocket authentication methods",
+      "methods": [
+        {
+          "method": "auth header",
+          "example": "socket.handshake.headers.authorization = 'Bearer <token>'"
+        },
+        {
+          "method": "query parameter",
+          "example": "ws://localhost:3000?token=<token>"
+        },
+        {
+          "method": "handshake auth",
+          "example": "socket.auth({ token: '<token>' })"
+        }
+      ]
     }
   }
 }

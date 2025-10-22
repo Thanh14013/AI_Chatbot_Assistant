@@ -9,7 +9,7 @@ import {
   setAccessToken,
   clearTokens,
 } from "../utils/token.util";
-import { API_BASE_URL } from "../config/env.config";
+import { websocketService } from "./websocket.service";
 import type { ApiErrorResponse, RefreshTokenResponse } from "../types";
 
 // Create axios instance with base configuration
@@ -75,6 +75,8 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   // Success response - pass through
   (response) => {
+    // no debug logs
+
     return response;
   },
 
@@ -96,7 +98,8 @@ axiosInstance.interceptors.response.use(
       if (url.includes("/auth/login") || url.includes("/auth/register")) {
         return Promise.reject(error);
       }
-      // If refresh endpoint fails, logout user
+
+      // If refresh endpoint fails, logout user (token expired or invalid)
       if (originalRequest.url?.includes("/auth/refresh")) {
         clearTokens();
         window.location.href = "/login";
@@ -128,7 +131,8 @@ axiosInstance.interceptors.response.use(
       try {
         // POST to refresh endpoint without body. Browser will send cookie automatically because
         // axiosInstance was created with withCredentials: true. Use plain axios to avoid interceptor recursion.
-        const refreshUrl = `${API_BASE_URL.replace(/\/$/, "")}/auth/refresh`;
+        // Use the same proxy path as axiosInstance baseURL to ensure consistency
+        const refreshUrl = "/api/auth/refresh";
         const response = await axios.post<RefreshTokenResponse>(
           refreshUrl,
           {},
@@ -139,6 +143,13 @@ axiosInstance.interceptors.response.use(
 
         // Persist new access token locally
         setAccessToken(accessToken);
+
+        // Tell WebSocket service to reconnect using the new token (if connected)
+        try {
+          websocketService.updateToken();
+        } catch {
+          // Non-fatal: websocket token update failed (log suppressed)
+        }
 
         // Update Authorization header for the original request
         if (originalRequest.headers) {
@@ -152,8 +163,18 @@ axiosInstance.interceptors.response.use(
         return axiosInstance(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        clearTokens();
-        window.location.href = "/login";
+
+        // Only clear tokens and redirect if it's a 401/403 (authentication failure)
+        if (axios.isAxiosError(refreshError)) {
+          if (
+            refreshError.response?.status === 401 ||
+            refreshError.response?.status === 403
+          ) {
+            clearTokens();
+            window.location.href = "/login";
+          }
+        }
+
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

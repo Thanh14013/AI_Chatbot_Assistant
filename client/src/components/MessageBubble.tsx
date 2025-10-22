@@ -3,32 +3,151 @@
  * Displays individual chat messages with different styles for user and assistant
  */
 
-import React, { useState } from "react";
-import { Avatar, Typography, Button, message as antMessage } from "antd";
+import React, { useState, useEffect, useRef } from "react";
+import { Avatar, Typography, Button, App } from "antd";
 import {
   UserOutlined,
   RobotOutlined,
   CopyOutlined,
   CheckOutlined,
+  ReloadOutlined,
+  BulbOutlined,
+  ClockCircleOutlined,
+  SyncOutlined,
+  WarningOutlined,
+  PushpinOutlined,
+  PushpinFilled,
 } from "@ant-design/icons";
-import { Message, MessageRole } from "../types/chat.type";
+import { Message } from "../types/chat.type";
+import { PendingMessage } from "../types/offline-message.type";
 import styles from "./MessageBubble.module.css";
+import { pinMessage, unpinMessage } from "../services/chat.service";
 
 const { Text } = Typography;
 
 interface MessageBubbleProps {
-  message: Message;
+  message: Message | PendingMessage;
+  // Optional retry handler for failed messages
+  onRetry?: (message: Message | PendingMessage) => void;
+  // Optional handler for requesting follow-up suggestions
+  onRequestFollowups?: (messageId: string, content: string) => void;
+  // Optional handler for clicking a follow-up suggestion
+  onFollowupClick?: (suggestion: string) => void;
+  // Optional handler for when a message is pinned/unpinned
+  onPinToggle?: (messageId: string, isPinned: boolean) => void;
 }
 
 /**
  * MessageBubble component
  * Renders a single message with avatar, content, timestamp, and copy button
  */
-const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+const MessageBubble: React.FC<MessageBubbleProps> = ({
+  message,
+  onRetry,
+  onRequestFollowups,
+  onFollowupClick,
+  onPinToggle,
+}) => {
+  const { message: antMessage } = App.useApp();
   const [isCopied, setIsCopied] = useState(false);
+  const [isPinning, setIsPinning] = useState(false);
+  // Client-side streaming display (progressive reveal)
+  const [displayedContent, setDisplayedContent] = useState<string>(
+    message.content || ""
+  );
+  // Render-time debug logging removed
+  const lastStreamedMessageId = useRef<string | null>(null);
+  const displayedContentRef = useRef<string>(displayedContent);
   // MessageRole is a string union ('user' | 'assistant' | 'system')
   // compare against the literal value
   const isUser = message.role === "user";
+
+  // Type guard to check if message is PendingMessage
+  const isPendingMessage = (
+    msg: Message | PendingMessage
+  ): msg is PendingMessage => {
+    return "status" in msg && "retryCount" in msg;
+  };
+
+  // Local status helpers - check both Message.localStatus and PendingMessage.status
+  const messageStatus = isPendingMessage(message)
+    ? message.status
+    : (message as Message).localStatus;
+
+  const isFailed = messageStatus === "failed";
+  const isPending = messageStatus === "pending";
+  const isSending = messageStatus === "sending";
+
+  // Retry metadata
+  const retryCount = !isPendingMessage(message)
+    ? (message as Message).retryCount || 0
+    : 0;
+  const errorMessage = !isPendingMessage(message)
+    ? (message as Message).errorMessage
+    : undefined;
+  const maxRetries = 3;
+
+  // Follow-up suggestions state (only for Message type)
+  const hasFollowups =
+    !isPendingMessage(message) &&
+    message.followupSuggestions &&
+    message.followupSuggestions.length > 0;
+  const isLoadingFollowups =
+    !isPendingMessage(message) && (message.isLoadingFollowups || false);
+  const isTyping = !isPendingMessage(message) && (message.isTyping || false);
+
+  // Pin status (only for Message type)
+  const isPinned = !isPendingMessage(message) && (message.pinned || false);
+
+  /**
+   * Handle pin/unpin toggle
+   */
+  const handlePinToggle = async () => {
+    if (isPendingMessage(message) || isPinning) return;
+
+    // IMPORTANT: Read current pinned status directly from message prop
+    // to avoid using stale cached const value
+    const currentPinned =
+      !isPendingMessage(message) && (message.pinned || false);
+
+    setIsPinning(true);
+    try {
+      if (currentPinned) {
+        await unpinMessage(message.id);
+        antMessage.success("Message unpinned");
+      } else {
+        await pinMessage(message.id);
+        antMessage.success("Message pinned");
+      }
+
+      // Notify parent component
+      if (onPinToggle) {
+        onPinToggle(message.id, !currentPinned);
+      }
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        antMessage.error(
+          error.message ||
+            `Failed to ${currentPinned ? "unpin" : "pin"} message`
+        );
+      } else {
+        antMessage.error(
+          `Failed to ${currentPinned ? "unpin" : "pin"} message`
+        );
+      }
+    } finally {
+      setIsPinning(false);
+    }
+  };
+
+  /**
+   * Handle requesting follow-up suggestions
+   */
+  const handleRequestFollowups = () => {
+    if (!isTyping && message.content && onRequestFollowups) {
+      onRequestFollowups(message.id, message.content);
+    }
+  };
 
   /**
    * Format timestamp to readable format
@@ -69,8 +188,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
       setTimeout(() => {
         setIsCopied(false);
       }, 2000);
-    } catch (error) {
-      console.error("Failed to copy message:", error);
+    } catch {
+      // Copy failed - silently ignore
       antMessage.error("Failed to copy message");
     }
   };
@@ -103,49 +222,331 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
     });
   };
 
+  // Client-side streaming: reveal assistant message token-by-token
+  useEffect(() => {
+    // If message isTyping (stream in progress), just reflect the accumulated
+    // content immediately on each chunk so the UI shows per-chunk updates.
+    const full = message.content || "";
+
+    if (isTyping) {
+      try {
+        // streaming chunk debug removed
+      } catch {
+        // Ignore debug logging errors
+      }
+      setDisplayedContent(full);
+      // No token timer while streaming via chunks
+      return;
+    }
+
+    // Otherwise (message is finalized/not typing) run tokenized reveal
+    // If there's no content, nothing to stream
+    if (!full) {
+      setDisplayedContent("");
+      return;
+    }
+
+    // Split into tokens while preserving whitespace so spacing stays correct
+    const tokens = full.match(/\s+|\S+/g) || [full];
+
+    // Determine starting index: if we're already streaming the same message id,
+    // resume from the number of tokens already displayed. Otherwise start from 0.
+    let startIndex = 0;
+    if (lastStreamedMessageId.current === message.id) {
+      const displayedTokens =
+        (displayedContentRef.current || "").match(/\s+|\S+/g) || [];
+      startIndex = displayedTokens.length;
+      if (startIndex >= tokens.length) {
+        // Nothing new to stream
+        setDisplayedContent(full);
+        return;
+      }
+    } else {
+      lastStreamedMessageId.current = message.id;
+      setDisplayedContent("");
+      startIndex = 0;
+    }
+
+    let idx = startIndex;
+    const DELAY_MS = 40;
+
+    // Debug logging to help trace streaming behavior in browser console
+    try {
+      // streaming start debug removed
+    } catch {
+      // Ignore debug logging errors
+    }
+
+    const timer = setInterval(() => {
+      idx += 1;
+      const token = tokens[idx - 1] || "";
+      setDisplayedContent((prev) => prev + token);
+      try {
+        // append token debug removed
+      } catch {
+        // Ignore debug logging errors
+      }
+      if (idx >= tokens.length) {
+        clearInterval(timer);
+      }
+    }, DELAY_MS);
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, [message.id, message.content, message.role, isTyping]);
+
+  // Keep a ref in sync with displayedContent so the streaming effect can
+  // compute how many tokens were already shown without adding displayedContent
+  // as a dependency (which would cause extra effect runs).
+  useEffect(() => {
+    displayedContentRef.current = displayedContent;
+  }, [displayedContent]);
+
   return (
     <div
       className={`${styles.messageContainer} ${
         isUser ? styles.userMessage : styles.assistantMessage
       }`}
     >
-      {/* Avatar - show on left for assistant, right for user */}
-      {!isUser && (
-        <Avatar
-          icon={<RobotOutlined />}
-          className={`${styles.avatar} ${styles.assistantAvatar}`}
-        />
-      )}
+      {/* Render content even while isTyping if content exists (shows streaming).
+          Only show typing dots when content is empty. */}
+      {!(isTyping && displayedContent.trim() === "") ? (
+        <>
+          {/* Avatar - show on left for assistant, right for user */}
+          {!isUser && (
+            <Avatar
+              icon={<RobotOutlined />}
+              className={`${styles.avatar} ${styles.assistantAvatar}`}
+            />
+          )}
 
-      {/* Message content bubble */}
-      <div className={styles.messageBubble}>
-        <div className={styles.messageContent}>
-          {renderContent(message.content)}
-        </div>
+          {/* Message content bubble */}
+          <div
+            className={`${styles.messageBubble} ${
+              isPinned ? styles.pinnedMessage : ""
+            }`}
+          >
+            {/* Pin button positioned in top-right corner */}
+            {!isPendingMessage(message) && message.content && (
+              <Button
+                type="text"
+                size="small"
+                icon={isPinned ? <PushpinFilled /> : <PushpinOutlined />}
+                onClick={handlePinToggle}
+                loading={isPinning}
+                className={`${styles.pinButtonCorner} ${
+                  isPinned ? styles.pinned : ""
+                }`}
+                title={isPinned ? "Unpin message" : "Pin message"}
+              />
+            )}
 
-        {/* Message footer with timestamp and copy button */}
-        <div className={styles.messageFooter}>
-          <Text className={styles.timestamp}>
-            {formatTimestamp(message.createdAt)}
-          </Text>
+            {/* Follow-up button positioned in top-right corner for assistant messages */}
+            {!isUser && !isTyping && message.content && (
+              <Button
+                type="text"
+                size="small"
+                icon={<BulbOutlined />}
+                onClick={handleRequestFollowups}
+                loading={isLoadingFollowups}
+                className={styles.followupButtonCorner}
+                title="Get follow-up suggestions"
+              />
+            )}
 
-          {/* Copy button */}
-          <Button
-            type="text"
-            size="small"
-            icon={isCopied ? <CheckOutlined /> : <CopyOutlined />}
-            onClick={handleCopy}
-            className={styles.copyButton}
+            <div className={styles.messageContent}>
+              {message.role === "assistant" &&
+              (!displayedContent || displayedContent.trim() === "") ? (
+                <em className={styles.emptyAssistant}>
+                  Assistant did not return content. Try retrying the message.
+                </em>
+              ) : (
+                renderContent(displayedContent)
+              )}
+            </div>
+
+            {/* Attachments display - show files attached to message */}
+            {!isPendingMessage(message) &&
+              message.attachments &&
+              message.attachments.length > 0 && (
+                <div className={styles.attachmentsContainer}>
+                  {message.attachments.map((attachment, index) => (
+                    <div key={index} className={styles.attachmentItem}>
+                      {attachment.resource_type === "image" ? (
+                        // Image preview
+                        <a
+                          href={attachment.secure_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={styles.imageAttachment}
+                        >
+                          <img
+                            src={
+                              attachment.thumbnail_url || attachment.secure_url
+                            }
+                            alt={attachment.original_filename || "Image"}
+                            className={styles.attachmentImage}
+                          />
+                        </a>
+                      ) : (
+                        // File link for non-image files
+                        <a
+                          href={attachment.secure_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={styles.fileAttachment}
+                        >
+                          <div className={styles.fileIcon}>📄</div>
+                          <div className={styles.fileInfo}>
+                            <div className={styles.fileName}>
+                              {attachment.original_filename || "File"}
+                            </div>
+                            <div className={styles.fileSize}>
+                              {attachment.format?.toUpperCase() || "FILE"}
+                              {attachment.size_bytes &&
+                                ` • ${(attachment.size_bytes / 1024).toFixed(
+                                  1
+                                )} KB`}
+                            </div>
+                          </div>
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+            {/* Message footer with timestamp and actions (copy + retry) */}
+            <div className={styles.messageFooter}>
+              <Text className={styles.timestamp}>
+                {formatTimestamp(message.createdAt)}
+              </Text>
+
+              <div className={styles.footerActions}>
+                {/* Copy button (always present) */}
+                <Button
+                  type="text"
+                  size="small"
+                  icon={isCopied ? <CheckOutlined /> : <CopyOutlined />}
+                  onClick={handleCopy}
+                  className={styles.copyButton}
+                  disabled={isSending}
+                />
+
+                {/* Retry button shown for failed messages, placed next to copy */}
+                {isFailed && (
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<ReloadOutlined />}
+                    onClick={() => onRetry && onRetry(message)}
+                    className={styles.retryButton}
+                    disabled={isSending || retryCount >= maxRetries}
+                    title={
+                      retryCount >= maxRetries
+                        ? `Maximum retry attempts (${maxRetries}) reached`
+                        : `Retry (${retryCount}/${maxRetries} attempts)`
+                    }
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Error message display for failed messages */}
+            {isFailed && errorMessage && (
+              <div className={styles.errorMessageContainer}>
+                <WarningOutlined className={styles.errorIcon} />
+                <Text className={styles.errorText}>
+                  {errorMessage}
+                  {retryCount > 0 && ` (Attempt ${retryCount}/${maxRetries})`}
+                </Text>
+              </div>
+            )}
+
+            {/* Sending status display */}
+            {isSending && (
+              <div className={styles.sendingStatusContainer}>
+                <SyncOutlined spin className={styles.sendingIcon} />
+                <Text className={styles.sendingText}>
+                  {retryCount > 0
+                    ? `Retrying (${retryCount}/${maxRetries})...`
+                    : "Sending..."}
+                </Text>
+              </div>
+            )}
+
+            {/* Follow-up suggestions displayed below the message with animation */}
+            {!isUser && hasFollowups && (
+              <div className={styles.followupSuggestionsCard}>
+                <div className={styles.suggestionChips}>
+                  {message.followupSuggestions!.map((suggestion, index) => (
+                    <div
+                      key={index}
+                      className={styles.suggestionChip}
+                      onClick={() =>
+                        onFollowupClick && onFollowupClick(suggestion)
+                      }
+                    >
+                      {suggestion}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Loading indicator for follow-up suggestions */}
+            {!isUser && isLoadingFollowups && !hasFollowups && (
+              <div className={styles.followupLoading}>
+                <span className={styles.loadingDot} />
+                <span className={styles.loadingDot} />
+                <span className={styles.loadingDot} />
+                <span className={styles.loadingText}>
+                  Generating suggestions...
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* User avatar on the right */}
+          {isUser && (
+            <>
+              <Avatar
+                icon={<UserOutlined />}
+                className={`${styles.avatar} ${styles.userAvatar}`}
+              />
+              {/* Status indicator for pending/sending/failed messages - show next to avatar */}
+              {(isPending || isSending || isFailed) && (
+                <div className={styles.messageStatusBadge}>
+                  {isPending && (
+                    <ClockCircleOutlined style={{ color: "#8c8c8c" }} />
+                  )}
+                  {isSending && (
+                    <SyncOutlined spin style={{ color: "#1890ff" }} />
+                  )}
+                  {isFailed && <WarningOutlined style={{ color: "#ff4d4f" }} />}
+                </div>
+              )}
+            </>
+          )}
+        </>
+      ) : (
+        // Typing placeholder: when assistant is typing and there's no accumulated
+        // content yet, show the assistant avatar and a message bubble containing
+        // three animated dots.
+        <div className={styles.typingRow}>
+          <Avatar
+            icon={<RobotOutlined />}
+            className={`${styles.avatar} ${styles.assistantAvatar}`}
           />
+          <div className={styles.messageBubble}>
+            <div className={styles.typingPlaceholder}>
+              <span className={styles.typingDot} />
+              <span className={styles.typingDot} />
+              <span className={styles.typingDot} />
+            </div>
+          </div>
         </div>
-      </div>
-
-      {/* User avatar on the right */}
-      {isUser && (
-        <Avatar
-          icon={<UserOutlined />}
-          className={`${styles.avatar} ${styles.userAvatar}`}
-        />
       )}
     </div>
   );
