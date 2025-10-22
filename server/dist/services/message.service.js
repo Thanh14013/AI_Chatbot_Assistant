@@ -124,6 +124,32 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
                 pinned: msg.pinned,
                 createdAt: msg.createdAt,
             }));
+            // Fetch attachments for all messages
+            const { default: fileUploadModel } = await import("../models/fileUpload.model.js");
+            for (const msgResponse of messageResponses) {
+                try {
+                    const attachments = await fileUploadModel.findByMessageId(msgResponse.id);
+                    if (attachments && attachments.length > 0) {
+                        msgResponse.attachments = attachments.map((att) => ({
+                            id: att.id,
+                            public_id: att.public_id,
+                            secure_url: att.secure_url,
+                            resource_type: att.resource_type,
+                            format: att.format,
+                            original_filename: att.original_filename,
+                            size_bytes: att.size_bytes,
+                            width: att.width,
+                            height: att.height,
+                            thumbnail_url: att.thumbnail_url,
+                            extracted_text: att.extracted_text,
+                        }));
+                    }
+                }
+                catch (err) {
+                    // Don't fail if attachments fetch fails
+                    console.error(`[MessageService] Failed to fetch attachments for message ${msgResponse.id}`);
+                }
+            }
             // Determine if there are more messages older than the first returned
             let hasMore = false;
             if (messageResponses.length > 0) {
@@ -176,6 +202,32 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
             pinned: msg.pinned,
             createdAt: msg.createdAt,
         }));
+        // Fetch attachments for all messages
+        const { default: fileUploadModel } = await import("../models/fileUpload.model.js");
+        for (const msgResponse of messageResponses) {
+            try {
+                const attachments = await fileUploadModel.findByMessageId(msgResponse.id);
+                if (attachments && attachments.length > 0) {
+                    msgResponse.attachments = attachments.map((att) => ({
+                        id: att.id,
+                        public_id: att.public_id,
+                        secure_url: att.secure_url,
+                        resource_type: att.resource_type,
+                        format: att.format,
+                        original_filename: att.original_filename,
+                        size_bytes: att.size_bytes,
+                        width: att.width,
+                        height: att.height,
+                        thumbnail_url: att.thumbnail_url,
+                        extracted_text: att.extracted_text,
+                    }));
+                }
+            }
+            catch (err) {
+                // Don't fail if attachments fetch fails
+                console.error(`[MessageService] Failed to fetch attachments for message ${msgResponse.id}`);
+            }
+        }
         return {
             messages: messageResponses,
             pagination: {
@@ -217,7 +269,9 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
  */
 export const sendMessageAndStreamResponse = async (conversationId, userId, content, onChunk, 
 // optional callback invoked immediately after the user message is persisted
-onUserMessageCreated) => {
+onUserMessageCreated, 
+// optional attachments array
+attachments) => {
     if (!content || content.trim().length === 0) {
         throw new Error("Message content cannot be empty");
     }
@@ -238,9 +292,47 @@ onUserMessageCreated) => {
         tokens_used: userTokens,
         model: conversation.model,
     });
+    // Link attachments to this message if present
+    if (attachments && attachments.length > 0) {
+        try {
+            const { default: fileUploadModel } = await import("../models/fileUpload.model.js");
+            const publicIds = attachments.map((att) => att.public_id);
+            await fileUploadModel.updateMessageId(publicIds, userMessage.id);
+        }
+        catch (err) {
+            console.error("[MessageService] Failed to link attachments to message:", err.message);
+            // Don't fail the entire request if linking fails
+        }
+    }
     // Invoke callback so callers (socket server) can broadcast the persisted user message
     try {
         if (onUserMessageCreated) {
+            // Fetch attachments for this message to include in broadcast
+            let messageAttachments;
+            if (attachments && attachments.length > 0) {
+                try {
+                    const { default: fileUploadModel } = await import("../models/fileUpload.model.js");
+                    const fetchedAttachments = await fileUploadModel.findByMessageId(userMessage.id);
+                    if (fetchedAttachments && fetchedAttachments.length > 0) {
+                        messageAttachments = fetchedAttachments.map((att) => ({
+                            id: att.id,
+                            public_id: att.public_id,
+                            secure_url: att.secure_url,
+                            resource_type: att.resource_type,
+                            format: att.format,
+                            original_filename: att.original_filename,
+                            size_bytes: att.size_bytes,
+                            width: att.width,
+                            height: att.height,
+                            thumbnail_url: att.thumbnail_url,
+                            extracted_text: att.extracted_text,
+                        }));
+                    }
+                }
+                catch (err) {
+                    console.error("[MessageService] Failed to fetch attachments for broadcast:", err.message);
+                }
+            }
             await onUserMessageCreated({
                 id: userMessage.id,
                 conversation_id: userMessage.conversation_id,
@@ -249,6 +341,7 @@ onUserMessageCreated) => {
                 tokens_used: userMessage.tokens_used,
                 model: userMessage.model,
                 createdAt: userMessage.createdAt,
+                attachments: messageAttachments,
             });
         }
     }
@@ -334,9 +427,27 @@ onUserMessageCreated) => {
             content: m.content,
         })));
     }
+    // Process attachments if present
+    // Determine model to use - if attachments present, always use GPT-4o for multimodal support
+    let modelToUse = conversation.model;
+    if (attachments && attachments.length > 0) {
+        // Import OpenAI service helpers
+        const { buildMessageContentWithAttachments } = await import("./openai.service.js");
+        // Force GPT-4o when attachments present (images, PDFs, CSVs, etc.)
+        modelToUse = "gpt-4o";
+        // Build enhanced content for the last user message with attachments
+        const enhancedContent = buildMessageContentWithAttachments(content.trim(), attachments);
+        // Replace the last message (current user message) with enhanced version
+        if (contextMessages.length > 0) {
+            const lastMessage = contextMessages[contextMessages.length - 1];
+            if (lastMessage.role === "user") {
+                lastMessage.content = enhancedContent;
+            }
+        }
+    }
     // Prepare payload for streaming
     const payload = {
-        model: conversation.model,
+        model: modelToUse, // Use determined model (gpt-4o if attachments, otherwise conversation model)
         messages: contextMessages,
         stream: true,
         max_completion_tokens: 2000,
@@ -345,6 +456,8 @@ onUserMessageCreated) => {
     if (!["gpt-5-nano"].includes(conversation.model)) {
         payload.temperature = 0.7;
     }
+    // Log detailed structure of last message to verify attachments
+    const lastMsg = payload.messages[payload.messages.length - 1];
     // Call OpenAI streaming
     const openai = (await import("./openai.service.js")).default;
     const stream = await openai.chat.completions.create(payload);

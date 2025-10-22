@@ -109,30 +109,8 @@ const ConversationForm: React.FC<ConversationFormProps> = ({
   // Update form and state when initialValues change (for edit mode)
   React.useEffect(() => {
     if (mode === "edit" && initialValues) {
-      console.log(
-        "[ConversationForm] Setting initial values for edit mode:",
-        initialValues
-      );
-      console.log(
-        "[ConversationForm] Tags in initialValues:",
-        initialValues.tags
-      );
-      console.log(
-        "[ConversationForm] Tags is array?",
-        Array.isArray(initialValues.tags)
-      );
-
       form.setFieldsValue(initialValues);
       setContextWindow(initialValues.context_window);
-
-      console.log(
-        "[ConversationForm] Form values after set:",
-        form.getFieldsValue()
-      );
-      console.log(
-        "[ConversationForm] Tags field value:",
-        form.getFieldValue("tags")
-      );
     }
   }, [mode, initialValues, form]);
 
@@ -143,10 +121,6 @@ const ConversationForm: React.FC<ConversationFormProps> = ({
     form
       .validateFields()
       .then((values) => {
-        console.log(
-          "[ConversationForm] Form validated, submitting values:",
-          values
-        );
         onSubmit(values);
         if (mode === "create") {
           form.resetFields();

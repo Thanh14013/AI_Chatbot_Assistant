@@ -112,9 +112,15 @@ export const sendMessageStream = async (req, res) => {
             res.status(400).json({ success: false, message: "Conversation ID is required" });
             return;
         }
-        const { content } = req.body;
+        const { content, attachments } = req.body;
         if (!content || typeof content !== "string" || content.trim().length === 0) {
             res.status(400).json({ success: false, message: "Message content is required" });
+            return;
+        }
+        // Log received attachments
+        // Validate attachments if provided
+        if (attachments && !Array.isArray(attachments)) {
+            res.status(400).json({ success: false, message: "Attachments must be an array" });
             return;
         }
         // Set headers for SSE
@@ -123,10 +129,11 @@ export const sendMessageStream = async (req, res) => {
         res.setHeader("Connection", "keep-alive");
         res.flushHeaders?.();
         // Call service to stream; service will invoke onChunk for each partial piece
+        // Pass attachments to the service
         await sendMessageAndStreamResponse(conversationId, userId, content, async (chunk) => {
             // Send SSE data event with chunk
             res.write(`data: ${JSON.stringify({ type: "chunk", text: chunk })}\n\n`);
-        })
+        }, attachments)
             .then((result) => {
             // Send final event with complete result (userMessage, assistantMessage, conversation)
             const doneEvent = { type: "done", ...result };

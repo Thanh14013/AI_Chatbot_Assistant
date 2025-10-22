@@ -395,12 +395,6 @@ export function buildMessageContentWithAttachments(
     return textContent;
   }
 
-  console.log("[OpenAI] Building message content with attachments:", {
-    count: attachments.length,
-    types: attachments.map((a) => a.resource_type),
-    hasText: attachments.some((a) => !!a.extracted_text),
-  });
-
   // Check if any attachment is an image (requires vision API)
   const hasImages = attachments.some((att) => att.resource_type === "image");
 
@@ -440,7 +434,6 @@ export function buildMessageContentWithAttachments(
           url: att.secure_url,
         },
       });
-      console.log(`[OpenAI] Added image ${idx + 1} for vision analysis:`, att.secure_url);
     });
 
     // Add extracted text from documents
@@ -450,18 +443,7 @@ export function buildMessageContentWithAttachments(
           type: "text",
           text: `\n\n--- ${att.format?.toUpperCase()} Document Content (extracted) ---\n${att.extracted_text}\n--- End of ${att.format?.toUpperCase()} ---`,
         });
-        console.log("[OpenAI] Added extracted text from document:", {
-          format: att.format,
-          textLength: att.extracted_text.length,
-        });
       }
-    });
-
-    console.log("[OpenAI] Built multimodal content array:", {
-      totalItems: content.length,
-      textItems: content.filter((c) => c.type === "text").length,
-      imageItems: content.filter((c) => c.type === "image_url").length,
-      structure: content.map((c) => c.type),
     });
 
     return content;
@@ -480,20 +462,11 @@ export function buildMessageContentWithAttachments(
     attachments.forEach((att) => {
       if (att.extracted_text) {
         fullContent += `\n\n--- ${att.format?.toUpperCase()} Document Content (extracted) ---\n${att.extracted_text}\n--- End of ${att.format?.toUpperCase()} ---`;
-        console.log("[OpenAI] Added extracted text from document:", {
-          format: att.format,
-          textLength: att.extracted_text.length,
-        });
       }
     });
 
     fullContent +=
       "\n\nYou can reference these file URLs in your response if the user needs to access them.";
-
-    console.log("[OpenAI] Built text-only content with attachments:", {
-      totalLength: fullContent.length,
-      hasExtractedText: attachments.some((a) => !!a.extracted_text),
-    });
 
     return fullContent;
   }

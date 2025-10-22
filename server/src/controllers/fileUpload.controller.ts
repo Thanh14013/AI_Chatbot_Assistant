@@ -21,9 +21,7 @@ export const generateUploadSignature = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    console.log("📤 Generating upload signature for folder:", folder);
     const signature = CloudinaryService.generateUploadSignature(folder);
-    console.log("📦 Signature response:", JSON.stringify(signature, null, 2));
 
     res.json({
       success: true,

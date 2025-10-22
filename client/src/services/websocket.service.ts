@@ -385,9 +385,6 @@ class WebSocketService {
       // Message pin/unpin events (multi-tab sync)
       this.socket.on("message:pinned", (data) => {
         try {
-          console.log(
-            `[WebSocket] Message pinned event received: ${data.messageId}`
-          );
           this.handlers.onMessagePinned?.(data);
         } catch {
           // logging removed
@@ -403,9 +400,6 @@ class WebSocketService {
 
       this.socket.on("message:unpinned", (data) => {
         try {
-          console.log(
-            `[WebSocket] Message unpinned event received: ${data.messageId}`
-          );
           this.handlers.onMessageUnpinned?.(data);
         } catch {
           // logging removed

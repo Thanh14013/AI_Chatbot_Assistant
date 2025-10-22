@@ -21,8 +21,6 @@ export default {
       name: "idx_conversations_tags",
       using: "GIN",
     });
-
-    console.log("✅ Added tags column and GIN index to conversations table");
   },
 
   // Reverse the migration - Remove tags column and index
@@ -32,7 +30,5 @@ export default {
 
     // Remove tags column
     await queryInterface.removeColumn("conversations", "tags");
-
-    console.log("✅ Removed tags column and GIN index from conversations table");
   },
 };

@@ -29,11 +29,6 @@ export const fileUploadService = {
     signature: CloudinarySignature,
     onProgress?: (progress: number) => void
   ): Promise<CloudinaryUploadResponse> {
-    console.log(
-      "📥 Received signature from server:",
-      JSON.stringify(signature, null, 2)
-    );
-
     const formData = new FormData();
     formData.append("file", file);
     formData.append("api_key", signature.api_key);
@@ -45,7 +40,6 @@ export const fileUploadService = {
     // NOTE: Do NOT send resource_type for /auto/upload endpoint - it auto-detects!
 
     if (signature.access_mode) {
-      console.log("✅ Appending access_mode:", signature.access_mode);
       formData.append("access_mode", signature.access_mode);
     } else {
       console.error("❌ Missing access_mode in signature!");
@@ -56,7 +50,6 @@ export const fileUploadService = {
     formData.forEach((value, key) => {
       entries.push(`${key}=${value}`);
     });
-    console.log("📤 FormData entries:", entries.join(", "));
 
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();

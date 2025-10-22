@@ -78,31 +78,6 @@ export const getConversations = async (
     `/conversations?${queryParams.toString()}`
   );
 
-  console.log("[Chat Service] getConversations RAW response:", resp.data);
-  console.log(
-    "[Chat Service] First conversation FULL:",
-    JSON.stringify(resp.data.data?.[0], null, 2)
-  );
-  console.log("[Chat Service] getConversations response:", {
-    count: resp.data.data?.length,
-    firstConversation: resp.data.data?.[0],
-    firstConversationKeys: Object.keys(resp.data.data?.[0] || {}),
-    firstConversationTags: resp.data.data?.[0]?.tags,
-    hasTagsField: "tags" in (resp.data.data?.[0] || {}),
-    pagination: resp.data.pagination,
-  });
-
-  // Check each conversation for tags
-  const conversationsWithTags =
-    resp.data.data?.filter(
-      (c: ConversationListItem) => c.tags && c.tags.length > 0
-    ) || [];
-  console.log(
-    "[Chat Service] Conversations with tags:",
-    conversationsWithTags.length,
-    conversationsWithTags
-  );
-
   return {
     conversations: resp.data.data as ConversationListItem[],
     pagination: resp.data.pagination,
@@ -114,12 +89,6 @@ export const getConversation = async (
   id: string
 ): Promise<ConversationType> => {
   const resp = await axiosInstance.get(`/conversations/${id}`);
-
-  console.log("[Chat Service] getConversation response for id:", id, {
-    conversation: resp.data.data,
-    tags: resp.data.data?.tags,
-    hasTagsField: "tags" in (resp.data.data || {}),
-  });
 
   return resp.data.data as ConversationType;
 };
@@ -337,14 +306,11 @@ export const updateConversation = async (
   conversationId: string,
   payload: UpdateConversationPayload
 ): Promise<ConversationType> => {
-  console.log("[Chat Service] Updating conversation:", conversationId, payload);
-
   const resp = await axiosInstance.patch(
     `/conversations/${conversationId}`,
     payload
   );
 
-  console.log("[Chat Service] Update response:", resp.data);
   return resp.data.data as ConversationType;
 };
 
@@ -376,9 +342,7 @@ export const getPopularTags = async (): Promise<PopularTag[]> => {
  * @param messageId - ID of the message to pin
  */
 export const pinMessage = async (messageId: string): Promise<void> => {
-  console.log(`[Chat Service] Pinning message: ${messageId}`);
   await axiosInstance.patch(`/conversations/messages/${messageId}/pin`);
-  console.log(`[Chat Service] Message pinned successfully: ${messageId}`);
 };
 
 /**
@@ -386,9 +350,7 @@ export const pinMessage = async (messageId: string): Promise<void> => {
  * @param messageId - ID of the message to unpin
  */
 export const unpinMessage = async (messageId: string): Promise<void> => {
-  console.log(`[Chat Service] Unpinning message: ${messageId}`);
   await axiosInstance.patch(`/conversations/messages/${messageId}/unpin`);
-  console.log(`[Chat Service] Message unpinned successfully: ${messageId}`);
 };
 
 /**
@@ -398,13 +360,10 @@ export const unpinMessage = async (messageId: string): Promise<void> => {
 export const getPinnedMessages = async (
   conversationId: string
 ): Promise<Message[]> => {
-  console.log(
-    `[Chat Service] Fetching pinned messages for conversation: ${conversationId}`
-  );
   const resp = await axiosInstance.get(
     `/conversations/${conversationId}/messages/pinned`
   );
-  console.log(`[Chat Service] Found ${resp.data.count} pinned messages`);
+
   return resp.data.messages as Message[];
 };
 

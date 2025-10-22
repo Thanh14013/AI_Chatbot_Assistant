@@ -140,20 +140,6 @@ export const sendMessageStream = async (req: Request, res: Response): Promise<vo
     }
 
     // Log received attachments
-    console.log("[Controller] Received message request:", {
-      conversationId,
-      userId,
-      contentLength: content.length,
-      hasAttachments: !!attachments,
-      attachmentsCount: attachments?.length || 0,
-      attachmentsData: attachments?.map((att: any) => ({
-        public_id: att.public_id,
-        resource_type: att.resource_type,
-        secure_url: att.secure_url?.substring(0, 50) + "...",
-        format: att.format,
-        has_extracted_text: !!att.extracted_text,
-      })),
-    });
 
     // Validate attachments if provided
     if (attachments && !Array.isArray(attachments)) {

@@ -179,8 +179,6 @@ export const generateUploadSignature = (folder?: string): CloudinarySignaturePar
     access_mode: "public", // Ensure public access for all uploaded files
   };
 
-  console.log("🔑 Params to sign:", JSON.stringify(paramsToSign, null, 2));
-
   // Generate signature
   const signature = generateSignature(paramsToSign);
 
@@ -212,8 +210,6 @@ const generateSignature = (params: Record<string, any>): string => {
     .map((key) => `${key}=${params[key]}`)
     .join("&");
 
-  console.log("🔐 String to sign:", sortedParams);
-
   const apiSecret = process.env.CLOUDINARY_SECRET_KEY;
   if (!apiSecret) {
     throw new Error("Cloudinary API secret not configured");
@@ -224,8 +220,6 @@ const generateSignature = (params: Record<string, any>): string => {
     .createHash("sha1")
     .update(sortedParams + apiSecret)
     .digest("hex");
-
-  console.log("✅ Generated signature:", signature);
 
   return signature;
 };

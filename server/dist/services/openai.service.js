@@ -270,4 +270,93 @@ export function getRecentMessages(allMessages, count) {
     }
     return allMessages.slice(-count);
 }
+/**
+ * Build message content with attachments for OpenAI multimodal API
+ * Supports images (vision) and document text content
+ *
+ * @param textContent - The text message content
+ * @param attachments - Array of file attachments
+ * @returns Message content formatted for OpenAI API
+ */
+export function buildMessageContentWithAttachments(textContent, attachments) {
+    // If no attachments, return simple text
+    if (!attachments || attachments.length === 0) {
+        return textContent;
+    }
+    // Check if any attachment is an image (requires vision API)
+    const hasImages = attachments.some((att) => att.resource_type === "image");
+    if (hasImages) {
+        // Build multimodal content array for vision API
+        const content = [];
+        // Add text content first with file context
+        let mainText = textContent || "Please analyze the attached files.";
+        // Add file URLs as context for non-image files
+        const nonImageFiles = attachments.filter((att) => att.resource_type !== "image");
+        if (nonImageFiles.length > 0) {
+            mainText += "\n\n📎 Attached Files:\n";
+            nonImageFiles.forEach((att, idx) => {
+                const fileType = att.format?.toUpperCase() || att.resource_type.toUpperCase();
+                mainText += `${idx + 1}. [${fileType} File] - Access via URL: ${att.secure_url}\n`;
+            });
+            mainText += "\nYou can reference these file URLs in your response if needed.";
+        }
+        content.push({
+            type: "text",
+            text: mainText,
+        });
+        // Add images with context
+        const imageAttachments = attachments.filter((att) => att.resource_type === "image");
+        imageAttachments.forEach((att, idx) => {
+            content.push({
+                type: "image_url",
+                image_url: {
+                    url: att.secure_url,
+                },
+            });
+        });
+        // Add extracted text from documents
+        attachments.forEach((att) => {
+            if (att.resource_type === "raw" && att.extracted_text) {
+                content.push({
+                    type: "text",
+                    text: `\n\n--- ${att.format?.toUpperCase()} Document Content (extracted) ---\n${att.extracted_text}\n--- End of ${att.format?.toUpperCase()} ---`,
+                });
+            }
+        });
+        return content;
+    }
+    else {
+        // No images, just append document text and URLs to message
+        let fullContent = textContent || "Please analyze the attached files.";
+        // Add file URLs
+        fullContent += "\n\n📎 Attached Files:\n";
+        attachments.forEach((att, idx) => {
+            const fileType = att.format?.toUpperCase() || att.resource_type.toUpperCase();
+            fullContent += `${idx + 1}. [${fileType} File] - URL: ${att.secure_url}\n`;
+        });
+        // Add extracted text if available
+        attachments.forEach((att) => {
+            if (att.extracted_text) {
+                fullContent += `\n\n--- ${att.format?.toUpperCase()} Document Content (extracted) ---\n${att.extracted_text}\n--- End of ${att.format?.toUpperCase()} ---`;
+            }
+        });
+        fullContent +=
+            "\n\nYou can reference these file URLs in your response if the user needs to access them.";
+        return fullContent;
+    }
+}
+/**
+ * Determine the appropriate OpenAI model based on message content
+ * Uses vision model if images are present, otherwise uses default
+ *
+ * @param hasImages - Whether the message contains images
+ * @returns Model name to use
+ */
+export function selectModelForContent(hasImages) {
+    if (hasImages) {
+        // Use GPT-4 Vision for image analysis
+        return "gpt-4o"; // or 'gpt-4-vision-preview'
+    }
+    return "gpt-5-nano"; // Default model
+}
 export default openai;

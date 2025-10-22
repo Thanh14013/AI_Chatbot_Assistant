@@ -3,6 +3,8 @@ import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
 import Conversation from "../models/conversation.model.js";
 import { getSocketIOInstance } from "../services/socket.service.js";
+import { invalidateCachePattern } from "../services/cache.service.js";
+import { messageHistoryPattern } from "../utils/cache-key.util.js";
 
 /**
  * Helper function to get user ID from authenticated request
@@ -20,8 +22,6 @@ const getUserIdFromRequest = async (req: Request): Promise<string | null> => {
  * PATCH /api/messages/:messageId/pin
  */
 export const pinMessage = async (req: Request, res: Response): Promise<void> => {
-  console.log("📌 [PIN_MESSAGE] ===== Pin Message Request Started =====");
-
   try {
     // Get user ID from authenticated request
     const userId = await getUserIdFromRequest(req);
@@ -34,8 +34,6 @@ export const pinMessage = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    console.log(`📌 [PIN_MESSAGE] User ID: ${userId}`);
-
     // Extract message ID from params
     const messageId = req.params.messageId;
     if (!messageId) {
@@ -47,8 +45,6 @@ export const pinMessage = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    console.log(`📌 [PIN_MESSAGE] Message ID: ${messageId}`);
-
     // Find the message
     const message = await Message.findByPk(messageId);
     if (!message) {
@@ -59,8 +55,6 @@ export const pinMessage = async (req: Request, res: Response): Promise<void> => 
       });
       return;
     }
-
-    console.log(`📌 [PIN_MESSAGE] Message found, conversation_id: ${message.conversation_id}`);
 
     // Check if user owns the conversation
     const conversation = await Conversation.findByPk(message.conversation_id);
@@ -84,11 +78,8 @@ export const pinMessage = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    console.log(`📌 [PIN_MESSAGE] Authorization passed for user ${userId}`);
-
     // Check if message is already pinned
     if (message.pinned) {
-      console.log(`ℹ️ [PIN_MESSAGE] Message already pinned: ${messageId}`);
       res.status(200).json({
         success: true,
         message: "Message is already pinned",
@@ -102,7 +93,6 @@ export const pinMessage = async (req: Request, res: Response): Promise<void> => 
 
     // Check pinned message limit (max 10 per conversation)
     const pinnedCount = await Message.countPinnedByConversation(message.conversation_id);
-    console.log(`📌 [PIN_MESSAGE] Current pinned count: ${pinnedCount}`);
 
     if (pinnedCount >= 10) {
       console.warn(
@@ -116,10 +106,15 @@ export const pinMessage = async (req: Request, res: Response): Promise<void> => 
     }
 
     // Pin the message
-    console.log(`📌 [PIN_MESSAGE] Pinning message: ${messageId}`);
     const updatedMessage = await Message.pinMessage(messageId);
 
-    console.log(`✅ [PIN_MESSAGE] Message pinned successfully: ${messageId}`);
+    // Invalidate message history cache to ensure fresh data
+    try {
+      await invalidateCachePattern(messageHistoryPattern(message.conversation_id));
+    } catch (cacheError) {
+      console.error(`⚠️ [PIN_MESSAGE] Failed to invalidate cache:`, cacheError);
+      // Don't fail the request if cache invalidation fails
+    }
 
     // Emit socket event for real-time sync
     try {
@@ -128,8 +123,6 @@ export const pinMessage = async (req: Request, res: Response): Promise<void> => 
         console.warn(`⚠️ [PIN_MESSAGE] Socket.io instance not available`);
       } else {
         const roomName = `conversation:${message.conversation_id}`;
-
-        console.log(`📌 [PIN_MESSAGE] Emitting socket event to room: ${roomName}`);
 
         io.to(roomName).emit("message:pinned", {
           conversationId: message.conversation_id,
@@ -145,15 +138,11 @@ export const pinMessage = async (req: Request, res: Response): Promise<void> => 
             createdAt: updatedMessage.createdAt,
           },
         });
-
-        console.log(`✅ [PIN_MESSAGE] Socket event emitted successfully`);
       }
     } catch (socketError) {
       console.error(`⚠️ [PIN_MESSAGE] Failed to emit socket event:`, socketError);
       // Don't fail the request if socket emit fails
     }
-
-    console.log("📌 [PIN_MESSAGE] ===== Pin Message Request Completed =====");
 
     // Send success response
     res.status(200).json({
@@ -183,8 +172,6 @@ export const pinMessage = async (req: Request, res: Response): Promise<void> => 
  * PATCH /api/messages/:messageId/unpin
  */
 export const unpinMessage = async (req: Request, res: Response): Promise<void> => {
-  console.log("📌 [UNPIN_MESSAGE] ===== Unpin Message Request Started =====");
-
   try {
     // Get user ID from authenticated request
     const userId = await getUserIdFromRequest(req);
@@ -197,8 +184,6 @@ export const unpinMessage = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    console.log(`📌 [UNPIN_MESSAGE] User ID: ${userId}`);
-
     // Extract message ID from params
     const messageId = req.params.messageId;
     if (!messageId) {
@@ -210,8 +195,6 @@ export const unpinMessage = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    console.log(`📌 [UNPIN_MESSAGE] Message ID: ${messageId}`);
-
     // Find the message
     const message = await Message.findByPk(messageId);
     if (!message) {
@@ -222,8 +205,6 @@ export const unpinMessage = async (req: Request, res: Response): Promise<void> =
       });
       return;
     }
-
-    console.log(`📌 [UNPIN_MESSAGE] Message found, conversation_id: ${message.conversation_id}`);
 
     // Check if user owns the conversation
     const conversation = await Conversation.findByPk(message.conversation_id);
@@ -247,11 +228,8 @@ export const unpinMessage = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    console.log(`📌 [UNPIN_MESSAGE] Authorization passed for user ${userId}`);
-
     // Check if message is not pinned
     if (!message.pinned) {
-      console.log(`ℹ️ [UNPIN_MESSAGE] Message is not pinned: ${messageId}`);
       res.status(200).json({
         success: true,
         message: "Message is not pinned",
@@ -264,10 +242,15 @@ export const unpinMessage = async (req: Request, res: Response): Promise<void> =
     }
 
     // Unpin the message
-    console.log(`📌 [UNPIN_MESSAGE] Unpinning message: ${messageId}`);
     const updatedMessage = await Message.unpinMessage(messageId);
 
-    console.log(`✅ [UNPIN_MESSAGE] Message unpinned successfully: ${messageId}`);
+    // Invalidate message history cache to ensure fresh data
+    try {
+      await invalidateCachePattern(messageHistoryPattern(message.conversation_id));
+    } catch (cacheError) {
+      console.error(`⚠️ [UNPIN_MESSAGE] Failed to invalidate cache:`, cacheError);
+      // Don't fail the request if cache invalidation fails
+    }
 
     // Emit socket event for real-time sync
     try {
@@ -277,21 +260,15 @@ export const unpinMessage = async (req: Request, res: Response): Promise<void> =
       } else {
         const roomName = `conversation:${message.conversation_id}`;
 
-        console.log(`📌 [UNPIN_MESSAGE] Emitting socket event to room: ${roomName}`);
-
         io.to(roomName).emit("message:unpinned", {
           conversationId: message.conversation_id,
           messageId: updatedMessage.id,
         });
-
-        console.log(`✅ [UNPIN_MESSAGE] Socket event emitted successfully`);
       }
     } catch (socketError) {
       console.error(`⚠️ [UNPIN_MESSAGE] Failed to emit socket event:`, socketError);
       // Don't fail the request if socket emit fails
     }
-
-    console.log("📌 [UNPIN_MESSAGE] ===== Unpin Message Request Completed =====");
 
     // Send success response
     res.status(200).json({
@@ -321,8 +298,6 @@ export const unpinMessage = async (req: Request, res: Response): Promise<void> =
  * GET /api/conversations/:id/messages/pinned
  */
 export const getPinnedMessages = async (req: Request, res: Response): Promise<void> => {
-  console.log("📌 [GET_PINNED] ===== Get Pinned Messages Request Started =====");
-
   try {
     // Get user ID from authenticated request
     const userId = await getUserIdFromRequest(req);
@@ -335,8 +310,6 @@ export const getPinnedMessages = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    console.log(`📌 [GET_PINNED] User ID: ${userId}`);
-
     // Extract conversation ID from params
     const conversationId = req.params.id;
     if (!conversationId) {
@@ -347,8 +320,6 @@ export const getPinnedMessages = async (req: Request, res: Response): Promise<vo
       });
       return;
     }
-
-    console.log(`📌 [GET_PINNED] Conversation ID: ${conversationId}`);
 
     // Check if conversation exists and user owns it
     const conversation = await Conversation.findByPk(conversationId);
@@ -372,14 +343,8 @@ export const getPinnedMessages = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    console.log(`📌 [GET_PINNED] Authorization passed for user ${userId}`);
-
     // Get pinned messages
-    console.log(`📌 [GET_PINNED] Fetching pinned messages for conversation: ${conversationId}`);
     const pinnedMessages = await Message.findPinnedMessages(conversationId);
-
-    console.log(`✅ [GET_PINNED] Found ${pinnedMessages.length} pinned messages`);
-    console.log("📌 [GET_PINNED] ===== Get Pinned Messages Request Completed =====");
 
     // Send success response
     res.status(200).json({

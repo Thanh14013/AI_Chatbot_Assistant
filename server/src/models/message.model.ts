@@ -101,20 +101,15 @@ class Message
    * @returns Promise with updated message
    */
   public static async pinMessage(messageId: string): Promise<Message> {
-    console.log(`📌 [MESSAGE_MODEL] Attempting to pin message: ${messageId}`);
-
     const message = await Message.findByPk(messageId);
     if (!message) {
       console.error(`❌ [MESSAGE_MODEL] Message not found: ${messageId}`);
       throw new Error("Message not found");
     }
 
-    console.log(`📌 [MESSAGE_MODEL] Message found, current pinned status: ${message.pinned}`);
-
     message.pinned = true;
     await message.save();
 
-    console.log(`✅ [MESSAGE_MODEL] Message pinned successfully: ${messageId}`);
     return message;
   }
 
@@ -124,20 +119,15 @@ class Message
    * @returns Promise with updated message
    */
   public static async unpinMessage(messageId: string): Promise<Message> {
-    console.log(`📌 [MESSAGE_MODEL] Attempting to unpin message: ${messageId}`);
-
     const message = await Message.findByPk(messageId);
     if (!message) {
       console.error(`❌ [MESSAGE_MODEL] Message not found: ${messageId}`);
       throw new Error("Message not found");
     }
 
-    console.log(`📌 [MESSAGE_MODEL] Message found, current pinned status: ${message.pinned}`);
-
     message.pinned = false;
     await message.save();
 
-    console.log(`✅ [MESSAGE_MODEL] Message unpinned successfully: ${messageId}`);
     return message;
   }
 
@@ -147,8 +137,6 @@ class Message
    * @returns Promise with array of pinned messages
    */
   public static async findPinnedMessages(conversationId: string): Promise<Message[]> {
-    console.log(`📌 [MESSAGE_MODEL] Fetching pinned messages for conversation: ${conversationId}`);
-
     const messages = await Message.findAll({
       where: {
         conversation_id: conversationId,
@@ -157,7 +145,6 @@ class Message
       order: [["createdAt", "DESC"]], // Most recent first
     });
 
-    console.log(`✅ [MESSAGE_MODEL] Found ${messages.length} pinned messages`);
     return messages;
   }
 
@@ -174,7 +161,6 @@ class Message
       },
     });
 
-    console.log(`📌 [MESSAGE_MODEL] Conversation ${conversationId} has ${count} pinned messages`);
     return count;
   }
 }

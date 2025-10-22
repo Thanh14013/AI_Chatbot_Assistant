@@ -61,16 +61,13 @@ class Message extends Model {
      * @returns Promise with updated message
      */
     static async pinMessage(messageId) {
-        console.log(`📌 [MESSAGE_MODEL] Attempting to pin message: ${messageId}`);
         const message = await Message.findByPk(messageId);
         if (!message) {
             console.error(`❌ [MESSAGE_MODEL] Message not found: ${messageId}`);
             throw new Error("Message not found");
         }
-        console.log(`📌 [MESSAGE_MODEL] Message found, current pinned status: ${message.pinned}`);
         message.pinned = true;
         await message.save();
-        console.log(`✅ [MESSAGE_MODEL] Message pinned successfully: ${messageId}`);
         return message;
     }
     /**
@@ -79,16 +76,13 @@ class Message extends Model {
      * @returns Promise with updated message
      */
     static async unpinMessage(messageId) {
-        console.log(`📌 [MESSAGE_MODEL] Attempting to unpin message: ${messageId}`);
         const message = await Message.findByPk(messageId);
         if (!message) {
             console.error(`❌ [MESSAGE_MODEL] Message not found: ${messageId}`);
             throw new Error("Message not found");
         }
-        console.log(`📌 [MESSAGE_MODEL] Message found, current pinned status: ${message.pinned}`);
         message.pinned = false;
         await message.save();
-        console.log(`✅ [MESSAGE_MODEL] Message unpinned successfully: ${messageId}`);
         return message;
     }
     /**
@@ -97,7 +91,6 @@ class Message extends Model {
      * @returns Promise with array of pinned messages
      */
     static async findPinnedMessages(conversationId) {
-        console.log(`📌 [MESSAGE_MODEL] Fetching pinned messages for conversation: ${conversationId}`);
         const messages = await Message.findAll({
             where: {
                 conversation_id: conversationId,
@@ -105,7 +98,6 @@ class Message extends Model {
             },
             order: [["createdAt", "DESC"]], // Most recent first
         });
-        console.log(`✅ [MESSAGE_MODEL] Found ${messages.length} pinned messages`);
         return messages;
     }
     /**
@@ -120,7 +112,6 @@ class Message extends Model {
                 pinned: true,
             },
         });
-        console.log(`📌 [MESSAGE_MODEL] Conversation ${conversationId} has ${count} pinned messages`);
         return count;
     }
 }

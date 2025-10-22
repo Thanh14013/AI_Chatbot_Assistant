@@ -103,21 +103,8 @@ export const getUserConversations = async (userId, page = 1, limit = 20, search,
             limit,
             offset,
         });
-        console.log(`[Conversation Service] Fetched ${conversations.length} conversations from DB`);
         if (conversations[0]) {
             const firstConv = conversations[0];
-            console.log(`[Conversation Service] First raw conversation:`, {
-                id: firstConv.id,
-                title: firstConv.title,
-                tags: firstConv.tags,
-                tagsType: typeof firstConv.tags,
-                tagsIsArray: Array.isArray(firstConv.tags),
-                tagsJSON: JSON.stringify(firstConv.tags),
-                tagsLength: firstConv.tags?.length,
-                // Get raw dataValues to see what Sequelize actually has
-                dataValues: firstConv.dataValues,
-                dataValuesTags: firstConv.dataValues?.tags,
-            });
         }
         // Map to response format
         const conversationResponses = conversations.map((conv) => ({
@@ -133,9 +120,6 @@ export const getUserConversations = async (userId, page = 1, limit = 20, search,
             updatedAt: conv.updatedAt,
             deleted_at: conv.deleted_at,
         }));
-        console.log(`[Conversation Service] getUserConversations mapped ${conversationResponses.length} conversations`);
-        console.log(`[Conversation Service] First conversation:`, conversationResponses[0]);
-        console.log(`[Conversation Service] Conversations with tags:`, conversationResponses.filter((c) => c.tags && c.tags.length > 0).length);
         // Calculate total pages
         const totalPages = Math.ceil(total / limit);
         return {
@@ -226,31 +210,14 @@ export const updateConversation = async (conversationId, userId, data) => {
     }
     if (data.tags !== undefined) {
         const sanitizedTags = sanitizeTags(data.tags);
-        console.log(`[Conversation Service] Updating tags for conversation ${conversationId}:`, {
-            originalTags: data.tags,
-            sanitizedTags,
-            beforeSave: conversation.tags,
-        });
         conversation.tags = sanitizedTags;
     }
     // Save changes
     await conversation.save();
-    // Log after save to confirm tags were persisted
-    if (data.tags !== undefined) {
-        console.log(`[Conversation Service] Tags saved to DB for conversation ${conversationId}:`, {
-            savedTags: conversation.tags,
-            allFields: {
-                id: conversation.id,
-                title: conversation.title,
-                tags: conversation.tags,
-            },
-        });
-    }
     // Invalidate caches
     await invalidateCachePattern(conversationListPattern(userId));
     await deleteCache(conversationMetaKey(conversationId));
     await deleteCache(popularTagsKey(userId));
-    console.log(`[Conversation Service] Cache invalidated for user ${userId}`);
     // Return updated conversation
     return {
         id: conversation.id,

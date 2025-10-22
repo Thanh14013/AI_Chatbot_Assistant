@@ -149,18 +149,6 @@ export const getAll = async (req: Request, res: Response): Promise<void> => {
     // Get conversations with optional search and tag filtering
     const result = await getUserConversations(userId, page, limit, search, tags, tagMode);
 
-    console.log(
-      `[Conversation Controller] Sending response with ${result.conversations.length} conversations`
-    );
-    console.log(
-      `[Conversation Controller] First conversation in response:`,
-      result.conversations[0]
-    );
-    console.log(
-      `[Conversation Controller] First conversation tags:`,
-      result.conversations[0]?.tags
-    );
-
     // Send success response
     res.status(200).json({
       success: true,

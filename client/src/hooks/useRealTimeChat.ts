@@ -254,13 +254,6 @@ export const useRealTimeChat = (
         return;
       }
 
-      console.log("[useRealTimeChat] Sending message with attachments:", {
-        conversationId: conversation.id,
-        contentLength: content.length,
-        hasAttachments: !!attachments?.length,
-        attachmentsCount: attachments?.length || 0,
-      });
-
       try {
         setIsSending(true);
         setIsAITyping(true);
@@ -289,8 +282,6 @@ export const useRealTimeChat = (
 
         // Send via WebSocket with attachments
         websocket.sendMessage(conversation.id, content, attachments);
-
-        console.log("[useRealTimeChat] Message sent via WebSocket");
 
         // Dispatch event for optimistic UI update
         window.dispatchEvent(

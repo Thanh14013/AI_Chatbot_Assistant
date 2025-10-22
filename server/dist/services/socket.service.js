@@ -255,7 +255,7 @@ export const initializeSocketIO = (httpServer) => {
         // Handle message sending with streaming AI response
         socket.on("message:send", async (data) => {
             try {
-                const { conversationId, content, messageId } = data;
+                const { conversationId, content, messageId, attachments } = data;
                 if (!conversationId || !content) {
                     socket.emit("error", { message: "Conversation ID and content are required" });
                     return;
@@ -297,10 +297,12 @@ export const initializeSocketIO = (httpServer) => {
                             const userSocketIds = getUserSockets(socket.userId);
                             for (const sid of userSocketIds) {
                                 // skip sender socket and any sockets already in the conversation room
-                                if (sid === socket.id)
+                                if (sid === socket.id) {
                                     continue;
-                                if (roomSockets.has(sid))
+                                }
+                                if (roomSockets.has(sid)) {
                                     continue;
+                                }
                                 const target = io.sockets.sockets.get(sid);
                                 if (target) {
                                     target.emit("message:new", {
@@ -311,6 +313,7 @@ export const initializeSocketIO = (httpServer) => {
                             }
                         }
                         catch (e) {
+                            console.error("[Socket] Error notifying other user sockets:", e);
                             // ignore per-socket notify failures
                         }
                         // After other clients have been notified about the user's message, start AI typing
@@ -346,7 +349,8 @@ export const initializeSocketIO = (httpServer) => {
                     catch (err) {
                         // ignore
                     }
-                });
+                }, attachments // Pass attachments as the last parameter
+                );
                 // Stop typing indicator for ALL users in conversation room (including sender) for sync
                 io.to(`conversation:${conversationId}`).emit("ai:typing:stop", {
                     conversationId,

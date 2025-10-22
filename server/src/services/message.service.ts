@@ -336,14 +336,6 @@ export const sendMessageAndStreamResponse = async (
     throw new Error("Message content cannot be empty");
   }
 
-  console.log("[MessageService] sendMessageAndStreamResponse called", {
-    conversationId,
-    userId,
-    contentLength: content.length,
-    hasAttachments: !!attachments?.length,
-    attachmentsCount: attachments?.length || 0,
-  });
-
   // Verify conversation and access
   const conversation = await Conversation.findOne({
     where: { id: conversationId, deleted_at: null },
@@ -361,21 +353,12 @@ export const sendMessageAndStreamResponse = async (
     model: conversation.model,
   });
 
-  console.log("[MessageService] User message created:", {
-    messageId: userMessage.id,
-    conversationId: userMessage.conversation_id,
-  });
-
   // Link attachments to this message if present
   if (attachments && attachments.length > 0) {
     try {
       const { default: fileUploadModel } = await import("../models/fileUpload.model.js");
       const publicIds = attachments.map((att) => att.public_id);
       await fileUploadModel.updateMessageId(publicIds, userMessage.id);
-      console.log("[MessageService] Linked attachments to message:", {
-        publicIds,
-        messageId: userMessage.id,
-      });
     } catch (err: any) {
       console.error("[MessageService] Failed to link attachments to message:", err.message);
       // Don't fail the entire request if linking fails
@@ -405,10 +388,6 @@ export const sendMessageAndStreamResponse = async (
               thumbnail_url: att.thumbnail_url,
               extracted_text: att.extracted_text,
             }));
-            console.log("[MessageService] Fetched attachments for broadcast:", {
-              messageId: userMessage.id,
-              count: messageAttachments.length,
-            });
           }
         } catch (err: any) {
           console.error("[MessageService] Failed to fetch attachments for broadcast:", err.message);
@@ -527,17 +506,11 @@ export const sendMessageAndStreamResponse = async (
   let modelToUse = conversation.model;
 
   if (attachments && attachments.length > 0) {
-    console.log("[MessageService] Processing attachments:", {
-      count: attachments.length,
-      types: attachments.map((a) => a.resource_type),
-    });
-
     // Import OpenAI service helpers
     const { buildMessageContentWithAttachments } = await import("./openai.service.js");
 
     // Force GPT-4o when attachments present (images, PDFs, CSVs, etc.)
     modelToUse = "gpt-4o";
-    console.log("[MessageService] Attachments detected, switching to GPT-4o for this request");
 
     // Build enhanced content for the last user message with attachments
     const enhancedContent = buildMessageContentWithAttachments(content.trim(), attachments);
@@ -547,10 +520,6 @@ export const sendMessageAndStreamResponse = async (
       const lastMessage = contextMessages[contextMessages.length - 1];
       if (lastMessage.role === "user") {
         lastMessage.content = enhancedContent as any;
-        console.log("[MessageService] Enhanced user message with attachments", {
-          isMultimodal: typeof enhancedContent !== "string",
-          contentType: typeof enhancedContent,
-        });
       }
     }
   }
@@ -568,26 +537,8 @@ export const sendMessageAndStreamResponse = async (
     payload.temperature = 0.7;
   }
 
-  console.log("[MessageService] Calling OpenAI API", {
-    model: payload.model,
-    messageCount: payload.messages.length,
-    lastMessageType: typeof payload.messages[payload.messages.length - 1]?.content,
-  });
-
   // Log detailed structure of last message to verify attachments
   const lastMsg = payload.messages[payload.messages.length - 1];
-  console.log("[MessageService] Last message structure:", {
-    role: lastMsg?.role,
-    contentType: typeof lastMsg?.content,
-    isArray: Array.isArray(lastMsg?.content),
-    content: Array.isArray(lastMsg?.content)
-      ? lastMsg.content.map((item: any) => ({
-          type: item.type,
-          text: item.text?.substring(0, 50),
-          image_url: item.image_url ? "✓ Present" : undefined,
-        }))
-      : lastMsg?.content?.substring(0, 100),
-  });
 
   // Call OpenAI streaming
   const openai = (await import("./openai.service.js")).default;
@@ -640,11 +591,6 @@ export const sendMessageAndStreamResponse = async (
     }
 
     // streaming complete
-
-    console.log("[MessageService] OpenAI streaming completed:", {
-      fullContentLength: fullContent.length,
-      estimatedTokens: estimateTokenCount(fullContent),
-    });
 
     // Estimate tokens
     const estimated_completion_tokens = estimateTokenCount(fullContent);

@@ -138,17 +138,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
       (att) => att.status === "uploaded"
     );
 
-    console.log("[ChatInput] Sending message:", {
-      message: trimmedMessage || "Attachment",
-      totalAttachments: attachments.length,
-      uploadedAttachments: uploadedAttachments.length,
-      attachmentsData: uploadedAttachments.map((att) => ({
-        public_id: att.public_id,
-        resource_type: att.resource_type,
-        secure_url: att.secure_url?.substring(0, 50) + "...",
-      })),
-    });
-
     onSendMessage(trimmedMessage || "Attachment", uploadedAttachments);
 
     // Clear input and attachments after sending

@@ -105,15 +105,20 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const handlePinToggle = async () => {
     if (isPendingMessage(message) || isPinning) return;
 
+    // IMPORTANT: Read current pinned status directly from message prop
+    // to avoid using stale cached const value
+    const currentPinned =
+      !isPendingMessage(message) && (message.pinned || false);
+
     setIsPinning(true);
     try {
       console.log(
-        `[MessageBubble] ${isPinned ? "Unpinning" : "Pinning"} message: ${
+        `[MessageBubble] ${currentPinned ? "Unpinning" : "Pinning"} message: ${
           message.id
         }`
       );
 
-      if (isPinned) {
+      if (currentPinned) {
         await unpinMessage(message.id);
         antMessage.success("Message unpinned");
       } else {
@@ -123,19 +128,22 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
       // Notify parent component
       if (onPinToggle) {
-        onPinToggle(message.id, !isPinned);
+        onPinToggle(message.id, !currentPinned);
       }
     } catch (error: unknown) {
       console.error(
-        `[MessageBubble] Failed to ${isPinned ? "unpin" : "pin"} message:`,
+        `[MessageBubble] Failed to ${currentPinned ? "unpin" : "pin"} message:`,
         error
       );
       if (error instanceof Error) {
         antMessage.error(
-          error.message || `Failed to ${isPinned ? "unpin" : "pin"} message`
+          error.message ||
+            `Failed to ${currentPinned ? "unpin" : "pin"} message`
         );
       } else {
-        antMessage.error(`Failed to ${isPinned ? "unpin" : "pin"} message`);
+        antMessage.error(
+          `Failed to ${currentPinned ? "unpin" : "pin"} message`
+        );
       }
     } finally {
       setIsPinning(false);
