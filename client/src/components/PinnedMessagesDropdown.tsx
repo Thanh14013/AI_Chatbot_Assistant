@@ -44,19 +44,9 @@ const PinnedMessagesDropdown: React.FC<PinnedMessagesDropdownProps> = ({
 
     setLoading(true);
     try {
-      console.log(
-        `[PinnedMessagesDropdown] Fetching pinned messages for conversation: ${conversationId}`
-      );
       const messages = await getPinnedMessages(conversationId);
       setPinnedMessages(messages);
-      console.log(
-        `[PinnedMessagesDropdown] Loaded ${messages.length} pinned messages`
-      );
     } catch (error) {
-      console.error(
-        "[PinnedMessagesDropdown] Failed to fetch pinned messages:",
-        error
-      );
       antMessage.error("Failed to load pinned messages");
     } finally {
       setLoading(false);
@@ -70,7 +60,6 @@ const PinnedMessagesDropdown: React.FC<PinnedMessagesDropdownProps> = ({
     e.stopPropagation(); // Prevent dropdown from closing
 
     try {
-      console.log(`[PinnedMessagesDropdown] Unpinning message: ${messageId}`);
       await unpinMessage(messageId);
 
       // Update local state
@@ -83,7 +72,6 @@ const PinnedMessagesDropdown: React.FC<PinnedMessagesDropdownProps> = ({
 
       antMessage.success("Message unpinned");
     } catch (error) {
-      console.error("[PinnedMessagesDropdown] Failed to unpin message:", error);
       antMessage.error("Failed to unpin message");
     }
   };
@@ -92,7 +80,6 @@ const PinnedMessagesDropdown: React.FC<PinnedMessagesDropdownProps> = ({
    * Handle clicking on a pinned message
    */
   const handleMessageClick = (messageId: string) => {
-    console.log(`[PinnedMessagesDropdown] Navigating to message: ${messageId}`);
     setDropdownOpen(false);
     if (onMessageClick) {
       onMessageClick(messageId);
@@ -189,9 +176,6 @@ const PinnedMessagesDropdown: React.FC<PinnedMessagesDropdownProps> = ({
     const handleMessagePinned = (event: CustomEvent) => {
       const { conversationId: eventConvId, message } = event.detail;
       if (eventConvId === conversationId && message) {
-        console.log(
-          "[PinnedMessagesDropdown] Message pinned event received, adding to list"
-        );
         setPinnedMessages((prev) => {
           // Check if already exists
           if (prev.some((msg) => msg.id === message.id)) return prev;
@@ -203,9 +187,6 @@ const PinnedMessagesDropdown: React.FC<PinnedMessagesDropdownProps> = ({
     const handleMessageUnpinned = (event: CustomEvent) => {
       const { conversationId: eventConvId, messageId } = event.detail;
       if (eventConvId === conversationId) {
-        console.log(
-          "[PinnedMessagesDropdown] Message unpinned event received, removing from list"
-        );
         setPinnedMessages((prev) => prev.filter((msg) => msg.id !== messageId));
       }
     };

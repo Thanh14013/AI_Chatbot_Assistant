@@ -185,9 +185,6 @@ export const getConversationMessages = async (
           }
         } catch (err) {
           // Don't fail if attachments fetch fails
-          console.error(
-            `[MessageService] Failed to fetch attachments for message ${msgResponse.id}`
-          );
         }
       }
 
@@ -270,7 +267,6 @@ export const getConversationMessages = async (
         }
       } catch (err) {
         // Don't fail if attachments fetch fails
-        console.error(`[MessageService] Failed to fetch attachments for message ${msgResponse.id}`);
       }
     }
 
@@ -360,7 +356,6 @@ export const sendMessageAndStreamResponse = async (
       const publicIds = attachments.map((att) => att.public_id);
       await fileUploadModel.updateMessageId(publicIds, userMessage.id);
     } catch (err: any) {
-      console.error("[MessageService] Failed to link attachments to message:", err.message);
       // Don't fail the entire request if linking fails
     }
   }
@@ -389,9 +384,7 @@ export const sendMessageAndStreamResponse = async (
               extracted_text: att.extracted_text,
             }));
           }
-        } catch (err: any) {
-          console.error("[MessageService] Failed to fetch attachments for broadcast:", err.message);
-        }
+        } catch (err: any) {}
       }
 
       await onUserMessageCreated({

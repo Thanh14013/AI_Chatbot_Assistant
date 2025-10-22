@@ -269,7 +269,6 @@ export const uploadFile = async (
     const result = await uploadPromise;
     return result as CloudinaryUploadResponse;
   } catch (error: any) {
-    console.error("Cloudinary upload error:", error);
     throw new Error(`Failed to upload file to Cloudinary: ${error.message}`);
   }
 };
@@ -284,7 +283,6 @@ export const deleteFile = async (
   try {
     await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
   } catch (error: any) {
-    console.error("Cloudinary delete error:", error);
     throw new Error(`Failed to delete file from Cloudinary: ${error.message}`);
   }
 };
@@ -323,7 +321,6 @@ export const getFileInfo = async (
     const result = await cloudinary.api.resource(publicId, { resource_type: resourceType });
     return result;
   } catch (error: any) {
-    console.error("Cloudinary get file info error:", error);
     throw new Error(`Failed to get file info from Cloudinary: ${error.message}`);
   }
 };

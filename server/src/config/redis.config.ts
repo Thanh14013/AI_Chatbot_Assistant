@@ -29,22 +29,17 @@ const redisConfig = {
 const redisClient = new Redis(redisConfig);
 
 // Connection event handlers
-redisClient.on("connect", () => {
-});
+redisClient.on("connect", () => {});
 
-redisClient.on("ready", () => {
-});
+redisClient.on("ready", () => {});
 
-redisClient.on("error", (error: Error) => {
-  console.error("✗ Redis connection error:", error.message);
-});
+redisClient.on("error", (error: Error) => {});
 
 redisClient.on("close", () => {
   console.warn("⚠ Redis connection closed");
 });
 
-redisClient.on("reconnecting", () => {
-});
+redisClient.on("reconnecting", () => {});
 
 /**
  * Check if Redis is connected and ready
@@ -59,9 +54,7 @@ export const isRedisConnected = (): boolean => {
 export const disconnectRedis = async (): Promise<void> => {
   try {
     await redisClient.quit();
-  } catch (error) {
-    console.error("✗ Error disconnecting Redis:", error);
-  }
+  } catch (error) {}
 };
 
 // Export Redis client instance

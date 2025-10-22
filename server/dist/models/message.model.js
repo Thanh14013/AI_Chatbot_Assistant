@@ -63,7 +63,6 @@ class Message extends Model {
     static async pinMessage(messageId) {
         const message = await Message.findByPk(messageId);
         if (!message) {
-            console.error(`❌ [MESSAGE_MODEL] Message not found: ${messageId}`);
             throw new Error("Message not found");
         }
         message.pinned = true;
@@ -78,7 +77,6 @@ class Message extends Model {
     static async unpinMessage(messageId) {
         const message = await Message.findByPk(messageId);
         if (!message) {
-            console.error(`❌ [MESSAGE_MODEL] Message not found: ${messageId}`);
             throw new Error("Message not found");
         }
         message.pinned = false;

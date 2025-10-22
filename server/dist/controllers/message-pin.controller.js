@@ -43,7 +43,6 @@ export const pinMessage = async (req, res) => {
         // Find the message
         const message = await Message.findByPk(messageId);
         if (!message) {
-            console.error(`❌ [PIN_MESSAGE] Message not found: ${messageId}`);
             res.status(404).json({
                 success: false,
                 message: "Message not found",
@@ -53,7 +52,6 @@ export const pinMessage = async (req, res) => {
         // Check if user owns the conversation
         const conversation = await Conversation.findByPk(message.conversation_id);
         if (!conversation) {
-            console.error(`❌ [PIN_MESSAGE] Conversation not found: ${message.conversation_id}`);
             res.status(404).json({
                 success: false,
                 message: "Conversation not found",
@@ -97,7 +95,6 @@ export const pinMessage = async (req, res) => {
             await invalidateCachePattern(messageHistoryPattern(message.conversation_id));
         }
         catch (cacheError) {
-            console.error(`⚠️ [PIN_MESSAGE] Failed to invalidate cache:`, cacheError);
             // Don't fail the request if cache invalidation fails
         }
         // Emit socket event for real-time sync
@@ -125,7 +122,6 @@ export const pinMessage = async (req, res) => {
             }
         }
         catch (socketError) {
-            console.error(`⚠️ [PIN_MESSAGE] Failed to emit socket event:`, socketError);
             // Don't fail the request if socket emit fails
         }
         // Send success response
@@ -139,7 +135,6 @@ export const pinMessage = async (req, res) => {
         });
     }
     catch (error) {
-        console.error("❌ [PIN_MESSAGE] Error occurred:", error);
         // Handle errors
         const errorMessage = error instanceof Error ? error.message : "Failed to pin message";
         res.status(500).json({
@@ -178,7 +173,6 @@ export const unpinMessage = async (req, res) => {
         // Find the message
         const message = await Message.findByPk(messageId);
         if (!message) {
-            console.error(`❌ [UNPIN_MESSAGE] Message not found: ${messageId}`);
             res.status(404).json({
                 success: false,
                 message: "Message not found",
@@ -188,7 +182,6 @@ export const unpinMessage = async (req, res) => {
         // Check if user owns the conversation
         const conversation = await Conversation.findByPk(message.conversation_id);
         if (!conversation) {
-            console.error(`❌ [UNPIN_MESSAGE] Conversation not found: ${message.conversation_id}`);
             res.status(404).json({
                 success: false,
                 message: "Conversation not found",
@@ -222,7 +215,6 @@ export const unpinMessage = async (req, res) => {
             await invalidateCachePattern(messageHistoryPattern(message.conversation_id));
         }
         catch (cacheError) {
-            console.error(`⚠️ [UNPIN_MESSAGE] Failed to invalidate cache:`, cacheError);
             // Don't fail the request if cache invalidation fails
         }
         // Emit socket event for real-time sync
@@ -240,7 +232,6 @@ export const unpinMessage = async (req, res) => {
             }
         }
         catch (socketError) {
-            console.error(`⚠️ [UNPIN_MESSAGE] Failed to emit socket event:`, socketError);
             // Don't fail the request if socket emit fails
         }
         // Send success response
@@ -254,7 +245,6 @@ export const unpinMessage = async (req, res) => {
         });
     }
     catch (error) {
-        console.error("❌ [UNPIN_MESSAGE] Error occurred:", error);
         // Handle errors
         const errorMessage = error instanceof Error ? error.message : "Failed to unpin message";
         res.status(500).json({
@@ -293,7 +283,6 @@ export const getPinnedMessages = async (req, res) => {
         // Check if conversation exists and user owns it
         const conversation = await Conversation.findByPk(conversationId);
         if (!conversation) {
-            console.error(`❌ [GET_PINNED] Conversation not found: ${conversationId}`);
             res.status(404).json({
                 success: false,
                 message: "Conversation not found",
@@ -318,7 +307,6 @@ export const getPinnedMessages = async (req, res) => {
         });
     }
     catch (error) {
-        console.error("❌ [GET_PINNED] Error occurred:", error);
         // Handle errors
         const errorMessage = error instanceof Error ? error.message : "Failed to get pinned messages";
         res.status(500).json({

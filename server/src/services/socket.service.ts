@@ -415,7 +415,6 @@ export const initializeSocketIO = (
                   }
                 }
               } catch (e) {
-                console.error("[Socket] Error notifying other user sockets:", e);
                 // ignore per-socket notify failures
               }
 

@@ -99,9 +99,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const handleFileChange = async (file: File) => {
     try {
       await uploadFiles([file]);
-    } catch (error) {
-      console.error("File upload error:", error);
-    }
+    } catch (error) {}
     return false; // Prevent default upload behavior
   };
 

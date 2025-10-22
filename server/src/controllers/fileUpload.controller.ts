@@ -28,7 +28,6 @@ export const generateUploadSignature = async (req: Request, res: Response) => {
       data: signature,
     });
   } catch (error: any) {
-    console.error("Generate signature error:", error);
     res.status(500).json({
       success: false,
       error: error.message || "Failed to generate upload signature",
@@ -91,7 +90,6 @@ export const saveFileMetadata = async (req: Request, res: Response) => {
       );
 
       if (processingResult.error) {
-        console.error("File processing error:", processingResult.error);
         status = "failed";
       } else {
         extracted_text = processingResult.extracted_text;
@@ -127,7 +125,6 @@ export const saveFileMetadata = async (req: Request, res: Response) => {
       data: savedFile,
     });
   } catch (error: any) {
-    console.error("Save file metadata error:", error);
     res.status(500).json({
       success: false,
       error: error.message || "Failed to save file metadata",
@@ -170,7 +167,6 @@ export const getFileById = async (req: Request, res: Response) => {
       data: file,
     });
   } catch (error: any) {
-    console.error("Get file error:", error);
     res.status(500).json({
       success: false,
       error: error.message || "Failed to get file",
@@ -200,7 +196,6 @@ export const getConversationFiles = async (req: Request, res: Response) => {
       data: files,
     });
   } catch (error: any) {
-    console.error("Get conversation files error:", error);
     res.status(500).json({
       success: false,
       error: error.message || "Failed to get conversation files",
@@ -242,7 +237,6 @@ export const deleteFile = async (req: Request, res: Response) => {
     try {
       await CloudinaryService.deleteFile(file.public_id, file.resource_type);
     } catch (error) {
-      console.error("Cloudinary delete error:", error);
       // Continue with DB deletion even if Cloudinary fails
     }
 
@@ -254,7 +248,6 @@ export const deleteFile = async (req: Request, res: Response) => {
       message: "File deleted successfully",
     });
   } catch (error: any) {
-    console.error("Delete file error:", error);
     res.status(500).json({
       success: false,
       error: error.message || "Failed to delete file",
@@ -281,7 +274,6 @@ export const getUserStats = async (req: Request, res: Response) => {
       data: stats,
     });
   } catch (error: any) {
-    console.error("Get stats error:", error);
     res.status(500).json({
       success: false,
       error: error.message || "Failed to get upload statistics",

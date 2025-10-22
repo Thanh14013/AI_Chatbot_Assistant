@@ -41,8 +41,6 @@ export const fileUploadService = {
 
     if (signature.access_mode) {
       formData.append("access_mode", signature.access_mode);
-    } else {
-      console.error("❌ Missing access_mode in signature!");
     }
 
     // Debug: log all FormData entries
@@ -172,66 +170,61 @@ export const fileUploadService = {
       onProgress?: (progress: number) => void;
     }
   ): Promise<FileAttachment> {
-    try {
-      // Step 1: Get presigned signature
-      const signature = await this.getUploadSignature();
+    // Step 1: Get presigned signature
+    const signature = await this.getUploadSignature();
 
-      // Step 2: Upload to Cloudinary with progress tracking
-      const uploadProgress = (progress: number) => {
-        if (options?.onProgress) {
-          // Reserve 0-90% for upload, 90-100% for processing
-          options.onProgress(Math.min(progress * 0.9, 90));
-        }
-      };
-
-      const cloudinaryResponse = await this.uploadToCloudinary(
-        file,
-        signature,
-        uploadProgress
-      );
-
-      // Step 3: Save metadata to database
+    // Step 2: Upload to Cloudinary with progress tracking
+    const uploadProgress = (progress: number) => {
       if (options?.onProgress) {
-        options.onProgress(95);
+        // Reserve 0-90% for upload, 90-100% for processing
+        options.onProgress(Math.min(progress * 0.9, 90));
       }
+    };
 
-      const metadata: {
-        public_id: string;
-        secure_url: string;
-        resource_type: string;
-        format?: string;
-        original_filename?: string;
-        size_bytes?: number;
-        width?: number;
-        height?: number;
-        duration?: number;
-        pages?: number;
-        conversation_id?: string;
-      } = {
-        public_id: cloudinaryResponse.public_id,
-        secure_url: cloudinaryResponse.secure_url,
-        resource_type: cloudinaryResponse.resource_type,
-        format: cloudinaryResponse.format,
-        original_filename: file.name,
-        size_bytes: cloudinaryResponse.bytes,
-        width: cloudinaryResponse.width,
-        height: cloudinaryResponse.height,
-        duration: cloudinaryResponse.duration,
-        pages: cloudinaryResponse.pages,
-        conversation_id: options?.conversation_id,
-      };
+    const cloudinaryResponse = await this.uploadToCloudinary(
+      file,
+      signature,
+      uploadProgress
+    );
 
-      const savedFile = await this.saveFileMetadata(metadata);
-
-      if (options?.onProgress) {
-        options.onProgress(100);
-      }
-
-      return savedFile;
-    } catch (error) {
-      console.error("Upload error:", error);
-      throw error;
+    // Step 3: Save metadata to database
+    if (options?.onProgress) {
+      options.onProgress(95);
     }
+
+    const metadata: {
+      public_id: string;
+      secure_url: string;
+      resource_type: string;
+      format?: string;
+      original_filename?: string;
+      size_bytes?: number;
+      width?: number;
+      height?: number;
+      duration?: number;
+      pages?: number;
+      conversation_id?: string;
+    } = {
+      public_id: cloudinaryResponse.public_id,
+      secure_url: cloudinaryResponse.secure_url,
+      resource_type: cloudinaryResponse.resource_type,
+      format: cloudinaryResponse.format,
+      original_filename: file.name,
+      size_bytes: cloudinaryResponse.bytes,
+      width: cloudinaryResponse.width,
+      height: cloudinaryResponse.height,
+      duration: cloudinaryResponse.duration,
+      pages: cloudinaryResponse.pages,
+      conversation_id: options?.conversation_id,
+    };
+
+    const savedFile = await this.saveFileMetadata(metadata);
+
+    if (options?.onProgress) {
+      options.onProgress(100);
+    }
+
+    return savedFile;
   },
 
   /**

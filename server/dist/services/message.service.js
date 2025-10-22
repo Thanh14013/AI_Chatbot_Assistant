@@ -147,7 +147,6 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
                 }
                 catch (err) {
                     // Don't fail if attachments fetch fails
-                    console.error(`[MessageService] Failed to fetch attachments for message ${msgResponse.id}`);
                 }
             }
             // Determine if there are more messages older than the first returned
@@ -225,7 +224,6 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
             }
             catch (err) {
                 // Don't fail if attachments fetch fails
-                console.error(`[MessageService] Failed to fetch attachments for message ${msgResponse.id}`);
             }
         }
         return {
@@ -300,7 +298,6 @@ attachments) => {
             await fileUploadModel.updateMessageId(publicIds, userMessage.id);
         }
         catch (err) {
-            console.error("[MessageService] Failed to link attachments to message:", err.message);
             // Don't fail the entire request if linking fails
         }
     }
@@ -329,9 +326,7 @@ attachments) => {
                         }));
                     }
                 }
-                catch (err) {
-                    console.error("[MessageService] Failed to fetch attachments for broadcast:", err.message);
-                }
+                catch (err) { }
             }
             await onUserMessageCreated({
                 id: userMessage.id,

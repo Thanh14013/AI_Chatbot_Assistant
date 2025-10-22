@@ -65,11 +65,6 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
         .toLowerCase()
         .replace(/[^a-z0-9-]/g, "");
 
-      console.log(
-        "[Search] Attempting tag search first with query:",
-        normalizedQuery
-      );
-
       let tagResults: ConversationSearchResult[] = [];
       try {
         const { getConversations } = await import("../services/chat.service");
@@ -84,12 +79,6 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
           tagSearchRes.conversations &&
           tagSearchRes.conversations.length > 0
         ) {
-          console.log(
-            "[Search] Found",
-            tagSearchRes.conversations.length,
-            "conversations with tag:",
-            normalizedQuery
-          );
           tagResults = tagSearchRes.conversations.map((conv) => ({
             conversation_id: conv.id,
             conversation_title: conv.title || "Untitled",
@@ -101,11 +90,6 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
             max_similarity: 1.0, // Perfect match for tag search
             top_messages: [], // Empty since we're searching by tag, not message content
           }));
-        } else {
-          console.log(
-            "[Search] No conversations found with tag:",
-            normalizedQuery
-          );
         }
       } catch (err) {
         console.warn(
@@ -129,7 +113,6 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
       }
 
       // Step 2: Fallback to semantic search if no tag matches
-      console.log("[Search] No tag matches, falling back to semantic search");
       const res = await searchAllConversations({
         query: trimmedQuery,
         limit: 10,
@@ -139,11 +122,6 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
       // Always surface the results to the header UI. If there are zero
       // results, present an empty list so the dropdown shows "Found 0".
       const results = res.results || [];
-      console.log(
-        "[Search] Semantic search returned",
-        results.length,
-        "results"
-      );
       setError(null);
       onSemanticResults?.(results);
 

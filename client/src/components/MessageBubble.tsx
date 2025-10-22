@@ -112,12 +112,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
     setIsPinning(true);
     try {
-      console.log(
-        `[MessageBubble] ${currentPinned ? "Unpinning" : "Pinning"} message: ${
-          message.id
-        }`
-      );
-
       if (currentPinned) {
         await unpinMessage(message.id);
         antMessage.success("Message unpinned");
@@ -131,10 +125,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         onPinToggle(message.id, !currentPinned);
       }
     } catch (error: unknown) {
-      console.error(
-        `[MessageBubble] Failed to ${currentPinned ? "unpin" : "pin"} message:`,
-        error
-      );
       if (error instanceof Error) {
         antMessage.error(
           error.message ||

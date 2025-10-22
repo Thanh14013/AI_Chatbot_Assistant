@@ -487,18 +487,7 @@ const ChatPage: React.FC = () => {
     const handleMessageComplete = (event: CustomEvent) => {
       const { userMessage, assistantMessage, conversation } = event.detail;
 
-      console.log("[ChatPage] message:complete received:", {
-        userMessageId: userMessage?.id,
-        assistantMessageId: assistantMessage?.id,
-        conversationId: userMessage?.conversation_id,
-        currentConvId: currentConversation?.id,
-        hasUserAttachments: !!userMessage?.attachments,
-      });
-
       if (userMessage.conversation_id !== currentConversation.id) {
-        console.log(
-          "[ChatPage] Ignoring message:complete - different conversation"
-        );
         return;
       }
 
@@ -520,12 +509,6 @@ const ChatPage: React.FC = () => {
             m.role === "user" &&
             m.conversation_id === userMessage.conversation_id
           ) {
-            console.log(
-              "[ChatPage] Replacing optimistic message:",
-              m.id,
-              "with server message:",
-              userMessage.id
-            );
             replaced = true;
             // mark the server id as existing
             existingIds.add(userMessage.id);
@@ -536,16 +519,12 @@ const ChatPage: React.FC = () => {
 
         // If no optimistic user message found to replace, append the server userMessage
         if (!replaced && userMessage && !existingIds.has(userMessage.id)) {
-          console.log(
-            "[ChatPage] No optimistic message found, appending user message"
-          );
           replacedList.push(userMessage);
           existingIds.add(userMessage.id);
         }
 
         // Append assistant message if present and not duplicate
         if (assistantMessage && !existingIds.has(assistantMessage.id)) {
-          console.log("[ChatPage] Adding assistant message");
           replacedList.push(assistantMessage);
         }
 
@@ -602,26 +581,13 @@ const ChatPage: React.FC = () => {
     const handleMessageNew = (event: CustomEvent) => {
       const { conversationId, message } = event.detail;
 
-      console.log("[ChatPage] message:new received:", {
-        messageId: message.id,
-        conversationId,
-        role: message.role,
-        hasAttachments: !!message.attachments,
-        currentConvId: currentConversation?.id,
-      });
-
       if (conversationId !== currentConversation?.id) {
-        console.log("[ChatPage] Ignoring message:new - different conversation");
         return;
       }
 
       setMessages((prev) => {
         // Avoid duplicates: if message id already exists, don't add
         if (prev.some((m) => m.id === message.id)) {
-          console.log(
-            "[ChatPage] Duplicate message ID detected, skipping:",
-            message.id
-          );
           return prev;
         }
 
@@ -638,14 +604,10 @@ const ChatPage: React.FC = () => {
               String(message.content || "").trim()
         );
         if (hasMatchingPending) {
-          console.log(
-            "[ChatPage] Matching pending message found, skipping broadcast"
-          );
           return prev;
         }
 
         // Otherwise append normally
-        console.log("[ChatPage] Adding message from broadcast");
         return [...prev, message];
       });
     };
@@ -821,20 +783,14 @@ const ChatPage: React.FC = () => {
         if (wordCount <= 4) {
           // Message ngắn: dùng trực tiếp làm title
           title = content.trim();
-          console.log("[ChatPage] Using short message as title:", title);
         } else {
           // Message dài: dùng "New Chat"
           title = "New Chat";
-          console.log(
-            "[ChatPage] Message too long, using default title:",
-            title
-          );
         }
 
         // Validate title before creating conversation
         if (!title || title.trim().length === 0) {
           title = "New Chat";
-          console.log("[ChatPage] Invalid title, using fallback:", title);
         }
 
         // Step 2: Create conversation
@@ -1854,8 +1810,6 @@ const ChatPage: React.FC = () => {
    * Handle pin toggle from MessageBubble
    */
   const handlePinToggle = (messageId: string, isPinned: boolean) => {
-    console.log(`[ChatPage] Pin toggle: ${messageId}, isPinned: ${isPinned}`);
-
     // Update local state
     setMessages((prev) =>
       prev.map((msg) =>
@@ -1871,10 +1825,6 @@ const ChatPage: React.FC = () => {
   useEffect(() => {
     const handleMessagePinned = (event: CustomEvent) => {
       const { conversationId: eventConvId, messageId, message } = event.detail;
-
-      console.log(
-        `[ChatPage] Message pinned event: convId=${eventConvId}, msgId=${messageId}`
-      );
 
       // Only update if it's for the current conversation
       if (eventConvId === currentConversation?.id) {
@@ -1903,10 +1853,6 @@ const ChatPage: React.FC = () => {
 
     const handleMessageUnpinned = (event: CustomEvent) => {
       const { conversationId: eventConvId, messageId } = event.detail;
-
-      console.log(
-        `[ChatPage] Message unpinned event: convId=${eventConvId}, msgId=${messageId}`
-      );
 
       // Only update if it's for the current conversation
       if (eventConvId === currentConversation?.id) {

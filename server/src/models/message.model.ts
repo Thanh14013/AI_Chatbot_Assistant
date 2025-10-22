@@ -103,7 +103,6 @@ class Message
   public static async pinMessage(messageId: string): Promise<Message> {
     const message = await Message.findByPk(messageId);
     if (!message) {
-      console.error(`❌ [MESSAGE_MODEL] Message not found: ${messageId}`);
       throw new Error("Message not found");
     }
 
@@ -121,7 +120,6 @@ class Message
   public static async unpinMessage(messageId: string): Promise<Message> {
     const message = await Message.findByPk(messageId);
     if (!message) {
-      console.error(`❌ [MESSAGE_MODEL] Message not found: ${messageId}`);
       throw new Error("Message not found");
     }
 

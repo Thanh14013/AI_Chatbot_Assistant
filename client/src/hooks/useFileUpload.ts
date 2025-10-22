@@ -90,7 +90,6 @@ export const useFileUpload = (options?: UseFileUploadOptions) => {
         options?.onUploadSuccess?.(uploadedFile);
         return uploadedFile;
       } catch (error) {
-        console.error("Upload error:", error);
         const err = error instanceof Error ? error : new Error("Upload failed");
         options?.onUploadError?.(err);
 
@@ -145,13 +144,8 @@ export const useFileUpload = (options?: UseFileUploadOptions) => {
    * Delete attachment from server and local state
    */
   const deleteAttachment = useCallback(async (fileId: number) => {
-    try {
-      await fileUploadService.deleteFile(fileId);
-      setAttachments((prev) => prev.filter((att) => att.id !== fileId));
-    } catch (error) {
-      console.error("Delete error:", error);
-      throw error;
-    }
+    await fileUploadService.deleteFile(fileId);
+    setAttachments((prev) => prev.filter((att) => att.id !== fileId));
   }, []);
 
   return {

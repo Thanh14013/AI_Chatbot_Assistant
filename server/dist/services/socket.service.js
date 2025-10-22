@@ -313,7 +313,6 @@ export const initializeSocketIO = (httpServer) => {
                             }
                         }
                         catch (e) {
-                            console.error("[Socket] Error notifying other user sockets:", e);
                             // ignore per-socket notify failures
                         }
                         // After other clients have been notified about the user's message, start AI typing

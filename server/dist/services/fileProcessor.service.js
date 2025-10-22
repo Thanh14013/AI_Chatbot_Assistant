@@ -29,7 +29,6 @@ export const processFile = async (secureUrl, resourceType, format) => {
         return {};
     }
     catch (error) {
-        console.error("File processing error:", error);
         return { error: error.message };
     }
 };

@@ -73,7 +73,6 @@ export const semanticSearch = async (req, res) => {
         });
     }
     catch (error) {
-        console.error("Semantic search error:", error);
         // Handle specific errors
         if (error.message.includes("not found")) {
             res.status(404).json({

@@ -43,7 +43,6 @@ export const processFile = async (
     // For images and videos, no text extraction needed (handled by OpenAI vision)
     return {};
   } catch (error: any) {
-    console.error("File processing error:", error);
     return { error: error.message };
   }
 };

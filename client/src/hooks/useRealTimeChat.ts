@@ -295,7 +295,6 @@ export const useRealTimeChat = (
           })
         );
       } catch (error) {
-        console.error("[useRealTimeChat] Failed to send message:", error);
         setIsSending(false);
         setIsAITyping(false);
         antdMessage.error("Failed to send message. Please try again.");

@@ -70,23 +70,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       try {
         const result = await getConversations({ limit: 20, page: targetPage });
 
-        console.log("[Sidebar] Loaded conversations:", {
-          count: result.conversations.length,
-          firstConversation: result.conversations[0],
-          firstConvTags: result.conversations[0]?.tags,
-          allConversations: result.conversations.map((c) => ({
-            id: c.id,
-            title: c.title,
-            tags: c.tags,
-          })),
-          hasTags: result.conversations.some(
-            (c) => c.tags && c.tags.length > 0
-          ),
-          conversationsWithTags: result.conversations.filter(
-            (c) => c.tags && c.tags.length > 0
-          ).length,
-        });
-
         // sort by updatedAt desc
         const sorted = (result.conversations || []).slice().sort((a, b) => {
           const ta = new Date(a.updatedAt).getTime();
@@ -94,19 +77,9 @@ const Sidebar: React.FC<SidebarProps> = ({
           return tb - ta;
         });
 
-        console.log("[Sidebar] After sorting:", {
-          count: sorted.length,
-          firstSorted: sorted[0],
-          firstSortedTags: sorted[0]?.tags,
-        });
-
         if (opts.reset || targetPage === 1) {
           setConversations(sorted);
           setFilteredConversations(sorted);
-          console.log("[Sidebar] Set conversations state:", {
-            count: sorted.length,
-            hasTags: sorted.some((c) => c.tags && c.tags.length > 0),
-          });
         } else {
           setConversations((prev) => [...prev, ...sorted]);
           setFilteredConversations((prev) => [...prev, ...sorted]);
@@ -154,10 +127,6 @@ const Sidebar: React.FC<SidebarProps> = ({
           ?.context_window,
         tags: conversations.find((c) => c.id === r.conversation_id)?.tags || [],
       })) as ConversationListItem[];
-      console.log(
-        "[Sidebar] Mapped semantic results with tags:",
-        mapped.filter((c) => c.tags && c.tags.length > 0).length
-      );
       setFilteredConversations(mapped);
       return;
     }
@@ -165,22 +134,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     // Otherwise show the full conversations list (no local title filtering)
     // Add hasUnread status based on unreadConversations Set
     const withUnread = conversations.map((conv) => {
-      console.log("[Sidebar] Mapping conversation:", {
-        id: conv.id,
-        title: conv.title,
-        tags: conv.tags,
-        convKeys: Object.keys(conv),
-      });
       return {
         ...conv,
         hasUnread: unreadConversations?.has(conv.id) || false,
       };
-    });
-    console.log("[Sidebar] Setting filtered conversations (no search):", {
-      count: withUnread.length,
-      withTags: withUnread.filter((c) => c.tags && c.tags.length > 0).length,
-      firstWithUnread: withUnread[0],
-      firstWithUnreadKeys: Object.keys(withUnread[0] || {}),
     });
     setFilteredConversations(withUnread);
   }, [conversations, semanticResults, unreadConversations]);

@@ -50,16 +50,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     useState<ConversationListItem | null>(null);
   const navigate = useNavigate();
 
-  // Log conversation prop để debug tags
-  console.log("[ConversationItem] Received conversation prop:", {
-    id: conversation.id,
-    title: conversation.title,
-    tags: conversation.tags,
-    hasTags: "tags" in conversation,
-    conversationKeys: Object.keys(conversation),
-    fullConversation: conversation,
-  });
-
   /**
    * Format timestamp to relative time or date
    */
@@ -117,19 +107,12 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
 
     // Fetch full conversation details including tags
     try {
-      console.log(
-        "[ConversationItem] Fetching full conversation for edit:",
-        conversation.id
-      );
       const { getConversation } = await import("../services/chat.service");
       const fullConv = await getConversation(conversation.id);
-      console.log("[ConversationItem] Fetched full conversation:", fullConv);
-      console.log("[ConversationItem] Full conversation tags:", fullConv.tags);
 
       setFullConversation(fullConv as any);
       setIsEditModalOpen(true);
     } catch (error) {
-      console.error("[ConversationItem] Failed to fetch conversation:", error);
       message.error("Failed to load conversation details");
     }
   };
@@ -138,13 +121,9 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
    * Handle edit form submission
    */
   const handleEditSubmit = async (values: ConversationFormValues) => {
-    console.log("[ConversationItem] Submitting edit with values:", values);
-    console.log("[ConversationItem] Original conversation:", conversation);
-
     setIsUpdating(true);
     try {
       const result = await updateConversation(conversation.id, values);
-      console.log("[ConversationItem] Update response:", result);
 
       message.success("Conversation updated successfully");
       setIsEditModalOpen(false);
@@ -160,7 +139,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         } catch {}
       }
     } catch (error: any) {
-      console.error("[ConversationItem] Update failed:", error);
       message.error(
         error?.response?.data?.message || "Failed to update conversation"
       );
@@ -275,12 +253,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
 
         {/* Tags */}
         {(() => {
-          console.log("[ConversationItem] Rendering tags for conversation:", {
-            id: conversation.id,
-            title: conversation.title,
-            tags: conversation.tags,
-            hasTags: conversation.tags && conversation.tags.length > 0,
-          });
           return conversation.tags && conversation.tags.length > 0 ? (
             <div className={styles.tagsContainer}>
               {conversation.tags.slice(0, 3).map((tag) => (
@@ -358,23 +330,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           tags: fullConversation?.tags || conversation.tags || [],
         }}
       />
-
-      {/* Debug: Log conversation object before passing to form */}
-      {isEditModalOpen &&
-        (() => {
-          console.log(
-            "[ConversationItem] Opening edit modal with conversation:",
-            {
-              id: conversation.id,
-              title: conversation.title,
-              model: conversation.model,
-              context_window: conversation.context_window,
-              tags: conversation.tags,
-              fullConversation: conversation,
-            }
-          );
-          return null;
-        })()}
 
       {/* Active indicator */}
       {isActive && <div className={styles.activeIndicator} />}
