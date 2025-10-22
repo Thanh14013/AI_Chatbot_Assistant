@@ -181,6 +181,7 @@ export const getConversationMessages = async (
               height: att.height,
               thumbnail_url: att.thumbnail_url,
               extracted_text: att.extracted_text,
+              openai_file_id: att.openai_file_id, // Include OpenAI file_id
             }));
           }
         } catch (err) {
@@ -326,6 +327,7 @@ export const sendMessageAndStreamResponse = async (
     resource_type: string;
     format?: string;
     extracted_text?: string;
+    openai_file_id?: string; // OpenAI File API ID
   }>
 ): Promise<any> => {
   if (!content || content.trim().length === 0) {
@@ -382,6 +384,7 @@ export const sendMessageAndStreamResponse = async (
               height: att.height,
               thumbnail_url: att.thumbnail_url,
               extracted_text: att.extracted_text,
+              openai_file_id: att.openai_file_id, // Include OpenAI file_id
             }));
           }
         } catch (err: any) {}
@@ -505,6 +508,20 @@ export const sendMessageAndStreamResponse = async (
     // Force GPT-4o when attachments present (images, PDFs, CSVs, etc.)
     modelToUse = "gpt-4o";
 
+    // Log attachments with file_id for debugging
+    console.log("📎 [Message Service] Processing attachments for message", {
+      conversationId,
+      userId,
+      messageContent: content.trim().substring(0, 100) + (content.length > 100 ? "..." : ""),
+      attachments: attachments.map((att) => ({
+        public_id: att.public_id,
+        resource_type: att.resource_type,
+        format: att.format,
+        has_openai_file_id: !!att.openai_file_id,
+        openai_file_id: att.openai_file_id,
+      })),
+    });
+
     // Build enhanced content for the last user message with attachments
     const enhancedContent = buildMessageContentWithAttachments(content.trim(), attachments);
 
@@ -533,9 +550,31 @@ export const sendMessageAndStreamResponse = async (
   // Log detailed structure of last message to verify attachments
   const lastMsg = payload.messages[payload.messages.length - 1];
 
+  console.log("📤 [Message Service] Sending request to OpenAI API", {
+    model: payload.model,
+    messageCount: payload.messages.length,
+    lastMessageType: Array.isArray(lastMsg.content) ? "multimodal" : "text",
+    lastMessageContent: Array.isArray(lastMsg.content)
+      ? JSON.stringify(lastMsg.content, null, 2).substring(0, 500)
+      : lastMsg.content.substring(0, 200),
+  });
+
   // Call OpenAI streaming
   const openai = (await import("./openai.service.js")).default;
-  const stream = await openai.chat.completions.create(payload);
+
+  let stream;
+  try {
+    stream = await openai.chat.completions.create(payload);
+    console.log("✅ [Message Service] OpenAI stream created successfully");
+  } catch (error: any) {
+    console.error("❌ [Message Service] Failed to create OpenAI stream", {
+      error: error?.message,
+      status: error?.status,
+      code: error?.code,
+      type: error?.type,
+    });
+    throw error;
+  }
 
   let fullContent = "";
   try {
@@ -544,7 +583,11 @@ export const sendMessageAndStreamResponse = async (
     const groupSize = 2; // emit every N words (tuneable)
     let buffer = "";
 
+    console.log("🔄 [Message Service] Starting to process stream chunks...");
+    let chunkCount = 0;
+
     for await (const chunk of stream) {
+      chunkCount++;
       const delta = chunk.choices?.[0]?.delta;
       if (delta?.content) {
         const text = delta.content as string;
@@ -582,6 +625,12 @@ export const sendMessageAndStreamResponse = async (
       }
       buffer = "";
     }
+
+    console.log("✅ [Message Service] Stream completed", {
+      totalChunks: chunkCount,
+      contentLength: fullContent.length,
+      contentPreview: fullContent.substring(0, 200) + (fullContent.length > 200 ? "..." : ""),
+    });
 
     // streaming complete
 

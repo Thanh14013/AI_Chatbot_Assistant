@@ -358,6 +358,35 @@ export const initializeSocketIO = (
         // Import message service dynamically to avoid circular imports
         const { sendMessageAndStreamResponse } = await import("./message.service.js");
 
+        // CRITICAL FIX: Fetch attachments from database to get openai_file_id
+        let enrichedAttachments: any[] | undefined;
+        if (attachments && attachments.length > 0) {
+          try {
+            const FileUploadModel = (await import("../models/fileUpload.model.js")).default;
+            const publicIds = attachments.map((att: any) => att.public_id);
+
+            // Fetch full file metadata including openai_file_id from database
+            enrichedAttachments = [];
+            for (const publicId of publicIds) {
+              const fileData = await FileUploadModel.findByPublicId(publicId);
+              if (fileData) {
+                enrichedAttachments.push({
+                  public_id: fileData.public_id,
+                  secure_url: fileData.secure_url,
+                  resource_type: fileData.resource_type,
+                  format: fileData.format,
+                  extracted_text: fileData.extracted_text,
+                  openai_file_id: fileData.openai_file_id, // NOW INCLUDES FILE_ID!
+                });
+              }
+            }
+          } catch (err: any) {
+            console.error("❌ [Socket Service] Failed to fetch attachments from DB:", err.message);
+            // Fallback to client attachments if DB fetch fails
+            enrichedAttachments = attachments;
+          }
+        }
+
         // Stream AI response and broadcast user message early via onUserMessageCreated
         let assistantContent = "";
         const result = await sendMessageAndStreamResponse(
@@ -454,7 +483,7 @@ export const initializeSocketIO = (
               // ignore
             }
           },
-          attachments // Pass attachments as the last parameter
+          enrichedAttachments // Pass ENRICHED attachments with openai_file_id
         );
 
         // Stop typing indicator for ALL users in conversation room (including sender) for sync
