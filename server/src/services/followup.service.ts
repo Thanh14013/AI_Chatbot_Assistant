@@ -32,7 +32,8 @@ User: "${lastUserMessage}"
 Assistant: "${lastBotMessage}"
 
 Hãy tạo đúng 3 câu hỏi follow-up ngắn gọn, tự nhiên, sáng tạo liên quan đến nội dung trên.
-Chỉ trả về danh sách 3 câu hỏi, mỗi câu 1 dòng, không cần số thứ tự hay ký tự đặc biệt.`;
+Chỉ trả về danh sách 3 câu hỏi, mỗi câu 1 dòng, không cần số thứ tự hay ký tự đặc biệt.
+3 câu hỏi này là 3 câu với vai trò là người dùng, danh xưng là tôi, hỏi trợ lý ảo.`;
 
     const response = await openai.chat.completions.create({
       model: "gpt-5-nano",
