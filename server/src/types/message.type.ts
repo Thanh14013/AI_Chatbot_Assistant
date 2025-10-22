@@ -41,6 +41,7 @@ export interface MessageResponse {
     height?: number;
     thumbnail_url?: string;
     extracted_text?: string;
+    openai_file_id?: string; // OpenAI File API ID
   }>;
 }
 // Streaming endpoint uses the same MessageResponse types; non-streaming wrappers removed

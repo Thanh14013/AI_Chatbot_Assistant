@@ -65,6 +65,21 @@ export async function getChatCompletion(params) {
     if (!messages || messages.length === 0) {
         throw new Error("Messages array cannot be empty");
     }
+    console.log("🚀 [OpenAI Service] Starting chat completion request", {
+        model,
+        messageCount: messages.length,
+        hasAttachments: messages.some((msg) => Array.isArray(msg.content)),
+        stream,
+        temperature,
+        max_completion_tokens,
+        messages: messages.map((msg) => ({
+            role: msg.role,
+            contentType: Array.isArray(msg.content) ? "multimodal" : "text",
+            contentPreview: Array.isArray(msg.content)
+                ? msg.content.map((item) => item.type).join(", ")
+                : msg.content.substring(0, 100) + (msg.content.length > 100 ? "..." : ""),
+        })),
+    });
     try {
         // If streaming is enabled, handle stream response
         if (stream) {
@@ -111,6 +126,15 @@ export async function getChatCompletion(params) {
             throw new Error("OpenAI returned empty content");
         }
         const finish_reason = response.choices[0]?.finish_reason || "stop";
+        console.log("✅ [OpenAI Service] Chat completion response received", {
+            contentLength: content.length,
+            contentPreview: content.substring(0, 200) + (content.length > 200 ? "..." : ""),
+            tokens_used: total_tokens,
+            prompt_tokens,
+            completion_tokens,
+            model,
+            finish_reason,
+        });
         return {
             content,
             tokens_used: total_tokens,
@@ -123,6 +147,14 @@ export async function getChatCompletion(params) {
     }
     catch (error) {
         // Handle different types of errors
+        console.error("❌ [OpenAI Service] Chat completion failed", {
+            error: error?.message || "Unknown error",
+            status: error?.status,
+            code: error?.code,
+            model,
+            messageCount: messages.length,
+            hasAttachments: messages.some((msg) => Array.isArray(msg.content)),
+        });
         if (error?.status === 401) {
             throw new Error("Invalid OpenAI API key");
         }
@@ -187,6 +219,15 @@ async function handleStreamingResponse(params) {
         if (!fullContent || fullContent.trim() === "") {
             throw new Error("OpenAI streaming returned empty content");
         }
+        console.log("✅ [OpenAI Service] Streaming chat completion completed", {
+            contentLength: fullContent.length,
+            contentPreview: fullContent.substring(0, 200) + (fullContent.length > 200 ? "..." : ""),
+            tokens_used,
+            estimated_prompt_tokens,
+            estimated_completion_tokens,
+            model,
+            finish_reason,
+        });
         return {
             content: fullContent,
             tokens_used,
@@ -273,6 +314,7 @@ export function getRecentMessages(allMessages, count) {
 /**
  * Build message content with attachments for OpenAI multimodal API
  * Supports images (vision) and document text content
+ * Now uses OpenAI File API file_ids for supported file types
  *
  * @param textContent - The text message content
  * @param attachments - Array of file attachments
@@ -283,30 +325,57 @@ export function buildMessageContentWithAttachments(textContent, attachments) {
     if (!attachments || attachments.length === 0) {
         return textContent;
     }
-    // Check if any attachment is an image (requires vision API)
-    const hasImages = attachments.some((att) => att.resource_type === "image");
+    console.log("🔧 [OpenAI Service] Building message content with attachments", {
+        textContent: textContent.substring(0, 100) + (textContent.length > 100 ? "..." : ""),
+        attachmentCount: attachments.length,
+        attachments: attachments.map((att) => ({
+            resource_type: att.resource_type,
+            format: att.format,
+            has_file_id: !!att.openai_file_id,
+            file_id: att.openai_file_id,
+            has_extracted_text: !!att.extracted_text,
+            extracted_text_length: att.extracted_text?.length || 0,
+        })),
+    });
+    // Check if any attachment is a REAL image (not PDF)
+    // Only PNG, JPEG, GIF, WEBP are supported by image_url
+    const supportedImageFormats = ["png", "jpg", "jpeg", "gif", "webp"];
+    const hasImages = attachments.some((att) => att.resource_type === "image" &&
+        supportedImageFormats.includes(att.format?.toLowerCase() || ""));
     if (hasImages) {
         // Build multimodal content array for vision API
         const content = [];
         // Add text content first with file context
         let mainText = textContent || "Please analyze the attached files.";
-        // Add file URLs as context for non-image files
-        const nonImageFiles = attachments.filter((att) => att.resource_type !== "image");
-        if (nonImageFiles.length > 0) {
+        // Add file references and extracted text for documents (including PDFs)
+        const supportedImageFormats = ["png", "jpg", "jpeg", "gif", "webp"];
+        const documentFiles = attachments.filter((att) => att.resource_type !== "image" ||
+            !supportedImageFormats.includes(att.format?.toLowerCase() || ""));
+        if (documentFiles.length > 0) {
             mainText += "\n\n📎 Attached Files:\n";
-            nonImageFiles.forEach((att, idx) => {
+            documentFiles.forEach((att, idx) => {
                 const fileType = att.format?.toUpperCase() || att.resource_type.toUpperCase();
-                mainText += `${idx + 1}. [${fileType} File] - Access via URL: ${att.secure_url}\n`;
+                mainText += `${idx + 1}. [${fileType} File]`;
+                if (att.openai_file_id) {
+                    mainText += ` - OpenAI File ID: ${att.openai_file_id}\n`;
+                }
+                else {
+                    mainText += `\n`;
+                }
+                // IMPORTANT: Add extracted text if available for PDFs and documents
+                if (att.extracted_text) {
+                    mainText += `\n--- ${fileType} Document Content ---\n${att.extracted_text}\n--- End of ${fileType} ---\n\n`;
+                }
             });
-            mainText += "\nYou can reference these file URLs in your response if needed.";
         }
         content.push({
             type: "text",
             text: mainText,
         });
-        // Add images with context
-        const imageAttachments = attachments.filter((att) => att.resource_type === "image");
-        imageAttachments.forEach((att, idx) => {
+        // Add ONLY real images (PNG, JPEG, GIF, WEBP) with vision API
+        const realImageAttachments = attachments.filter((att) => att.resource_type === "image" &&
+            supportedImageFormats.includes(att.format?.toLowerCase() || ""));
+        realImageAttachments.forEach((att) => {
             content.push({
                 type: "image_url",
                 image_url: {
@@ -314,34 +383,27 @@ export function buildMessageContentWithAttachments(textContent, attachments) {
                 },
             });
         });
-        // Add extracted text from documents
-        attachments.forEach((att) => {
-            if (att.resource_type === "raw" && att.extracted_text) {
-                content.push({
-                    type: "text",
-                    text: `\n\n--- ${att.format?.toUpperCase()} Document Content (extracted) ---\n${att.extracted_text}\n--- End of ${att.format?.toUpperCase()} ---`,
-                });
-            }
-        });
         return content;
     }
     else {
-        // No images, just append document text and URLs to message
+        // No images, just append document text and file references to message
         let fullContent = textContent || "Please analyze the attached files.";
-        // Add file URLs
+        // Add file information and extracted text
         fullContent += "\n\n📎 Attached Files:\n";
         attachments.forEach((att, idx) => {
             const fileType = att.format?.toUpperCase() || att.resource_type.toUpperCase();
-            fullContent += `${idx + 1}. [${fileType} File] - URL: ${att.secure_url}\n`;
-        });
-        // Add extracted text if available
-        attachments.forEach((att) => {
+            fullContent += `${idx + 1}. [${fileType} File]`;
+            if (att.openai_file_id) {
+                fullContent += ` - OpenAI File ID: ${att.openai_file_id}\n`;
+            }
+            else {
+                fullContent += `\n`;
+            }
+            // Add extracted text if available
             if (att.extracted_text) {
-                fullContent += `\n\n--- ${att.format?.toUpperCase()} Document Content (extracted) ---\n${att.extracted_text}\n--- End of ${att.format?.toUpperCase()} ---`;
+                fullContent += `\n--- ${fileType} Document Content ---\n${att.extracted_text}\n--- End of ${fileType} ---\n\n`;
             }
         });
-        fullContent +=
-            "\n\nYou can reference these file URLs in your response if the user needs to access them.";
         return fullContent;
     }
 }

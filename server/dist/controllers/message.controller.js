@@ -128,12 +128,42 @@ export const sendMessageStream = async (req, res) => {
         res.setHeader("Cache-Control", "no-cache");
         res.setHeader("Connection", "keep-alive");
         res.flushHeaders?.();
+        // CRITICAL FIX: Fetch attachments from database to get openai_file_id
+        let enrichedAttachments;
+        if (attachments && attachments.length > 0) {
+            try {
+                const FileUploadModel = (await import("../models/fileUpload.model.js")).default;
+                const publicIds = attachments.map((att) => att.public_id);
+                // Fetch full file metadata including openai_file_id from database
+                enrichedAttachments = [];
+                for (const publicId of publicIds) {
+                    const fileData = await FileUploadModel.findByPublicId(publicId);
+                    if (fileData) {
+                        enrichedAttachments.push({
+                            public_id: fileData.public_id,
+                            secure_url: fileData.secure_url,
+                            resource_type: fileData.resource_type,
+                            format: fileData.format,
+                            extracted_text: fileData.extracted_text,
+                            openai_file_id: fileData.openai_file_id, // NOW INCLUDES FILE_ID!
+                        });
+                    }
+                }
+            }
+            catch (err) {
+                console.error("❌ [Message Controller] Failed to fetch attachments from DB:", err.message);
+                // Fallback to client attachments if DB fetch fails
+                enrichedAttachments = attachments;
+            }
+        }
         // Call service to stream; service will invoke onChunk for each partial piece
-        // Pass attachments to the service
+        // Pass ENRICHED attachments with openai_file_id to the service
         await sendMessageAndStreamResponse(conversationId, userId, content, async (chunk) => {
             // Send SSE data event with chunk
             res.write(`data: ${JSON.stringify({ type: "chunk", text: chunk })}\n\n`);
-        }, attachments)
+        }, undefined, // onUserMessageCreated callback (not needed in REST API)
+        enrichedAttachments // Pass enriched attachments with openai_file_id
+        )
             .then((result) => {
             // Send final event with complete result (userMessage, assistantMessage, conversation)
             const doneEvent = { type: "done", ...result };

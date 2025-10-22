@@ -4,6 +4,8 @@
  */
 import * as CloudinaryService from "../services/cloudinary.service.js";
 import * as FileProcessorService from "../services/fileProcessor.service.js";
+import * as OpenAIFileService from "../services/openai-file.service.js";
+import { extractTextFromPDF } from "../services/pdf-parser.service.js";
 import FileUploadModel from "../models/fileUpload.model.js";
 /**
  * Generate presigned upload signature for client
@@ -56,7 +58,28 @@ export const saveFileMetadata = async (req, res) => {
         let extracted_text;
         let processing_pages;
         let status = "uploaded";
-        if (resource_type === "raw" && format) {
+        // Extract text from PDF files
+        if (format === "pdf") {
+            console.log("📄 [FileUpload Controller] Detected PDF file, extracting text...");
+            status = "processing";
+            try {
+                extracted_text = await extractTextFromPDF(secure_url);
+                status = "processed";
+                console.log("✅ [FileUpload Controller] PDF text extraction completed", {
+                    textLength: extracted_text?.length || 0,
+                    textPreview: extracted_text?.substring(0, 100) + (extracted_text && extracted_text.length > 100 ? "..." : "")
+                });
+            }
+            catch (error) {
+                console.error("❌ [FileUpload Controller] PDF text extraction failed", {
+                    error: error?.message
+                });
+                status = "failed";
+                extracted_text = "[PDF text extraction failed]";
+            }
+        }
+        else if (resource_type === "raw" && format) {
+            // Fallback to old processor for other document types
             status = "processing";
             const processingResult = await FileProcessorService.processFile(secure_url, resource_type, format);
             if (processingResult.error) {
@@ -67,6 +90,54 @@ export const saveFileMetadata = async (req, res) => {
                 processing_pages = processingResult.pages;
                 status = "processed";
             }
+        }
+        // Upload to OpenAI File API if supported
+        let openai_file_id;
+        if (OpenAIFileService.isFileSupportedByOpenAI(resource_type, format)) {
+            console.log("🤖 [FileUpload Controller] File supported by OpenAI, checking for existing file_id");
+            // Check if file already exists in our database with OpenAI file_id
+            const existingFile = await FileUploadModel.findByPublicId(public_id);
+            if (existingFile?.openai_file_id) {
+                console.log("✅ [FileUpload Controller] Using existing OpenAI file_id", {
+                    public_id,
+                    openai_file_id: existingFile.openai_file_id,
+                });
+                openai_file_id = existingFile.openai_file_id;
+            }
+            else {
+                // Check if file already exists in OpenAI by filename
+                const existingOpenAIFileId = await OpenAIFileService.getExistingOpenAIFile(original_filename || public_id, userId);
+                if (existingOpenAIFileId) {
+                    console.log("✅ [FileUpload Controller] Found existing OpenAI file", {
+                        filename: original_filename,
+                        openai_file_id: existingOpenAIFileId,
+                    });
+                    openai_file_id = existingOpenAIFileId;
+                }
+                else {
+                    // Upload to OpenAI File API
+                    console.log("📤 [FileUpload Controller] Uploading to OpenAI File API");
+                    const openaiResult = await OpenAIFileService.uploadFileToOpenAI(secure_url, original_filename || public_id, resource_type, format);
+                    if (openaiResult.success && openaiResult.file_id) {
+                        console.log("✅ [FileUpload Controller] Successfully uploaded to OpenAI", {
+                            file_id: openaiResult.file_id,
+                        });
+                        openai_file_id = openaiResult.file_id;
+                    }
+                    else {
+                        console.warn("⚠️ [FileUpload Controller] Failed to upload to OpenAI", {
+                            error: openaiResult.error,
+                        });
+                        // Continue without OpenAI file_id - don't fail the whole operation
+                    }
+                }
+            }
+        }
+        else {
+            console.log("ℹ️ [FileUpload Controller] File type not supported by OpenAI File API", {
+                resource_type,
+                format,
+            });
         }
         // Save to database
         const fileData = {
@@ -86,6 +157,7 @@ export const saveFileMetadata = async (req, res) => {
             thumbnail_url,
             status,
             metadata,
+            openai_file_id,
         };
         const savedFile = await FileUploadModel.create(fileData);
         res.json({
@@ -193,6 +265,22 @@ export const deleteFile = async (req, res) => {
         }
         catch (error) {
             // Continue with DB deletion even if Cloudinary fails
+        }
+        // Delete from OpenAI if file_id exists
+        if (file.openai_file_id) {
+            try {
+                console.log("🗑️ [FileUpload Controller] Deleting from OpenAI File API", {
+                    file_id: file.openai_file_id,
+                });
+                await OpenAIFileService.deleteOpenAIFile(file.openai_file_id);
+            }
+            catch (error) {
+                console.warn("⚠️ [FileUpload Controller] Failed to delete from OpenAI", {
+                    file_id: file.openai_file_id,
+                    error: error.message,
+                });
+                // Continue with DB deletion even if OpenAI deletion fails
+            }
         }
         // Delete from database
         await FileUploadModel.delete(fileId);

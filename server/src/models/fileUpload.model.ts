@@ -26,6 +26,7 @@ export interface FileUploadMetadata {
   status?: "uploaded" | "processing" | "processed" | "failed";
   error_message?: string;
   metadata?: Record<string, any>;
+  openai_file_id?: string; // OpenAI File API ID
   created_at?: Date;
   updated_at?: Date;
 }
@@ -41,9 +42,9 @@ export class FileUploadModel {
       INSERT INTO files_upload (
         public_id, secure_url, resource_type, format, original_filename,
         size_bytes, width, height, duration, pages, uploaded_by,
-        conversation_id, message_id, extracted_text, thumbnail_url, status, metadata
+        conversation_id, message_id, extracted_text, thumbnail_url, status, metadata, openai_file_id
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
       RETURNING *
     `;
 
@@ -65,6 +66,7 @@ export class FileUploadModel {
       data.thumbnail_url || null,
       data.status || "uploaded",
       data.metadata ? JSON.stringify(data.metadata) : null,
+      data.openai_file_id || null,
     ];
 
     const result = await pool.query(query, values);
@@ -86,6 +88,15 @@ export class FileUploadModel {
   static async findByPublicId(publicId: string): Promise<FileUploadMetadata | null> {
     const query = "SELECT * FROM files_upload WHERE public_id = $1";
     const result = await pool.query(query, [publicId]);
+    return result.rows[0] || null;
+  }
+
+  /**
+   * Get file upload by openai_file_id
+   */
+  static async findByOpenAIFileId(openaiFileId: string): Promise<FileUploadMetadata | null> {
+    const query = "SELECT * FROM files_upload WHERE openai_file_id = $1";
+    const result = await pool.query(query, [openaiFileId]);
     return result.rows[0] || null;
   }
 
