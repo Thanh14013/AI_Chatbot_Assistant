@@ -9,20 +9,9 @@ import { createRequire } from "module";
 
 // Use createRequire to import CommonJS module
 const require = createRequire(import.meta.url);
-const pdfParseModule = require("pdf-parse");
 
-// Try to get the parser function - could be default export or the module itself
-const pdfParse =
-  pdfParseModule.default ||
-  pdfParseModule.PDFParse ||
-  (typeof pdfParseModule === "function" ? pdfParseModule : null);
-
-if (!pdfParse) {
-  console.error("❌ [PDF Parser] Failed to load pdf-parse function", {
-    moduleKeys: Object.keys(pdfParseModule),
-    moduleType: typeof pdfParseModule,
-  });
-}
+// Import PDFParse class from pdf-parse module
+const { PDFParse } = require("pdf-parse");
 
 /**
  * Download file from URL as Buffer
@@ -72,11 +61,12 @@ export async function extractTextFromPDF(pdfUrl: string): Promise<string> {
       sizeKB: Math.round(pdfBuffer.length / 1024),
     });
 
-    // Parse PDF and extract text
-    const data = await pdfParse(pdfBuffer);
+    // Parse PDF using PDFParse class
+    const pdfParser = new PDFParse({ data: pdfBuffer });
+    const data = await pdfParser.getText();
 
     const extractedText = data.text.trim();
-    const pageCount = data.numpages;
+    const pageCount = data.total;
     const textLength = extractedText.length;
 
     console.log("✅ [PDF Parser] Text extraction completed", {
@@ -116,11 +106,13 @@ export async function extractTextFromPDFBuffer(pdfBuffer: Buffer): Promise<strin
       sizeKB: Math.round(pdfBuffer.length / 1024),
     });
 
-    const data = await pdfParse(pdfBuffer);
+    // Parse PDF using PDFParse class
+    const pdfParser = new PDFParse({ data: pdfBuffer });
+    const data = await pdfParser.getText();
     const extractedText = data.text.trim();
 
     console.log("✅ [PDF Parser] Text extraction completed", {
-      pageCount: data.numpages,
+      pageCount: data.total,
       textLength: extractedText.length,
     });
 
