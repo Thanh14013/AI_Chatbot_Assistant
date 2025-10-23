@@ -21,7 +21,6 @@ import {
   TagOutlined,
 } from "@ant-design/icons";
 import styles from "./ConversationForm.module.css";
-import { getPopularTags, type PopularTag } from "../services/chat.service";
 
 const { Text, Title } = Typography;
 const { Option } = Select;
@@ -83,36 +82,25 @@ const ConversationForm: React.FC<ConversationFormProps> = ({
   const [contextWindow, setContextWindow] = useState(
     initialValues?.context_window || 10
   );
-  const [popularTags, setPopularTags] = useState<PopularTag[]>([]);
-  const [loadingTags, setLoadingTags] = useState(false);
+  const [currentTags, setCurrentTags] = useState<string[]>([]); // Simple state array for tags
 
-  // Fetch popular tags when modal opens
-  useEffect(() => {
-    if (open) {
-      fetchPopularTags();
-    }
-  }, [open]);
-
-  // Fetch popular tags from server
-  const fetchPopularTags = async () => {
-    try {
-      setLoadingTags(true);
-      const tags = await getPopularTags();
-      setPopularTags(tags);
-    } catch (error) {
-      // Silently fail - tags are optional
-    } finally {
-      setLoadingTags(false);
-    }
-  };
-
-  // Update form and state when initialValues change (for edit mode)
+  // Update form and state when modal opens in edit mode
   React.useEffect(() => {
-    if (mode === "edit" && initialValues) {
+    if (open && mode === "edit" && initialValues) {
+      // Reset form completely to clear any stale state
+      form.resetFields();
+      // Set fresh values
       form.setFieldsValue(initialValues);
       setContextWindow(initialValues.context_window);
+      setCurrentTags(initialValues.tags || []); // Initialize tags state
+    } else if (open && mode === "create") {
+      // Reset form for create mode
+      form.resetFields();
+      setContextWindow(10);
+      setCurrentTags([]); // Reset tags
     }
-  }, [mode, initialValues, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, mode]); // Only run when modal opens/closes or mode changes - NOT when initialValues changes during editing
 
   /**
    * Handle form submission
@@ -121,10 +109,14 @@ const ConversationForm: React.FC<ConversationFormProps> = ({
     form
       .validateFields()
       .then((values) => {
+        // Use currentTags state instead of form value
+        values.tags = currentTags;
+
         onSubmit(values);
         if (mode === "create") {
           form.resetFields();
-          setContextWindow(10); // Reset to default only for create mode
+          setContextWindow(10);
+          setCurrentTags([]); // Reset tags
         }
       })
       .catch((info) => {});
@@ -279,45 +271,50 @@ const ConversationForm: React.FC<ConversationFormProps> = ({
             </Space>
           }
           help="Add up to 4 tags to organize your conversation (max 20 characters each)"
-          rules={[
-            {
-              type: "array",
-              max: 4,
-              message: "Maximum 4 tags allowed!",
-            },
-            {
-              validator: async (_, tags: string[]) => {
-                if (tags && tags.length > 0) {
-                  for (const tag of tags) {
-                    if (tag.length > 20) {
-                      throw new Error(
-                        `Tag "${tag}" is too long (max 20 characters)`
-                      );
-                    }
-                    if (tag.length < 1) {
-                      throw new Error("Tags cannot be empty");
-                    }
-                  }
-                }
-              },
-            },
-          ]}
         >
           <Select
             mode="tags"
             size="large"
             placeholder="Add tags (e.g., work, study, personal...)"
-            loading={loadingTags}
             maxTagCount={4}
             maxTagTextLength={20}
             tokenSeparators={[","]}
-          >
-            {popularTags.map((tag) => (
-              <Option key={tag.name} value={tag.name}>
-                {tag.name} ({tag.count})
-              </Option>
-            ))}
-          </Select>
+            value={currentTags}
+            open={false}
+            onChange={(values: string[]) => {
+              // Completely replace with new logic
+              if (values.length > currentTags.length) {
+                // User added tag(s)
+                const newTags = values.filter((v) => !currentTags.includes(v));
+
+                // Collect valid tags
+                const validNewTags: string[] = [];
+
+                for (const tag of newTags) {
+                  const normalizedTag = tag.toLowerCase().trim();
+
+                  // Check if duplicate (against current + already validated)
+                  const exists = [...currentTags, ...validNewTags].some(
+                    (t) => t.toLowerCase().trim() === normalizedTag
+                  );
+
+                  if (exists) {
+                    message.warning(`Tag "${tag}" already exists!`);
+                  } else {
+                    validNewTags.push(normalizedTag);
+                  }
+                }
+
+                // Add all valid tags at once
+                if (validNewTags.length > 0) {
+                  setCurrentTags([...currentTags, ...validNewTags]);
+                }
+              } else {
+                // User removed a tag - update directly
+                setCurrentTags(values);
+              }
+            }}
+          />
         </Form.Item>
       </Form>
     </Modal>

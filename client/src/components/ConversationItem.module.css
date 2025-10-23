@@ -1,87 +1,72 @@
-/* ConversationItem Component Styles */
+/* ConversationItem Component Styles - Modern Minimal Design */
 
 .conversationItem {
   position: relative;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
-  padding: 12px 16px;
+  padding: 8px 12px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 8px;
   margin-bottom: 4px;
   background-color: transparent;
-  border-left: 3px solid transparent;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+    sans-serif;
 }
 
 .conversationItem:hover {
-  background-color: rgba(0, 0, 0, 0.04);
-}
-
-.conversationItem:active {
-  background-color: rgba(0, 0, 0, 0.06);
+  background-color: #f7f7f8;
 }
 
 /* Active state styling */
 .conversationItem.active {
-  background-color: #e6f7ff;
-  border-left-color: #1890ff;
+  background-color: #ececed;
 }
 
 .conversationItem.active:hover {
-  background-color: #e6f7ff;
+  background-color: #ececed;
 }
 
-/* Icon container */
+/* Nested conversation item (inside project) */
+.conversationItem.nested {
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  border-radius: 8px;
+  margin-left: 8px;
+}
+
+/* Draggable state */
+.conversationItem[draggable="true"] {
+  cursor: grab;
+}
+
+.conversationItem[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* Dragging state - lift effect */
+.conversationItem.dragging {
+  transform: scale(1.03);
+  opacity: 0.7;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+  background-color: #ffffff;
+  cursor: grabbing;
+}
+
+/* Small icon container - 20px subtle gray */
 .iconContainer {
-  position: relative;
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f0f0f0;
-  border-radius: 50%;
-  margin-top: 2px;
-}
-
-.conversationItem.active .iconContainer {
-  background-color: #1890ff;
 }
 
 .icon {
   font-size: 16px;
-  color: rgba(0, 0, 0, 0.45);
-}
-
-.conversationItem.active .icon {
-  color: white;
-}
-
-/* Unread indicator (green dot) */
-.unreadIndicator {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 10px;
-  height: 10px;
-  background-color: #52c41a;
-  border: 2px solid white;
-  border-radius: 50%;
-  animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 0.8;
-  }
+  color: #999;
 }
 
 /* Details container */
@@ -91,6 +76,27 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+/* Title - bold dark text */
+.title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #222;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Tags - plain text with bullet separators */
+.tags {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* More button (3 dots) */
@@ -103,9 +109,9 @@
   justify-content: center;
   border-radius: 4px;
   opacity: 0;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   font-size: 16px;
-  color: rgba(0, 0, 0, 0.45);
+  color: #999;
 }
 
 .conversationItem:hover .moreButton {
@@ -113,89 +119,17 @@
 }
 
 .moreButton:hover {
-  background-color: rgba(0, 0, 0, 0.06);
-  color: rgba(0, 0, 0, 0.85);
-}
-
-.deleteMenuItem {
-  color: #ff4d4f;
+  background-color: #e5e5e6;
+  color: #222;
 }
 
 .conversationItem.active .moreButton {
   opacity: 1;
 }
 
-/* Rename input */
-.renameInput {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-/* Title styling */
-.title {
-  font-size: 14px;
-  color: rgba(0, 0, 0, 0.85);
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.conversationItem.active .title {
-  color: #1890ff;
-}
-
-/* Last message preview */
-.preview {
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
-  margin: 0;
-  line-height: 1.4;
-}
-
-/* Metadata row (message count and timestamp) */
-.metadata {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 2px;
-}
-
-.messageCount {
-  font-size: 11px;
-  color: rgba(0, 0, 0, 0.45);
-}
-
-.timestamp {
-  font-size: 11px;
-  color: rgba(0, 0, 0, 0.45);
-  white-space: nowrap;
-}
-
-/* Active indicator line */
-.activeIndicator {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 6px;
-  height: 6px;
-  background-color: #1890ff;
-  border-radius: 50%;
-}
-
-/* Tags container */
-.tagsContainer {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 4px;
-}
-
 /* Focus state for accessibility */
 .conversationItem:focus {
-  outline: 2px solid #1890ff;
+  outline: 2px solid #0066cc;
   outline-offset: -2px;
 }
 
@@ -205,25 +139,24 @@
     padding: 10px 12px;
   }
 
-  .iconContainer {
-    width: 32px;
-    height: 32px;
-  }
-
-  .icon {
-    font-size: 14px;
-  }
-
   .title {
     font-size: 13px;
   }
 
-  .preview {
+  .tags {
     font-size: 11px;
   }
+}
 
-  .messageCount,
-  .timestamp {
-    font-size: 10px;
-  }
+/* Remove unused styles - keeping only what's needed for minimal design */
+.tagsContainer,
+.metadata,
+.messageCount,
+.timestamp,
+.preview,
+.unreadIndicator,
+.activeIndicator,
+.renameInput,
+.deleteMenuItem {
+  display: none;
 }

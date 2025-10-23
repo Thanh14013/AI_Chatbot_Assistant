@@ -1,0 +1,69 @@
+/* Compact Project Section - minimal space */
+.projectSection {
+  margin-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+/* Compact Header - Single line with + button only */
+.compactHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  min-height: 36px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  user-select: none;
+}
+
+.compactHeader:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.toggleIcon {
+  margin-left: 8px;
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.45);
+  transition: transform 0.2s;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.headerIcon {
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.headerText {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.addButton {
+  color: rgba(0, 0, 0, 0.45);
+  padding: 4px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.addButton:hover {
+  color: #1890ff;
+  background: rgba(24, 144, 255, 0.1);
+}
+
+/* Projects List - No scroll, let parent handle it */
+.projectsList {
+  padding: 4px 8px 8px 8px;
+}

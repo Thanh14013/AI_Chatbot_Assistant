@@ -76,6 +76,18 @@ export interface ConversationUnreadStatusData {
   socketId?: string;
 }
 
+export interface ProjectData {
+  id: string;
+  name: string;
+  description?: string | null;
+  color: string;
+  icon?: string | null;
+  order: number;
+  conversationCount?: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 export interface ErrorData {
   message: string;
   type?: string;
@@ -119,6 +131,11 @@ export interface ServerToClientEvents {
   }) => void;
   // New event for unread status tracking (multi-tab sync)
   "conversation:unread_status": (data: ConversationUnreadStatusData) => void;
+
+  // Project events (for real-time CRUD)
+  "project:created": (project: ProjectData) => void;
+  "project:updated": (project: ProjectData) => void;
+  "project:deleted": (data: { projectId: string }) => void;
 
   // Typing events
   "user:typing:start": (data: TypingData) => void;

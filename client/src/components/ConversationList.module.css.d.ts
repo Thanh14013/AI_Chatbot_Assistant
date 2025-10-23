@@ -1,5 +1,6 @@
 declare const styles: {
   readonly conversationsList: string;
+  readonly dropZoneActive: string;
   readonly collapsed: string;
   readonly conversationsScrollContainer: string;
   readonly listItem: string;

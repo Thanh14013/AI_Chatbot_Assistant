@@ -11,6 +11,7 @@ export type CreateConversationPayload = {
   model?: string;
   context_window?: number;
   tags?: string[];
+  project_id?: string;
 };
 
 export const createConversation = async (
@@ -42,6 +43,7 @@ export type GetConversationsParams = {
   search?: string;
   tags?: string[];
   tagMode?: "any" | "all";
+  standalone?: boolean; // Filter by project_id (true = only standalone, false = only in projects)
 };
 
 export type GetConversationsResult = {
@@ -57,7 +59,14 @@ export type GetConversationsResult = {
 export const getConversations = async (
   params: GetConversationsParams = {}
 ): Promise<GetConversationsResult> => {
-  const { page = 1, limit = 20, search, tags, tagMode = "any" } = params;
+  const {
+    page = 1,
+    limit = 20,
+    search,
+    tags,
+    tagMode = "any",
+    standalone,
+  } = params;
 
   // Build query string
   const queryParams = new URLSearchParams({
@@ -72,6 +81,11 @@ export const getConversations = async (
   if (tags && tags.length > 0) {
     queryParams.append("tags", tags.join(","));
     queryParams.append("tagMode", tagMode);
+  }
+
+  // Add standalone filter if specified
+  if (standalone !== undefined) {
+    queryParams.append("standalone", standalone.toString());
   }
 
   const resp = await axiosInstance.get(

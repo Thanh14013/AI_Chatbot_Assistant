@@ -1,0 +1,63 @@
+.projectModal {
+  .form {
+    margin-top: 20px;
+  }
+}
+
+.colorPicker {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.colorOption {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 2px solid transparent;
+}
+
+.colorOption:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.colorOption.selected {
+  border: 2px solid #000;
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.iconPicker {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.iconOption {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #d9d9d9;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 24px;
+  background: #fafafa;
+}
+
+.iconOption:hover {
+  border-color: #1890ff;
+  background: #e6f7ff;
+  transform: translateY(-2px);
+}
+
+.iconOption.selected {
+  border-color: #1890ff;
+  background: #e6f7ff;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+}

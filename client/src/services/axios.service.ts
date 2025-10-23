@@ -61,6 +61,12 @@ axiosInstance.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
+    // Attach socket ID to exclude sender from broadcasts
+    const socketId = websocketService.getSocketId();
+    if (socketId && config.headers) {
+      config.headers["x-socket-id"] = socketId;
+    }
+
     return config;
   },
   (error: AxiosError) => {

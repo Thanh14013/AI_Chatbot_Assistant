@@ -8,6 +8,7 @@ import {
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import styles from "./SidebarHeader.module.css";
+import SearchDropdown, { SearchType } from "./SearchDropdown";
 import {
   searchAllConversations,
   searchConversation,
@@ -21,7 +22,11 @@ interface SidebarHeaderProps {
   collapsed?: boolean;
   onToggle?: () => void;
   // receives semantic search results (or null if cleared)
-  onSemanticResults?: (results: ConversationSearchResult[] | null) => void;
+  onSemanticResults?: (
+    results: ConversationSearchResult[] | null,
+    query?: string
+  ) => void;
+  onSearchTypeChange?: (type: SearchType) => void;
   onHighlightMessage?: (messageId: string) => void;
   currentConversationId?: string | null;
 }
@@ -33,6 +38,7 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
   collapsed = false,
   onToggle,
   onSemanticResults,
+  onSearchTypeChange,
   onHighlightMessage,
   currentConversationId,
 }) => {
@@ -40,9 +46,15 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
   const [localQuery, setLocalQuery] = useState(searchQuery || "");
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchType, setSearchType] = useState<SearchType>("keyword");
 
   // keep localQuery in sync when parent clears
   useEffect(() => setLocalQuery(searchQuery || ""), [searchQuery]);
+
+  // Notify parent when search type changes
+  useEffect(() => {
+    onSearchTypeChange?.(searchType);
+  }, [searchType, onSearchTypeChange]);
 
   // Manual search function - only called when user clicks search button
   const handleSearch = useCallback(async () => {
@@ -50,7 +62,7 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
 
     // Clear results if query is empty
     if (!trimmedQuery) {
-      onSemanticResults?.(null);
+      onSemanticResults?.(null, "");
       setError(null);
       return;
     }
@@ -59,117 +71,68 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
     setError(null);
 
     try {
-      // Step 1: Try tag-based search first
-      // Normalize query for tag matching (lowercase, remove special chars)
-      const normalizedQuery = trimmedQuery
-        .toLowerCase()
-        .replace(/[^a-z0-9-]/g, "");
+      // Search based on selected type
+      if (searchType === "tags") {
+        // Tag-based search
+        const normalizedQuery = trimmedQuery
+          .toLowerCase()
+          .replace(/[^a-z0-9-]/g, "");
 
-      let tagResults: ConversationSearchResult[] = [];
-      try {
-        const { getConversations } = await import("../services/chat.service");
-        const tagSearchRes = await getConversations({
-          tags: [normalizedQuery],
-          tagMode: "any",
-          limit: 20,
+        let tagResults: ConversationSearchResult[] = [];
+        try {
+          const { getConversations } = await import("../services/chat.service");
+          const tagSearchRes = await getConversations({
+            tags: [normalizedQuery],
+            tagMode: "any",
+            limit: 20,
+          });
+
+          // Convert to search result format
+          if (
+            tagSearchRes.conversations &&
+            tagSearchRes.conversations.length > 0
+          ) {
+            tagResults = tagSearchRes.conversations.map((conv) => ({
+              conversation_id: conv.id,
+              conversation_title: conv.title || "Untitled",
+              message_count: conv.message_count || 0,
+              updated_at:
+                typeof conv.updatedAt === "string"
+                  ? conv.updatedAt
+                  : conv.updatedAt.toISOString(),
+              max_similarity: 1.0,
+              top_messages: [],
+            }));
+          }
+        } catch (err) {
+          console.warn("[Search] Tag search failed:", err);
+          throw new Error("Tag search failed");
+        }
+
+        if (tagResults.length > 0) {
+          setError(null);
+          onSemanticResults?.(tagResults, trimmedQuery);
+
+          // Removed auto-navigation - results will be displayed in sidebar
+          return;
+        } else {
+          throw new Error("No conversations found with this tag");
+        }
+      } else {
+        // Keyword search - semantic search
+        const res = await searchAllConversations({
+          query: trimmedQuery,
+          limit: 10,
+          messagesPerConversation: 2,
         });
 
-        // Convert to search result format
-        if (
-          tagSearchRes.conversations &&
-          tagSearchRes.conversations.length > 0
-        ) {
-          tagResults = tagSearchRes.conversations.map((conv) => ({
-            conversation_id: conv.id,
-            conversation_title: conv.title || "Untitled",
-            message_count: conv.message_count || 0,
-            updated_at:
-              typeof conv.updatedAt === "string"
-                ? conv.updatedAt
-                : conv.updatedAt.toISOString(),
-            max_similarity: 1.0, // Perfect match for tag search
-            top_messages: [], // Empty since we're searching by tag, not message content
-          }));
-        }
-      } catch (err) {
-        console.warn(
-          "[Search] Tag search failed, will fallback to semantic:",
-          err
-        );
-      }
-
-      // If tag search found results, use them
-      if (tagResults.length > 0) {
+        // Always surface the results to the header UI. If there are zero
+        // results, present an empty list so the dropdown shows "Found 0".
+        const results = res.results || [];
         setError(null);
-        onSemanticResults?.(tagResults);
+        onSemanticResults?.(results, trimmedQuery);
 
-        // Auto-navigate to first result
-        if (tagResults[0]?.conversation_id) {
-          const firstConvId = tagResults[0].conversation_id;
-          const basePath = `/conversations/${firstConvId}`;
-          navigate(`${basePath}?q=${encodeURIComponent(trimmedQuery)}`);
-        }
-        return;
-      }
-
-      // Step 2: Fallback to semantic search if no tag matches
-      const res = await searchAllConversations({
-        query: trimmedQuery,
-        limit: 10,
-        messagesPerConversation: 2,
-      });
-
-      // Always surface the results to the header UI. If there are zero
-      // results, present an empty list so the dropdown shows "Found 0".
-      const results = res.results || [];
-      setError(null);
-      onSemanticResults?.(results);
-
-      // Auto-navigate to the best matching conversation
-      try {
-        if (Array.isArray(results) && results.length > 0) {
-          let bestConversationId: string | null = null;
-          let bestSimilarity = -1;
-
-          for (const conv of results) {
-            const sim =
-              typeof conv.max_similarity === "number"
-                ? conv.max_similarity
-                : -1;
-            if (sim >= 0 && sim > bestSimilarity) {
-              bestSimilarity = sim;
-              bestConversationId = conv.conversation_id;
-            }
-          }
-
-          if (bestConversationId) {
-            if (
-              currentConversationId === bestConversationId &&
-              onHighlightMessage
-            ) {
-              // Already in the conversation, just highlight the message
-
-              try {
-                const convRes = await searchConversation(bestConversationId, {
-                  query: trimmedQuery,
-                  limit: 1,
-                });
-                if (convRes.bestMatch?.message_id) {
-                  onHighlightMessage(convRes.bestMatch.message_id);
-                }
-              } catch {
-                // logging removed: conversation search failed
-              }
-            } else {
-              // Navigate to the conversation
-
-              const basePath = `/conversations/${bestConversationId}`;
-              navigate(`${basePath}?q=${encodeURIComponent(trimmedQuery)}`);
-            }
-          }
-        }
-      } catch {
-        // logging removed: auto-navigate failed
+        // Removed auto-navigation - results will be displayed in sidebar
       }
     } catch (err: any) {
       // logging removed: semantic search failed
@@ -182,6 +145,7 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
     }
   }, [
     localQuery,
+    searchType,
     onSemanticResults,
     navigate,
     onHighlightMessage,
@@ -194,7 +158,7 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
     onSearchChange(e);
     // Clear semantic results when user clears input
     if (!e.target.value.trim()) {
-      onSemanticResults?.(null);
+      onSemanticResults?.(null, "");
       setError(null);
     }
   };
@@ -205,7 +169,7 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
     onSearchChange({
       target: { value: "" },
     } as React.ChangeEvent<HTMLInputElement>);
-    onSemanticResults?.(null);
+    onSemanticResults?.(null, "");
     setError(null);
   };
 
@@ -217,26 +181,15 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
   };
   return (
     <div className={`${styles.header} ${collapsed ? styles.collapsed : ""}`}>
-      <div className={styles.headerTopRow}>
-        {/* When collapsed, hide the New button and show only the toggle */}
-        {!collapsed && (
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            size="middle"
-            className={styles.newButton}
-            onClick={onNewConversation}
-          >
-            New Conversation
-          </Button>
-        )}
-
+      {/* Single horizontal row with all controls */}
+      <div className={styles.headerRow}>
+        {/* Toggle sidebar button (menu icon) */}
         <Tooltip
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           placement="right"
         >
           <button
-            className={styles.inlineToggle}
+            className={styles.toggleButton}
             onClick={onToggle}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
@@ -247,40 +200,38 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
             )}
           </button>
         </Tooltip>
+
+        {!collapsed && (
+          <>
+            {/* New Conversation button - small, blue, rounded */}
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              className={styles.newButton}
+              onClick={onNewConversation}
+              title="New Conversation"
+            />
+
+            {/* Search bar with dropdown + input */}
+            <div className={styles.searchBar}>
+              {/* Dropdown selector (Keyword/Tag) */}
+              <SearchDropdown value={searchType} onChange={setSearchType} />
+
+              {/* Search input field - press Enter to search */}
+              <Input
+                placeholder="Search…"
+                value={localQuery}
+                onChange={handleInputChange}
+                onKeyPress={handleKeyPress}
+                onPressEnter={handleSearch}
+                className={styles.searchInput}
+                allowClear
+                bordered={false}
+              />
+            </div>
+          </>
+        )}
       </div>
-
-      {/* Hide search input when collapsed */}
-      {!collapsed && (
-        <div className={styles.searchContainer}>
-          <Input
-            placeholder="Search conversations..."
-            prefix={<SearchOutlined />}
-            value={localQuery}
-            onChange={handleInputChange}
-            onKeyPress={handleKeyPress}
-            className={styles.searchInput}
-            size="middle"
-            allowClear
-            onClear={handleClear}
-          />
-          <Button
-            type="primary"
-            icon={<SearchOutlined />}
-            onClick={handleSearch}
-            loading={isSearching}
-            disabled={!localQuery.trim()}
-            className={styles.searchButton}
-            title="Search"
-          >
-            Search
-          </Button>
-        </div>
-      )}
-
-      {/* Error message */}
-      {!collapsed && error && (
-        <div className={styles.errorMessage}>⚠️ {error}</div>
-      )}
     </div>
   );
 };

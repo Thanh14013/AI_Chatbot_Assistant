@@ -202,10 +202,23 @@ export const leaveConversationView = (socketId: string): void => {
 
 /**
  * Broadcast message to all sockets of a specific user (across all tabs/devices)
+ * @param userId - User ID to broadcast to
+ * @param event - Event name
+ * @param data - Event data
+ * @param excludeSocketId - Optional socket ID to exclude (e.g., the sender)
  */
-export const broadcastToUser = (userId: string, event: string, data: any): void => {
+export const broadcastToUser = (
+  userId: string,
+  event: string,
+  data: any,
+  excludeSocketId?: string
+): void => {
   const sockets = getUserSockets(userId);
   sockets.forEach((socketId) => {
+    // Skip excluded socket (usually the sender)
+    if (excludeSocketId && socketId === excludeSocketId) {
+      return;
+    }
     const socket = io?.sockets.sockets.get(socketId);
     if (socket) {
       (socket as any).emit(event, data);

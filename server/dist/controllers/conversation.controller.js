@@ -1,6 +1,7 @@
 import { createConversation, getUserConversations, getConversationById, updateConversation, deleteConversation, generateConversationTitle, getPopularTags, } from "../services/conversation.service.js";
 import User from "../models/user.model.js";
 import { validateAndNormalizeTags } from "../utils/tag.util.js";
+import { broadcastToUser } from "../services/socket.service.js";
 /**
  * Helper function to get user ID from authenticated request
  */
@@ -27,7 +28,7 @@ export const create = async (req, res) => {
             return;
         }
         // Extract conversation data from request body
-        const { title, model, context_window, tags } = req.body;
+        const { title, model, context_window, tags, project_id } = req.body;
         // Validate required fields
         if (!title || title.trim().length === 0) {
             res.status(400).json({
@@ -55,8 +56,13 @@ export const create = async (req, res) => {
             model: model || "gpt-5-nano",
             context_window: context_window || 10,
             tags: tags || [],
+            ...(project_id && { project_id }), // Assign to project if provided
         };
         const conversation = await createConversation(conversationData);
+        // Broadcast conversation created event to user via WebSocket
+        // Exclude the sender's socket to prevent duplicate
+        const socketId = req.headers["x-socket-id"];
+        broadcastToUser(userId, "conversation:created", conversation, socketId);
         // Send success response
         res.status(201).json({
             success: true,
@@ -257,6 +263,12 @@ export const update = async (req, res) => {
         if (tags !== undefined)
             updateData.tags = tags;
         const conversation = await updateConversation(conversationId, userId, updateData);
+        // Broadcast conversation updated event to user via WebSocket, excluding sender
+        const socketId = req.headers["x-socket-id"];
+        broadcastToUser(userId, "conversation:updated", {
+            conversationId,
+            conversation,
+        }, socketId);
         // Send success response
         res.status(200).json({
             success: true,
@@ -315,6 +327,12 @@ export const remove = async (req, res) => {
         }
         // Delete conversation
         const result = await deleteConversation(conversationId, userId);
+        // Broadcast conversation deleted event to user via WebSocket
+        // Exclude the sender's socket to prevent duplicate
+        const socketId = req.headers["x-socket-id"];
+        broadcastToUser(userId, "conversation:deleted", {
+            conversationId,
+        }, socketId);
         // After deletion, fetch refreshed conversation list for the user.
         // Use page/limit from query params if provided so the client can
         // control which page is returned after delete; default to 1/20.

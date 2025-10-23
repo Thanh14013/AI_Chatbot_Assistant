@@ -40,6 +40,8 @@ class Conversation
   public total_tokens_used!: number;
   public message_count!: number;
   public tags!: string[];
+  public project_id!: string | null;
+  public order_in_project!: number;
   public deleted_at!: Date | null;
 
   // Timestamps (automatically managed by Sequelize)
@@ -180,6 +182,28 @@ Conversation.init(
       defaultValue: [],
       comment: "Tags for organizing conversations (max 4 tags, max 20 chars each)",
     },
+
+    // Project relationship
+    project_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      defaultValue: null,
+      references: {
+        model: "projects",
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+      onDelete: "SET NULL",
+      comment: "Project ID (foreign key to projects table, null if not in a project)",
+    },
+
+    // Order within project
+    order_in_project: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+      comment: "Display order within project",
+    },
   },
   {
     sequelize, // Database connection instance
@@ -191,6 +215,8 @@ Conversation.init(
       // Indexes for performance optimization
       { fields: ["user_id"] }, // Index for finding user's conversations
       { fields: ["user_id", "deleted_at"] }, // Composite index for active conversations
+      { fields: ["project_id"] }, // Index for finding conversations in a project
+      { fields: ["project_id", "order_in_project"] }, // Composite index for ordered project conversations
       { fields: ["createdAt"] }, // Index for sorting by creation date
       { fields: ["updatedAt"] }, // Index for sorting by update date
     ],

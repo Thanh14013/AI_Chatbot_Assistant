@@ -7,7 +7,7 @@
   background-color: #ffffff;
   border-right: 1px solid #e8e8e8;
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.06);
-  transition: width 0.3s ease;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
 }
 
 /* Header Section - Fixed at top */
@@ -15,6 +15,8 @@
   flex-shrink: 0;
   background: #fff;
   z-index: 10;
+  height: 64px;
+  transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Search Section for Semantic Search */
@@ -22,16 +24,36 @@
   padding: 0 16px 12px 16px;
 }
 
-/* Middle Section - Scrollable conversations */
+/* Middle Section - Single scrollbar for all content */
 .middleSection {
   flex: 1;
-  min-height: 550px;
+  min-height: 0;
+  height: 600px;
   overflow-y: auto;
   overflow-x: hidden;
   background: #fff;
   position: relative;
   padding-left: 2px;
-  transition: padding 0.3s ease;
+  transition: padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+  scrollbar-width: thin;
+  scrollbar-color: #d9d9d9 transparent;
+}
+
+.middleSection::-webkit-scrollbar {
+  width: 4px;
+}
+
+.middleSection::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.middleSection::-webkit-scrollbar-thumb {
+  background-color: #d9d9d9;
+  border-radius: 2px;
+}
+
+.middleSection::-webkit-scrollbar-thumb:hover {
+  background-color: #bfbfbf;
 }
 
 /* Collapsed middle section - better padding */
@@ -45,12 +67,13 @@
   flex-shrink: 0;
   background: #fff;
   z-index: 10;
-  padding: 8px 10px; /* smaller padding to reduce height */
-  max-height: 72px; /* constrain height so it fits the chat frame */
+  padding: 12px 16px;
+  border-top: 1px solid #f0f0f0;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: padding 0.3s ease;
+  transition: padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+  height: 48px;
 }
 
 /* Collapsed bottom section */
@@ -60,7 +83,7 @@
 
 /* Collapsed sidebar styles */
 .collapsed {
-  width: 72px !important;
+  width: 60px !important;
 }
 
 .collapseToggleContainer {
@@ -98,12 +121,12 @@
 /* Responsive Design */
 @media (max-width: 768px) {
   .sidebar {
-    width: 280px !important;
+    width: 200px !important;
   }
 }
 
 @media (max-width: 480px) {
   .sidebar {
-    width: 260px !important;
+    width: 260px;
   }
 }

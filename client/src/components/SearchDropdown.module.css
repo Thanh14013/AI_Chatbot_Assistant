@@ -1,0 +1,47 @@
+.dropdownButton {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px;
+  height: 24px;
+  border-radius: 6px;
+  border: none !important;
+  background: #f8f9fa !important;
+  box-shadow: none !important;
+  transition: all 0.15s ease;
+}
+
+.dropdownButton:hover {
+  background: #f0f1f2 !important;
+}
+
+.dropdownButton:focus {
+  background: #f0f1f2 !important;
+  box-shadow: none !important;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.arrow {
+  font-size: 10px;
+  color: #999;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.iconKeyword {
+  color: #1890ff;
+  font-size: 14px;
+}
+
+.iconTag {
+  color: #fa8c16;
+  font-size: 14px;
+}

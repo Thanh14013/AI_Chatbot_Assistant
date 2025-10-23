@@ -1,0 +1,12 @@
+/* SearchResultsList Component Styles */
+
+.searchResultsList {
+  padding: 8px 0;
+}
+
+.emptyState {
+  padding: 16px;
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+}

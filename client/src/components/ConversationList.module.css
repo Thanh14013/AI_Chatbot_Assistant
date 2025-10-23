@@ -1,33 +1,21 @@
-/* ConversationList Styles */
+/* ConversationList Styles - No scroll, let parent handle */
 .conversationsList {
   flex: 1;
-  overflow-y: auto;
-  max-height: calc(100vh - 200px);
-  scrollbar-width: thin;
-  scrollbar-color: #d9d9d9 transparent;
-  transition: all 0.3s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 12px;
+  padding: 4px;
+}
+
+/* Drop zone active state */
+.conversationsList.dropZoneActive {
+  background: rgba(0, 122, 255, 0.05);
+  border: 2px solid #007aff;
+  box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.2);
 }
 
 /* Collapsed state */
 .conversationsList.collapsed {
   padding: 0 4px;
-}
-
-.conversationsList::-webkit-scrollbar {
-  width: 4px;
-}
-
-.conversationsList::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.conversationsList::-webkit-scrollbar-thumb {
-  background-color: #d9d9d9;
-  border-radius: 2px;
-}
-
-.conversationsList::-webkit-scrollbar-thumb:hover {
-  background-color: #bfbfbf;
 }
 
 .listItem {
@@ -209,8 +197,7 @@
 
 .conversationsScrollContainer {
   height: 100%;
-  overflow-y: auto;
-  padding-right: 8px; /* prevent scroll overlaying content */
+  padding-right: 8px;
 }
 
 .loadMoreIndicator {

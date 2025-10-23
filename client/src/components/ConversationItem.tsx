@@ -5,7 +5,7 @@
 
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Typography, Dropdown, Modal, Input, App, Tag } from "antd";
+import { Typography, Dropdown, Modal, Input, App } from "antd";
 import {
   MessageOutlined,
   MoreOutlined,
@@ -20,7 +20,6 @@ import {
 import { websocketService } from "../services/websocket.service";
 import ConversationForm, { ConversationFormValues } from "./ConversationForm";
 import styles from "./ConversationItem.module.css";
-import { getTagColor } from "../utils/tag-colors.util";
 
 const { Text } = Typography;
 
@@ -29,6 +28,11 @@ interface ConversationItemProps {
   isActive: boolean;
   onClick: (conversationId: string) => void;
   onUpdate?: () => void; // Callback to refresh conversation list after rename/delete
+  nested?: boolean; // Whether this item is nested inside a project
+  draggable?: boolean; // Whether this item can be dragged
+  onDragStart?: (conversationId: string, projectId: string | null) => void;
+  onDragEnd?: () => void;
+  isDragging?: boolean; // Whether this item is currently being dragged
 }
 
 /**
@@ -40,6 +44,11 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   isActive,
   onClick,
   onUpdate,
+  nested = false,
+  draggable = false,
+  onDragStart,
+  onDragEnd,
+  isDragging = false,
 }) => {
   const { message } = App.useApp();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -92,6 +101,27 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   };
 
   /**
+   * Handle drag start
+   */
+  const handleDragStart = (e: React.DragEvent) => {
+    if (draggable && onDragStart) {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("conversationId", conversation.id);
+      e.dataTransfer.setData("projectId", conversation.project_id || "null");
+      onDragStart(conversation.id, conversation.project_id || null);
+    }
+  };
+
+  /**
+   * Handle drag end
+   */
+  const handleDragEnd = (e: React.DragEvent) => {
+    if (draggable && onDragEnd) {
+      onDragEnd();
+    }
+  };
+
+  /**
    * Truncate long text for preview
    */
   const truncateText = (text: string, maxLength: number): string => {
@@ -127,17 +157,25 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
 
       message.success("Conversation updated successfully");
       setIsEditModalOpen(false);
+
+      // Trigger parent component refresh
       onUpdate?.();
 
-      // Notify WebSocket for multi-tab sync
-      if (websocketService.isConnected()) {
-        try {
-          websocketService.notifyConversationUpdated(conversation.id, {
-            ...values,
-            updatedAt: new Date().toISOString(),
-          });
-        } catch {}
-      }
+      // Trigger global refresh for conversations list
+      window.dispatchEvent(new Event("conversations:refresh"));
+
+      // Dispatch conversation:updated event for THIS tab (sender is excluded from backend broadcast)
+      // This ensures ProjectSection and other components reload to show updated name/tags/count
+      window.dispatchEvent(
+        new CustomEvent("conversation:updated", {
+          detail: {
+            conversationId: conversation.id,
+            conversation: result,
+          },
+        })
+      );
+
+      // Note: Backend broadcasts conversation:updated to OTHER tabs (excludes sender socket)
     } catch (error: any) {
       message.error(
         error?.response?.data?.message || "Failed to update conversation"
@@ -161,13 +199,16 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
       await deleteConversation(conversation.id);
       message.success("Conversation deleted successfully");
 
-      // Notify WebSocket for multi-tab sync
-      if (websocketService.isConnected()) {
-        try {
-          websocketService.notifyConversationDeleted(conversation.id);
-        } catch {}
-      }
+      // Dispatch conversation:deleted event for THIS tab (sender is excluded from backend broadcast)
+      window.dispatchEvent(
+        new CustomEvent("conversation:deleted", {
+          detail: {
+            conversationId: conversation.id,
+          },
+        })
+      );
 
+      // Trigger parent component refresh
       try {
         const maybe: any = onUpdate?.();
         if (maybe && typeof maybe.then === "function") {
@@ -175,7 +216,10 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         }
       } catch {}
 
-      // redirect to home after delete (replace history)
+      // Trigger global refresh for conversations list
+      window.dispatchEvent(new Event("conversations:refresh"));
+
+      // Redirect to home after delete (replace history)
       try {
         navigate("/", { replace: true });
         setTimeout(() => {
@@ -184,6 +228,8 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
       } catch {
         setTimeout(() => (window.location.href = "/"), 120);
       }
+
+      // Note: Backend broadcasts conversation:deleted to OTHER tabs (excludes sender socket)
     } catch (error: any) {
       message.error(
         error?.response?.data?.message || "Failed to delete conversation"
@@ -224,10 +270,15 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
 
   return (
     <div
-      className={`${styles.conversationItem} ${isActive ? styles.active : ""}`}
+      className={`${styles.conversationItem} ${isActive ? styles.active : ""} ${
+        nested ? styles.nested : ""
+      } ${isDragging ? styles.dragging : ""}`}
       onClick={handleClick}
       role="button"
       tabIndex={0}
+      draggable={draggable}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
@@ -235,54 +286,26 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         }
       }}
     >
-      {/* Conversation icon */}
+      {/* Small chat icon on the left */}
       <div className={styles.iconContainer}>
         <MessageOutlined className={styles.icon} />
-        {/* Unread indicator (green dot) */}
-        {conversation.hasUnread && !isActive && (
-          <div className={styles.unreadIndicator} />
-        )}
       </div>
 
       {/* Conversation details */}
       <div className={styles.details}>
-        {/* Title */}
-        <span className={styles.title}>
+        {/* Title in bold */}
+        <div className={styles.title}>
           {truncateText(conversation.title, 30)}
-        </span>
-
-        {/* Tags */}
-        {(() => {
-          return conversation.tags && conversation.tags.length > 0 ? (
-            <div className={styles.tagsContainer}>
-              {conversation.tags.slice(0, 3).map((tag) => (
-                <Tag
-                  key={tag}
-                  color={getTagColor(tag)}
-                  style={{ fontSize: "11px", margin: 0 }}
-                >
-                  {tag}
-                </Tag>
-              ))}
-              {conversation.tags.length > 3 && (
-                <Tag style={{ fontSize: "11px", margin: 0 }}>
-                  +{conversation.tags.length - 3} more
-                </Tag>
-              )}
-            </div>
-          ) : null;
-        })()}
-
-        {/* Message count and timestamp */}
-        <div className={styles.metadata}>
-          <span className={styles.messageCount}>
-            {conversation.message_count}{" "}
-            {conversation.message_count === 1 ? "message" : "messages"}
-          </span>
-          <span className={styles.timestamp}>
-            {formatTimestamp(conversation.updatedAt)}
-          </span>
         </div>
+
+        {/* Tags as plain text with separators */}
+        {conversation.tags && conversation.tags.length > 0 && (
+          <div className={styles.tags}>
+            {conversation.tags.slice(0, 4).join(" • ")}
+            {conversation.tags.length > 4 &&
+              ` • +${conversation.tags.length - 4} more`}
+          </div>
+        )}
       </div>
 
       {/* More options dropdown */}
@@ -315,6 +338,9 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
 
       {/* Edit Conversation Modal */}
       <ConversationForm
+        key={`edit-conv-${conversation.id}-${
+          isEditModalOpen ? "open" : "closed"
+        }`}
         open={isEditModalOpen}
         onCancel={() => setIsEditModalOpen(false)}
         onSubmit={handleEditSubmit}
@@ -330,9 +356,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           tags: fullConversation?.tags || conversation.tags || [],
         }}
       />
-
-      {/* Active indicator */}
-      {isActive && <div className={styles.activeIndicator} />}
     </div>
   );
 };

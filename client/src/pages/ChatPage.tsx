@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from "react";
-import { Layout, Typography, App, Tag } from "antd";
+import { Layout, Typography, App } from "antd";
 import {
   createConversation as apiCreateConversation,
   generateConversationTitle as apiGenerateTitle,
@@ -37,7 +37,6 @@ import { NetworkStatus, TypingIndicator } from "../components";
 import { searchConversation } from "../services/searchService";
 import { useAuthContext } from "../hooks/useAuthContext";
 import { usePreferences } from "../stores/preferences.store";
-import { getTagColor } from "../utils/tag-colors.util";
 import styles from "./ChatPage.module.css";
 
 const { Content } = Layout;
@@ -352,49 +351,12 @@ const ChatPage: React.FC = () => {
         setMessagesHasMore(
           result.pagination.page < result.pagination.totalPages
         );
-        // If navigation included a highlight param, try to scroll to that message
-        const searchParams = new URLSearchParams(location.search);
-        const highlightParam = searchParams.get("highlight");
-        if (highlightParam) {
-          // Try to find and scroll to the highlighted message. If not present in
-          // the initial page, attempt to load older pages (pagination) up to a limit.
-          const tryScroll = async (
-            pageToTry = result.pagination.page,
-            attemptsLeft = 6
-          ) => {
-            // Give React a moment to render refs
-            await new Promise((r) => setTimeout(r, 120));
-            const el = messageRefs.current.get(highlightParam);
-            if (el) {
-              handleSearchResultClick(highlightParam);
-              // Remove highlight param from URL to avoid repeated actions
-              try {
-                const url = new URL(window.location.href);
-                url.searchParams.delete("highlight");
-                window.history.replaceState({}, "", url.toString());
-              } catch {}
-              return true;
-            }
-
-            // If not found and there are more pages, load next (older) page and retry
-            if (attemptsLeft > 0 && pageToTry < result.pagination.totalPages) {
-              try {
-                await loadMessages(convId, pageToTry + 1);
-                return tryScroll(pageToTry + 1, attemptsLeft - 1);
-              } catch {
-                return false;
-              }
-            }
-
-            return false;
-          };
-
-          void tryScroll();
-        }
         // If navigation included a q param (from global search), and highlight not found,
         // call the conversation-local search API to find the bestMatch and highlight it.
+        const searchParams = new URLSearchParams(location.search);
         const qParam = searchParams.get("q");
-        if (qParam && !highlightParam) {
+        const highlightParam = searchParams.get("highlight");
+        if (qParam) {
           // Only proceed if no highlight param (to avoid double processing)
 
           try {
@@ -752,6 +714,45 @@ const ChatPage: React.FC = () => {
       );
     };
   }, []);
+
+  // Listen for location changes to handle highlight params from navigation
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const highlightParam = searchParams.get("highlight");
+
+    if (highlightParam && currentConversation && messages.length > 0) {
+      // Try to find and highlight the message
+      const tryHighlight = async (attemptsLeft = 6) => {
+        // Give React a moment to render refs
+        await new Promise((r) => setTimeout(r, 120));
+        const el = messageRefs.current.get(highlightParam);
+        if (el) {
+          handleSearchResultClick(highlightParam);
+          // Remove highlight param from URL to avoid repeated actions
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.delete("highlight");
+            window.history.replaceState({}, "", url.toString());
+          } catch {}
+          return true;
+        }
+
+        // If not found and there are more pages, load next (older) page and retry
+        if (attemptsLeft > 0 && messagesHasMore) {
+          try {
+            await loadEarlier();
+            return tryHighlight(attemptsLeft - 1);
+          } catch {
+            return false;
+          }
+        }
+
+        return false;
+      };
+
+      void tryHighlight();
+    }
+  }, [location.search, currentConversation, messages.length, messagesHasMore]);
 
   /**
    * Handle sending a message
@@ -1950,25 +1951,6 @@ const ChatPage: React.FC = () => {
                     <Title level={4} className={styles.conversationTitle}>
                       {currentConversation.title}
                     </Title>
-                    {/* Tags - show all (max expected ~4); reduce size to fit */}
-                    {currentConversation.tags &&
-                      currentConversation.tags.length > 0 && (
-                        <div className={styles.headerTagsContainer}>
-                          {currentConversation.tags.map((tag) => (
-                            <Tag
-                              key={tag}
-                              color={getTagColor(tag)}
-                              style={{
-                                fontSize: "11px",
-                                margin: 0,
-                                padding: "2px 6px",
-                              }}
-                            >
-                              {tag}
-                            </Tag>
-                          ))}
-                        </div>
-                      )}
                   </div>
                   <NetworkStatus position="inline" />
                 </div>

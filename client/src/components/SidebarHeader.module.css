@@ -1,175 +1,165 @@
-/* SidebarHeader Styles */
+/* SidebarHeader - Modern Minimal Design (ChatGPT/Notion Style) */
+
 .header {
-  position: relative; /* make header the containing block for absolute overlays */
-  padding: 12px 16px;
-  border-bottom: 1px solid #f0f0f0;
+  position: relative;
+  padding: 10px 12px;
   background: #fff;
-  display: flex;
-  flex-direction: column;
-  transition: all 0.3s ease;
+  border-bottom: 1px solid #e5e5e6;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+    sans-serif;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Collapsed state - center toggle button */
 .header.collapsed {
-  padding: 12px 8px;
-  align-items: center;
-}
-
-.header.collapsed .headerTopRow {
+  padding: 10px 8px;
+  display: flex;
   justify-content: center;
-  width: 100%;
 }
 
-.headerTopRow {
+/* Single horizontal row layout */
+.headerRow {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
-  justify-content: flex-start; /* keep controls left-aligned */
-  min-height: 40px; /* align with search row height */
-  transition: all 0.3s ease;
+  transition: gap 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.inlineToggle {
-  background: #fff;
-  border-radius: 8px;
-  border: 1px solid var(--border-color, #e6e6e6);
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
+/* Toggle button (menu icon) - far left */
+.toggleButton {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
-  font-size: 16px;
-  transition: all 0.2s ease;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.inlineToggle:hover {
-  background: #f5f5f5;
-  border-color: #1890ff;
+.toggleButton:hover {
+  background: #f7f7f8;
   transform: scale(1.05);
 }
 
-.inlineToggle:active {
+.toggleButton:active {
+  background: #ececed;
   transform: scale(0.95);
 }
 
 .toggleIcon {
-  font-size: 16px;
-  color: #1890ff;
+  font-size: 14px;
+  color: #666;
 }
 
+/* New Conversation button - small, blue, rounded */
 .newButton {
-  border-radius: 8px;
-  padding: 6px 16px;
-  height: 36px;
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
   display: inline-flex;
   align-items: center;
-  min-width: 240px;
+  gap: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .newButton:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.2);
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 2px 6px rgba(24, 144, 255, 0.25);
 }
 
+.newButton:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Search bar - expands to fill available space */
+.searchBar {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: #f8f9fa;
+  border-radius: 6px;
+  padding: 0 8px;
+  gap: 4px;
+  min-height: 28px;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.searchBar:hover {
+  background: #f0f1f2;
+}
+
+.searchBar:focus-within {
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.12);
+  transform: scale(1.01);
+}
+
+/* Search icon inside input */
+.searchIcon {
+  font-size: 16px;
+  color: #999;
+}
+
+/* Search input field */
 .searchInput {
   flex: 1;
-  border-radius: 8px;
-}
-
-.searchInput .ant-input {
-  border-radius: 8px;
-  padding: 8px 12px;
-  height: 40px;
-}
-
-.searchInput .ant-input-prefix {
-  color: #8c8c8c;
-}
-.searchInput .ant-input:focus,
-.searchInput .ant-input-focused {
-  border-color: #1890ff;
-  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
-}
-
-/* Search container - holds input and button */
-.searchContainer {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.searchButton {
-  border-radius: 8px;
-  height: 32px;
-  padding: 0 12px; /* less horizontal padding to balance icon */
-  min-width: 72px; /* slightly smaller to avoid oversized button */
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-weight: 600;
-}
-
-.searchButton:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.2);
-}
-
-/* Make the Search icon slightly larger and aligned */
-.searchButton .anticon {
-  font-size: 16px;
-  line-height: 1;
-}
-
-/* Inline results overlay that appears under the search input */
-.resultsOverlay {
-  position: absolute;
-  top: calc(100% + 0.5rem);
-  left: 16px;
-  right: 16px;
-  background: #fff;
-  border: 1px solid #e6e6e6;
-  border-radius: 8px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
-  z-index: 1200;
-  max-height: 360px;
-  overflow: auto;
-}
-
-.resultsHeader {
-  padding: 10px 12px;
-  font-weight: 600;
-  border-bottom: 1px solid #f0f0f0;
-  background: #fafafa;
-}
-
-.noResultsInline {
-  padding: 12px;
-  color: #6c757d;
-  text-align: center;
-}
-
-.resultsListInline {
-  display: flex;
-  flex-direction: column;
-}
-
-.resultItemInline {
-  padding: 10px 12px;
-  border-bottom: 1px solid #f5f5f5;
-}
-
-.resultTitleInline {
-  font-weight: 600;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 6px 8px !important;
+  font-size: 14px;
   color: #222;
 }
 
-.resultMetaInline {
-  font-size: 12px;
-  color: #6c757d;
+.searchInput input {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  font-size: 14px;
+  color: #222;
+}
+
+.searchInput input::placeholder {
+  color: #999;
+  font-size: 14px;
+}
+
+.searchInput input:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Search button (optional, appears when typing) */
+.searchButton {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  transition: all 0.15s ease;
+}
+
+.searchButton:hover {
+  background: #e5e5e6;
+  color: #1890ff;
+}
+
+.searchButton:active {
+  background: #d9d9da;
 }
 
 /* Error message */
@@ -184,27 +174,63 @@
   line-height: 1.4;
 }
 
+/* Results overlay */
+.resultsOverlay {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 12px;
+  right: 12px;
+  background: #fff;
+  border: 1px solid #e5e5e6;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  z-index: 1200;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.resultsHeader {
+  padding: 10px 12px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #666;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.resultsListInline {
+  display: flex;
+  flex-direction: column;
+}
+
 .resultItemInline {
   padding: 10px 12px;
   border-bottom: 1px solid #f5f5f5;
   cursor: pointer;
+  transition: background-color 0.15s ease;
 }
 
 .resultItemInline:hover {
-  background: #f5f5f5;
+  background: #f7f7f8;
+}
+
+.resultItemInline:last-child {
+  border-bottom: none;
 }
 
 .resultTitleInline {
   font-weight: 600;
+  font-size: 14px;
   color: #222;
+  margin-bottom: 4px;
 }
 
 .resultMetaInline {
   font-size: 12px;
-  color: #6c757d;
+  color: #666;
   display: flex;
   justify-content: space-between;
-  margin-top: 4px;
+  gap: 8px;
 }
 
 .resultSimilarity {
@@ -213,11 +239,29 @@
 }
 
 .resultCount {
-  color: #8c8c8c;
+  color: #999;
 }
 
+.noResultsInline,
 .noResults {
-  padding: 12px;
-  color: #6c757d;
+  padding: 16px 12px;
   text-align: center;
+  color: #999;
+  font-size: 13px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .header {
+    padding: 8px 10px;
+  }
+
+  .newButton {
+    padding: 0 10px;
+    font-size: 13px;
+  }
+
+  .searchBar {
+    min-height: 30px;
+  }
 }

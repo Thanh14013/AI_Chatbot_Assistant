@@ -90,9 +90,9 @@ export function validateAndNormalizeTags(tags: string[]): TagValidationResult {
       continue;
     }
 
-    // Check for duplicates (after normalization)
+    // Skip duplicates (after normalization) instead of adding error
+    // This allows the server to auto-remove duplicates silently
     if (seenTags.has(normalized)) {
-      errors.push(`Duplicate tag: "${normalized}"`);
       continue;
     }
 

@@ -64,6 +64,12 @@ interface ServerToClientEvents {
     update: Partial<ConversationListItem>;
   }) => void;
   "conversation:deleted": (data: { conversationId: string }) => void;
+  "conversation:moved": (data: {
+    conversationId: string;
+    oldProjectId: string | null;
+    newProjectId: string | null;
+    conversation?: ConversationListItem;
+  }) => void;
   // New event for conversation activity (for list refresh)
   "conversation:activity": (data: {
     conversationId: string;
@@ -77,6 +83,27 @@ interface ServerToClientEvents {
     hasUnread: boolean;
     socketId?: string;
   }) => void;
+
+  // Project events (realtime CRUD)
+  "project:created": (project: {
+    id: string;
+    name: string;
+    description?: string | null;
+    color: string;
+    icon?: string | null;
+    order: number;
+    conversationCount?: number;
+  }) => void;
+  "project:updated": (project: {
+    id: string;
+    name: string;
+    description?: string | null;
+    color: string;
+    icon?: string | null;
+    order: number;
+    conversationCount?: number;
+  }) => void;
+  "project:deleted": (data: { projectId: string }) => void;
 
   // Follow-up suggestion events
   followups_response: (data: {
@@ -336,15 +363,69 @@ class WebSocketService {
 
       // Conversation events (multi-tab sync)
       this.socket.on("conversation:created", (conversation) => {
+        console.log("🎉 Conversation created via WebSocket:", conversation);
         this.handlers.onConversationCreated?.(conversation);
+        window.dispatchEvent(
+          new CustomEvent("conversation:created", { detail: conversation })
+        );
       });
 
       this.socket.on("conversation:updated", (data) => {
+        console.log("✏️ Conversation updated via WebSocket:", data);
         this.handlers.onConversationUpdated?.(data);
+        window.dispatchEvent(
+          new CustomEvent("conversation:updated", { detail: data })
+        );
       });
 
       this.socket.on("conversation:deleted", (data) => {
+        console.log("🗑️ Conversation deleted via WebSocket:", data);
         this.handlers.onConversationDeleted?.(data);
+        window.dispatchEvent(
+          new CustomEvent("conversation:deleted", { detail: data })
+        );
+      });
+
+      // Conversation moved event (between projects or to/from standalone)
+      this.socket.on("conversation:moved", (data) => {
+        console.log("🚚 Conversation moved via WebSocket:", data);
+        window.dispatchEvent(
+          new CustomEvent("conversation:moved", { detail: data })
+        );
+      });
+
+      // Project events (realtime CRUD)
+      this.socket.on("project:created", (project) => {
+        try {
+          window.dispatchEvent(
+            new CustomEvent("project:created", { detail: project })
+          );
+        } catch (err) {
+          // Ignore dispatch errors
+          console.debug("Failed to dispatch project:created", err);
+        }
+      });
+
+      this.socket.on("project:updated", (project) => {
+        try {
+          window.dispatchEvent(
+            new CustomEvent("project:updated", { detail: project })
+          );
+        } catch (err) {
+          // Ignore dispatch errors
+          console.debug("Failed to dispatch project:updated", err);
+        }
+      });
+
+      this.socket.on("project:deleted", (data) => {
+        try {
+          window.dispatchEvent(
+            new CustomEvent("project:deleted", { detail: data })
+          );
+        } catch (err) {
+          // Ignore dispatch errors
+          console.debug("Failed to dispatch project:deleted", err);
+        }
       });
 
       // Unread status tracking (multi-tab)
@@ -708,6 +789,13 @@ class WebSocketService {
         });
       }, 100);
     }
+  }
+
+  /**
+   * Get current socket ID (for excluding from broadcasts)
+   */
+  getSocketId(): string | undefined {
+    return this.socket?.id;
   }
 }
 

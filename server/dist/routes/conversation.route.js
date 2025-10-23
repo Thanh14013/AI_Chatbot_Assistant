@@ -32,6 +32,19 @@ router.patch("/:id", update);
 // Delete a conversation (soft delete)
 // DELETE /api/conversations/:id
 router.delete("/:id", remove);
+// Move a conversation to a project (or remove from project)
+// PUT /api/conversations/:id/move
+// Body: { projectId: string | null }
+router.put("/:id/move", async (req, res) => {
+    try {
+        // Import moveConversation from project controller
+        const { moveConversation } = await import("../controllers/project.controller.js");
+        return moveConversation(req, res);
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: "Failed to move conversation" });
+    }
+});
 /**
  * Message Routes (nested under conversations)
  */

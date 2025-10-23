@@ -2,17 +2,21 @@
  * PDF Parser Service
  * Extracts text content from PDF files using pdf-parse
  */
-// @ts-ignore
-import pdfParse from "pdf-parse";
 import https from "https";
 import http from "http";
+import { createRequire } from "module";
+// Use createRequire to import CommonJS module
+const require = createRequire(import.meta.url);
+// Import PDFParse class from pdf-parse module
+const { PDFParse } = require("pdf-parse");
 /**
  * Download file from URL as Buffer
  */
 function downloadPDF(url) {
     return new Promise((resolve, reject) => {
         const client = url.startsWith("https") ? https : http;
-        client.get(url, (response) => {
+        client
+            .get(url, (response) => {
             const chunks = [];
             response.on("data", (chunk) => {
                 chunks.push(chunk);
@@ -23,7 +27,8 @@ function downloadPDF(url) {
             response.on("error", (error) => {
                 reject(error);
             });
-        }).on("error", (error) => {
+        })
+            .on("error", (error) => {
             reject(error);
         });
     });
@@ -42,12 +47,13 @@ export async function extractTextFromPDF(pdfUrl) {
         const pdfBuffer = await downloadPDF(pdfUrl);
         console.log("✅ [PDF Parser] PDF downloaded", {
             size: pdfBuffer.length,
-            sizeKB: Math.round(pdfBuffer.length / 1024)
+            sizeKB: Math.round(pdfBuffer.length / 1024),
         });
-        // Parse PDF and extract text
-        const data = await pdfParse(pdfBuffer);
+        // Parse PDF using PDFParse class
+        const pdfParser = new PDFParse({ data: pdfBuffer });
+        const data = await pdfParser.getText();
         const extractedText = data.text.trim();
-        const pageCount = data.numpages;
+        const pageCount = data.total;
         const textLength = extractedText.length;
         console.log("✅ [PDF Parser] Text extraction completed", {
             pageCount,
@@ -82,10 +88,12 @@ export async function extractTextFromPDFBuffer(pdfBuffer) {
             size: pdfBuffer.length,
             sizeKB: Math.round(pdfBuffer.length / 1024),
         });
-        const data = await pdfParse(pdfBuffer);
+        // Parse PDF using PDFParse class
+        const pdfParser = new PDFParse({ data: pdfBuffer });
+        const data = await pdfParser.getText();
         const extractedText = data.text.trim();
         console.log("✅ [PDF Parser] Text extraction completed", {
-            pageCount: data.numpages,
+            pageCount: data.total,
             textLength: extractedText.length,
         });
         if (!extractedText || extractedText.length === 0) {

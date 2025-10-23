@@ -1,0 +1,118 @@
+.projectCard {
+  margin-bottom: 8px;
+  border-radius: 8px;
+  transition: all 0.2s;
+  background: transparent;
+}
+
+.projectCard:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.projectHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.projectInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.expandIcon {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.projectIcon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.projectName {
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.85);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.countBadge {
+  flex-shrink: 0;
+}
+
+.menuButton {
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.menuButton:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.conversationsList {
+  padding-left: 24px;
+  margin-top: 4px;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.emptyState {
+  padding: 16px 12px;
+  text-align: center;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.emptyState p {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+}
+
+/* Drag & Drop hover effects */
+.projectCard.dragOver {
+  background: rgba(0, 122, 255, 0.05);
+  border: 2px solid #007aff;
+  box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.2);
+  transition: all 250ms ease;
+}
+
+.projectCard.dragOverInvalid {
+  background: rgba(255, 59, 48, 0.05);
+  border: 2px solid #ff3b30;
+  animation: shake 400ms ease;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}

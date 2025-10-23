@@ -14,6 +14,7 @@ import type {
   UpdateConversationInput,
 } from "../types/conversation.type.js";
 import { validateAndNormalizeTags } from "../utils/tag.util.js";
+import { broadcastToUser } from "../services/socket.service.js";
 
 /**
  * Helper function to get user ID from authenticated request
@@ -43,7 +44,7 @@ export const create = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Extract conversation data from request body
-    const { title, model, context_window, tags }: CreateConversationInput = req.body;
+    const { title, model, context_window, tags, project_id }: CreateConversationInput = req.body;
 
     // Validate required fields
     if (!title || title.trim().length === 0) {
@@ -55,6 +56,7 @@ export const create = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Validate tags if provided
+    let validatedTags: string[] | undefined = undefined;
     if (tags !== undefined) {
       const tagValidation = validateAndNormalizeTags(tags);
       if (!tagValidation.isValid) {
@@ -65,6 +67,7 @@ export const create = async (req: Request, res: Response): Promise<void> => {
         });
         return;
       }
+      validatedTags = tagValidation.normalizedTags;
     }
 
     // Create conversation
@@ -73,10 +76,16 @@ export const create = async (req: Request, res: Response): Promise<void> => {
       title: title.trim(),
       model: model || "gpt-5-nano",
       context_window: context_window || 10,
-      tags: tags || [],
+      tags: validatedTags || [],
+      ...(project_id && { project_id }), // Assign to project if provided
     };
 
     const conversation = await createConversation(conversationData);
+
+    // Broadcast conversation created event to user via WebSocket
+    // Exclude the sender's socket to prevent duplicate
+    const socketId = req.headers["x-socket-id"] as string | undefined;
+    broadcastToUser(userId, "conversation:created", conversation, socketId);
 
     // Send success response
     res.status(201).json({
@@ -118,6 +127,11 @@ export const getAll = async (req: Request, res: Response): Promise<void> => {
     const limit = parseInt(req.query.limit as string) || 20;
     const search = req.query.search as string | undefined;
 
+    // Extract standalone filter (for filtering by project_id)
+    const standaloneParam = req.query.standalone as string | undefined;
+    const standalone =
+      standaloneParam === "true" ? true : standaloneParam === "false" ? false : undefined;
+
     // Extract tag filtering params
     const tagsParam = req.query.tags as string | undefined;
     const tagMode = (req.query.tagMode as "any" | "all") || "any";
@@ -147,7 +161,15 @@ export const getAll = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Get conversations with optional search and tag filtering
-    const result = await getUserConversations(userId, page, limit, search, tags, tagMode);
+    const result = await getUserConversations(
+      userId,
+      page,
+      limit,
+      search,
+      tags,
+      tagMode,
+      standalone
+    );
 
     // Send success response
     res.status(200).json({
@@ -278,6 +300,7 @@ export const update = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Validate tags if provided
+    let validatedTags: string[] | undefined = undefined;
     if (tags !== undefined) {
       const tagValidation = validateAndNormalizeTags(tags);
       if (!tagValidation.isValid) {
@@ -288,6 +311,7 @@ export const update = async (req: Request, res: Response): Promise<void> => {
         });
         return;
       }
+      validatedTags = tagValidation.normalizedTags;
     }
 
     // Update conversation
@@ -295,9 +319,21 @@ export const update = async (req: Request, res: Response): Promise<void> => {
     if (title !== undefined) updateData.title = title.trim();
     if (model !== undefined) updateData.model = model;
     if (context_window !== undefined) updateData.context_window = context_window;
-    if (tags !== undefined) updateData.tags = tags;
+    if (validatedTags !== undefined) updateData.tags = validatedTags;
 
     const conversation = await updateConversation(conversationId, userId, updateData);
+
+    // Broadcast conversation updated event to user via WebSocket, excluding sender
+    const socketId = req.headers["x-socket-id"] as string | undefined;
+    broadcastToUser(
+      userId,
+      "conversation:updated",
+      {
+        conversationId,
+        conversation,
+      },
+      socketId
+    );
 
     // Send success response
     res.status(200).json({
@@ -363,6 +399,18 @@ export const remove = async (req: Request, res: Response): Promise<void> => {
 
     // Delete conversation
     const result = await deleteConversation(conversationId, userId);
+
+    // Broadcast conversation deleted event to user via WebSocket
+    // Exclude the sender's socket to prevent duplicate
+    const socketId = req.headers["x-socket-id"] as string | undefined;
+    broadcastToUser(
+      userId,
+      "conversation:deleted",
+      {
+        conversationId,
+      },
+      socketId
+    );
 
     // After deletion, fetch refreshed conversation list for the user.
     // Use page/limit from query params if provided so the client can

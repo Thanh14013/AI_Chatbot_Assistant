@@ -1,68 +1,17 @@
+/**
+ * ConversationList Component - Simplified to use unified ConversationItem
+ */
+
 import React from "react";
-import {
-  List,
-  Avatar,
-  Typography,
-  Spin,
-  Button,
-  Empty,
-  Dropdown,
-  Menu,
-  Modal,
-  Input,
-  message,
-  Tooltip,
-  Tag,
-} from "antd";
-import { useNavigate } from "react-router-dom";
+import { Spin, Button, Empty } from "antd";
 import {
   MessageOutlined,
   LoadingOutlined,
   ReloadOutlined,
-  MoreOutlined,
 } from "@ant-design/icons";
-import {
-  updateConversation,
-  deleteConversation,
-} from "../services/chat.service";
-import { websocketService } from "../services/websocket.service";
-import ConversationForm, { ConversationFormValues } from "./ConversationForm";
+import ConversationItem from "./ConversationItem";
 import type { ConversationListItem } from "../types/chat.type";
-import { getTagColor } from "../utils/tag-colors.util";
 import styles from "./ConversationList.module.css";
-
-// Memoized item actions to avoid recreating menu items on every render
-const ConversationItemActions: React.FC<{
-  conversation: any;
-  openEdit: (c: any, e?: React.MouseEvent) => void;
-  openDelete: (c: any, e?: React.MouseEvent) => void;
-}> = React.memo(({ conversation, openEdit, openDelete }) => {
-  const items = React.useMemo(
-    () => [
-      {
-        key: "edit",
-        label: "Edit",
-        onClick: () => openEdit(conversation),
-      },
-      {
-        key: "delete",
-        label: "Delete",
-        onClick: () => openDelete(conversation),
-        danger: true,
-      },
-    ],
-    // conversation object reference may change, but the handlers are stable
-    [conversation, openEdit, openDelete]
-  );
-
-  return (
-    <Dropdown trigger={["click"]} menu={{ items }} placement="bottomRight">
-      <Button type="text" icon={<MoreOutlined />} />
-    </Dropdown>
-  );
-});
-
-const { Text } = Typography;
 
 interface ConversationListProps {
   conversations: ConversationListItem[];
@@ -76,6 +25,17 @@ interface ConversationListProps {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   collapsed?: boolean;
+  // Drag & Drop
+  onDragOver?: () => void;
+  onDrop?: (conversationId: string, sourceProjectId: string | null) => void;
+  onDragLeave?: () => void;
+  isDropTarget?: boolean;
+  draggedConversationId?: string | null;
+  onConversationDragStart?: (
+    conversationId: string,
+    projectId: string | null
+  ) => void;
+  onConversationDragEnd?: () => void;
 }
 
 const ConversationList: React.FC<ConversationListProps> = ({
@@ -90,145 +50,14 @@ const ConversationList: React.FC<ConversationListProps> = ({
   hasMore = false,
   isLoadingMore = false,
   collapsed = false,
+  onDragOver,
+  onDrop,
+  onDragLeave,
+  isDropTarget = false,
+  draggedConversationId = null,
+  onConversationDragStart,
+  onConversationDragEnd,
 }) => {
-  const navigate = useNavigate();
-  // State for edit modal (single shared modal)
-  const [editModal, setEditModal] = React.useState<{
-    visible: boolean;
-    conversation: ConversationListItem | null;
-  }>({ visible: false, conversation: null });
-
-  // State for delete confirmation modal (controlled, avoid Modal.confirm static API)
-  const [deleteModal, setDeleteModal] = React.useState<{
-    visible: boolean;
-    id: string | null;
-    title: string;
-  }>({ visible: false, id: null, title: "" });
-
-  // Track which conversation is currently processing an action (edit/delete)
-  const [processingId, setProcessingId] = React.useState<string | null>(null);
-
-  const openEdit = (
-    conversation: ConversationListItem,
-    e?: React.MouseEvent
-  ) => {
-    e?.stopPropagation();
-    setEditModal({
-      visible: true,
-      conversation,
-    });
-  };
-
-  const handleEditSubmit = async (values: ConversationFormValues) => {
-    const conversation = editModal.conversation;
-    if (!conversation) return;
-
-    setProcessingId(conversation.id);
-    try {
-      await updateConversation(conversation.id, values);
-      setEditModal({ visible: false, conversation: null });
-      onRefresh();
-      message.success("Conversation updated");
-
-      // Notify WebSocket for multi-tab sync
-      if (websocketService.isConnected()) {
-        try {
-          websocketService.notifyConversationUpdated(conversation.id, {
-            ...values,
-            updatedAt: new Date().toISOString(),
-          });
-        } catch {}
-      }
-    } catch (err) {
-      message.error("Failed to update conversation");
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  const handleEditCancel = (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    setEditModal({ visible: false, conversation: null });
-  };
-
-  const openDelete = (
-    conversation: ConversationListItem,
-    e?: React.MouseEvent
-  ) => {
-    e?.stopPropagation();
-    setDeleteModal({
-      visible: true,
-      id: conversation.id,
-      title: conversation.title || "Untitled",
-    });
-  };
-
-  const confirmDelete = async () => {
-    const id = deleteModal.id;
-    if (!id) return;
-
-    setProcessingId(id);
-    try {
-      await deleteConversation(id);
-      setDeleteModal({ visible: false, id: null, title: "" });
-
-      // Notify WebSocket for multi-tab sync
-      if (websocketService.isConnected()) {
-        try {
-          websocketService.notifyConversationDeleted(id);
-        } catch {}
-      }
-
-      // Refresh conversations list (await if it returns a Promise)
-      try {
-        const maybe: any = onRefresh?.();
-        if (maybe && typeof maybe.then === "function") {
-          await maybe;
-        }
-      } catch {}
-
-      // Redirect to home after deletion (replace history so back doesn't return)
-      try {
-        // logging removed: deleting conversation succeeded, navigating to /
-        navigate("/", { replace: true });
-        // Fallback in case navigate didn't change the location (rare)
-        setTimeout(() => {
-          if (window.location.pathname !== "/") {
-            window.location.href = "/";
-          }
-        }, 120);
-      } catch (e) {
-        // Final fallback
-        setTimeout(() => {
-          window.location.href = "/";
-        }, 120);
-      }
-      message.success("Conversation deleted");
-    } catch (err) {
-      message.error("Failed to delete conversation");
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  const cancelDelete = (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    setDeleteModal({ visible: false, id: null, title: "" });
-  };
-
-  // Format time display
-  const formatTime = (dateString: string | Date) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInHours =
-      Math.abs(now.getTime() - date.getTime()) / (1000 * 60 * 60);
-
-    if (diffInHours < 1) return "Just now";
-    if (diffInHours < 24) return `${Math.floor(diffInHours)}h ago`;
-    if (diffInHours < 168) return `${Math.floor(diffInHours / 24)}d ago`;
-    return date.toLocaleDateString();
-  };
-
   if (error) {
     return (
       <div className={styles.errorState}>
@@ -281,11 +110,50 @@ const ConversationList: React.FC<ConversationListProps> = ({
     );
   }
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onDragOver) {
+      onDragOver();
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const conversationId = e.dataTransfer.getData("conversationId");
+    const sourceProjectId = e.dataTransfer.getData("projectId");
+    const actualSourceProjectId =
+      sourceProjectId === "null" ? null : sourceProjectId;
+
+    if (onDrop && conversationId) {
+      onDrop(conversationId, actualSourceProjectId);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (
+      e.currentTarget === e.target ||
+      !e.currentTarget.contains(e.relatedTarget as Node)
+    ) {
+      if (onDragLeave) {
+        onDragLeave();
+      }
+    }
+  };
+
   return (
     <div
       className={`${styles.conversationsList} ${
         collapsed ? styles.collapsed : ""
-      }`}
+      } ${isDropTarget ? styles.dropZoneActive : ""}`}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      onDragLeave={handleDragLeave}
     >
       <div
         className={styles.conversationsScrollContainer}
@@ -294,152 +162,35 @@ const ConversationList: React.FC<ConversationListProps> = ({
             const el = e.currentTarget as HTMLDivElement;
             const distanceFromBottom =
               el.scrollHeight - el.scrollTop - el.clientHeight;
-            // if within 200px from bottom and hasMore and not already loading, trigger load more
             if (distanceFromBottom < 200 && hasMore && !isLoadingMore) {
               onLoadMore?.();
             }
           } catch {}
         }}
       >
-        <List
-          dataSource={conversations}
-          renderItem={(conversation) => {
-            const isActive = currentConversationId === conversation.id;
-            const conversationContent = (
-              <div
-                className={`${styles.conversationItem} ${
-                  isActive ? styles.active : ""
-                } ${collapsed ? styles.collapsed : ""}`}
-                onClick={() => onSelectConversation(conversation.id)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    onSelectConversation(conversation.id);
-                  }
-                }}
-              >
-                <Avatar
-                  shape="square"
-                  size={collapsed ? 32 : 40}
-                  className={styles.avatar}
-                  icon={<MessageOutlined />}
-                />
+        {/* Use unified ConversationItem component - same as Projects section */}
+        {conversations.map((conversation) => (
+          <ConversationItem
+            key={conversation.id}
+            conversation={conversation}
+            isActive={currentConversationId === conversation.id}
+            onClick={onSelectConversation}
+            onUpdate={onRefresh}
+            nested={false}
+            draggable={true}
+            isDragging={conversation.id === draggedConversationId}
+            onDragStart={onConversationDragStart}
+            onDragEnd={onConversationDragEnd}
+          />
+        ))}
 
-                {!collapsed && (
-                  <>
-                    <div className={styles.conversationMeta}>
-                      <div className={styles.titleRow}>
-                        {/* Use CSS-based ellipsis (avoid AntD EllipsisMeasure which can trigger layout-effect loops) */}
-                        <span className={styles.conversationTitle}>
-                          {conversation.title || "Untitled"}
-                        </span>
-                        <span className={styles.timeText}>
-                          {formatTime(conversation.updatedAt)}
-                        </span>
-                      </div>
-
-                      {/* Tags - show all (expected small number, e.g., up to 4). Reduce spacing/size if needed */}
-                      {conversation.tags && conversation.tags.length > 0 && (
-                        <div className={styles.tagsContainer}>
-                          {conversation.tags.map((tag) => (
-                            <Tag
-                              key={tag}
-                              color={getTagColor(tag)}
-                              style={{
-                                fontSize: "11px",
-                                margin: 0,
-                                padding: "2px 6px",
-                              }}
-                            >
-                              {tag}
-                            </Tag>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Removed message count as requested */}
-                    </div>
-
-                    {/* three-dot menu */}
-                    <div
-                      className={styles.itemActions}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <ConversationItemActions
-                        conversation={conversation}
-                        openEdit={openEdit}
-                        openDelete={openDelete}
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-
-            return (
-              <List.Item className={styles.listItem}>
-                {collapsed ? (
-                  <Tooltip
-                    title={conversation.title || "Untitled"}
-                    placement="right"
-                  >
-                    {conversationContent}
-                  </Tooltip>
-                ) : (
-                  conversationContent
-                )}
-              </List.Item>
-            );
-          }}
-        />
-        {/* bottom loader for infinite scroll */}
+        {/* Infinite scroll loader */}
         {isLoadingMore && (
           <div className={styles.loadMoreIndicator}>
             <Spin size="small" />
           </div>
         )}
       </div>
-      {/* Shared Edit Modal */}
-      <ConversationForm
-        open={editModal.visible}
-        onCancel={handleEditCancel}
-        onSubmit={handleEditSubmit}
-        loading={Boolean(
-          processingId && processingId === editModal.conversation?.id
-        )}
-        mode="edit"
-        initialValues={
-          editModal.conversation
-            ? {
-                title: editModal.conversation.title,
-                model: editModal.conversation.model || "gpt-5-nano",
-                context_window: editModal.conversation.context_window || 10,
-                tags: editModal.conversation.tags || [],
-              }
-            : undefined
-        }
-      />
-
-      {/* Controlled Delete Modal (replaces Modal.confirm to be compatible with AntD v5 + React 19) */}
-      <Modal
-        title="Delete conversation"
-        open={deleteModal.visible}
-        onOk={confirmDelete}
-        onCancel={cancelDelete}
-        okText="Delete"
-        okType="danger"
-        cancelText="Cancel"
-        okButtonProps={{
-          loading: Boolean(processingId && processingId === deleteModal.id),
-        }}
-      >
-        <div>
-          Are you sure you want to delete the conversation "{deleteModal.title}
-          "? This will remove it from your list.
-        </div>
-      </Modal>
     </div>
   );
 };

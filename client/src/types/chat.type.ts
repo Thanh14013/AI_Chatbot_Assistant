@@ -64,6 +64,8 @@ export interface Conversation {
   total_tokens_used: number;
   message_count: number;
   tags: string[];
+  project_id: string | null;
+  order_in_project: number;
   createdAt: string | Date;
   updatedAt: string | Date;
   deleted_at: string | Date | null;
@@ -77,6 +79,8 @@ export interface ConversationListItem {
   context_window?: number; // Added for edit functionality
   message_count: number;
   tags?: string[]; // Tags for organizing conversations
+  project_id?: string | null; // Project ID if in a project
+  order_in_project?: number; // Order within project
   updatedAt: string | Date;
   // Client-side only field for unread tracking (multi-tab)
   hasUnread?: boolean;

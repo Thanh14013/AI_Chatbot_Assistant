@@ -42,6 +42,8 @@ export const createConversation = async (
     total_tokens_used: 0,
     message_count: 0,
     tags,
+    project_id: data.project_id || null, // Assign to project if provided
+    order_in_project: 0, // Default order
     deleted_at: null,
   });
 
@@ -60,6 +62,8 @@ export const createConversation = async (
     total_tokens_used: conversation.total_tokens_used,
     message_count: conversation.message_count,
     tags: conversation.tags,
+    project_id: conversation.project_id,
+    order_in_project: conversation.order_in_project,
     createdAt: conversation.createdAt,
     updatedAt: conversation.updatedAt,
     deleted_at: conversation.deleted_at,
@@ -83,7 +87,8 @@ export const getUserConversations = async (
   limit: number = 20,
   search?: string,
   tags?: string[],
-  tagMode: "any" | "all" = "any"
+  tagMode: "any" | "all" = "any",
+  standalone?: boolean // New parameter to filter by project_id
 ): Promise<{
   conversations: ConversationResponse[];
   pagination: {
@@ -95,7 +100,8 @@ export const getUserConversations = async (
 }> => {
   // Use cache for conversation lists (include tags in cache key)
   const tagsStr = tags?.join(",") || "";
-  const cacheKey = `${conversationListKey(userId, page, limit, search)}:tags:${tagsStr}:mode:${tagMode}`;
+  const standaloneStr = standalone !== undefined ? `:standalone:${standalone}` : "";
+  const cacheKey = `${conversationListKey(userId, page, limit, search)}:tags:${tagsStr}:mode:${tagMode}${standaloneStr}`;
   const fetchConversations = async () => {
     // Calculate offset
     const offset = (page - 1) * limit;
@@ -105,6 +111,18 @@ export const getUserConversations = async (
       user_id: userId,
       deleted_at: null,
     };
+
+    // Filter by project_id if standalone parameter is provided
+    if (standalone === true) {
+      // Only fetch conversations without project_id (standalone conversations)
+      whereClause.project_id = null;
+    } else if (standalone === false) {
+      // Only fetch conversations with project_id
+      whereClause.project_id = {
+        [Op.ne]: null, // Not equal to null
+      };
+    }
+    // If standalone is undefined, fetch all conversations (existing behavior)
 
     // Add search filter if provided
     if (search && search.trim()) {
@@ -155,6 +173,8 @@ export const getUserConversations = async (
       total_tokens_used: conv.total_tokens_used,
       message_count: conv.message_count,
       tags: conv.tags,
+      project_id: conv.project_id,
+      order_in_project: conv.order_in_project,
       createdAt: conv.createdAt,
       updatedAt: conv.updatedAt,
       deleted_at: conv.deleted_at,
@@ -217,6 +237,8 @@ export const getConversationById = async (
     total_tokens_used: conversation.total_tokens_used,
     message_count: conversation.message_count,
     tags: conversation.tags,
+    project_id: conversation.project_id,
+    order_in_project: conversation.order_in_project,
     createdAt: conversation.createdAt,
     updatedAt: conversation.updatedAt,
     deleted_at: conversation.deleted_at,
@@ -288,6 +310,8 @@ export const updateConversation = async (
     total_tokens_used: conversation.total_tokens_used,
     message_count: conversation.message_count,
     tags: conversation.tags,
+    project_id: conversation.project_id,
+    order_in_project: conversation.order_in_project,
     createdAt: conversation.createdAt,
     updatedAt: conversation.updatedAt,
     deleted_at: conversation.deleted_at,

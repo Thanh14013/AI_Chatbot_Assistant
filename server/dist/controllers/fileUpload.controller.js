@@ -67,12 +67,13 @@ export const saveFileMetadata = async (req, res) => {
                 status = "processed";
                 console.log("✅ [FileUpload Controller] PDF text extraction completed", {
                     textLength: extracted_text?.length || 0,
-                    textPreview: extracted_text?.substring(0, 100) + (extracted_text && extracted_text.length > 100 ? "..." : "")
+                    textPreview: extracted_text?.substring(0, 100) +
+                        (extracted_text && extracted_text.length > 100 ? "..." : ""),
                 });
             }
             catch (error) {
                 console.error("❌ [FileUpload Controller] PDF text extraction failed", {
-                    error: error?.message
+                    error: error?.message,
                 });
                 status = "failed";
                 extracted_text = "[PDF text extraction failed]";
