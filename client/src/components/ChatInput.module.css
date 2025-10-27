@@ -31,6 +31,99 @@
   background-color: rgba(24, 144, 255, 0.1);
 }
 
+/* Suggest button (lightbulb) styling */
+.suggestButton {
+  height: 32px;
+  min-height: 32px;
+  width: 32px;
+  flex-shrink: 0;
+  padding: 4px;
+  border-radius: 8px !important;
+  transition: all 0.3s ease;
+}
+
+.suggestButton:hover:not(:disabled) {
+  color: #faad14;
+  background-color: rgba(250, 173, 20, 0.1);
+}
+
+/* Suggestions dropdown menu */
+.suggestionsMenu {
+  min-width: 320px;
+  max-width: 520px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.suggestionItem {
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  white-space: normal;
+  word-wrap: break-word;
+  line-height: 1.6;
+  font-size: 14px;
+  color: #2c3e50;
+  border-bottom: 1px solid #e8e9eb;
+}
+
+.suggestionItem:last-child {
+  border-bottom: none;
+}
+
+.suggestionItem:hover {
+  background-color: #e6f7ff;
+}
+
+.loadingItem {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #e8e9eb;
+}
+
+.loadingDots {
+  display: flex;
+  gap: 4px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #1890ff;
+  animation: dotPulse 1.4s infinite ease-in-out both;
+}
+
+.dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes dotPulse {
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.emptyItem {
+  padding: 14px 16px;
+  color: rgba(0, 0, 0, 0.45);
+  font-style: italic;
+  text-align: center;
+}
+
 /* Multiline layout - send button goes below textarea */
 .inputWrapper.multiline {
   flex-direction: column;

@@ -4,8 +4,19 @@
  */
 
 import React, { useState, useRef, useEffect } from "react";
-import { Input, Button, Upload, message as antdMessage } from "antd";
-import { SendOutlined, PaperClipOutlined } from "@ant-design/icons";
+import {
+  Input,
+  Button,
+  Upload,
+  message as antdMessage,
+  Dropdown,
+  Menu,
+} from "antd";
+import {
+  SendOutlined,
+  PaperClipOutlined,
+  BulbOutlined,
+} from "@ant-design/icons";
 import type { UploadFile } from "antd/es/upload/interface";
 import styles from "./ChatInput.module.css";
 import { useFileUpload } from "../hooks/useFileUpload";
@@ -21,6 +32,9 @@ interface ChatInputProps {
   placeholder?: string;
   onTypingStart?: () => void;
   onTypingStop?: () => void;
+  onRequestSuggestions?: () => void;
+  suggestions?: string[];
+  isLoadingSuggestions?: boolean;
 }
 
 /**
@@ -34,10 +48,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
   placeholder = "Type your message here...",
   onTypingStart,
   onTypingStop,
+  onRequestSuggestions,
+  suggestions = [],
+  isLoadingSuggestions = false,
 }) => {
   const [message, setMessage] = useState("");
   const [isMultiline, setIsMultiline] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [dropdownVisible, setDropdownVisible] = useState(false);
   const textAreaRef = useRef<any>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -161,6 +179,29 @@ const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   /**
+   * Handle lightbulb button click
+   */
+  const handleRequestSuggestions = () => {
+    if (onRequestSuggestions && !isLoadingSuggestions) {
+      onRequestSuggestions();
+      setDropdownVisible(true);
+    }
+  };
+
+  /**
+   * Handle clicking a suggestion - send immediately
+   */
+  const handleSuggestionClick = (suggestion: string) => {
+    setDropdownVisible(false);
+    // Send the suggestion message immediately
+    onSendMessage(suggestion, []);
+    // Clear suggestions after sending
+    if (onRequestSuggestions) {
+      // Suggestion state will be cleared by parent
+    }
+  };
+
+  /**
    * Auto-focus textarea when component mounts
    */
   useEffect(() => {
@@ -173,6 +214,43 @@ const ChatInput: React.FC<ChatInputProps> = ({
       }
     };
   }, []);
+
+  // Show dropdown when suggestions arrive
+  useEffect(() => {
+    if (suggestions.length > 0) {
+      setDropdownVisible(true);
+    }
+  }, [suggestions]);
+
+  // Create dropdown menu for suggestions
+  const suggestionsMenu = (
+    <Menu className={styles.suggestionsMenu}>
+      {isLoadingSuggestions ? (
+        <Menu.Item key="loading" disabled className={styles.loadingItem}>
+          <div className={styles.loadingDots}>
+            <span className={styles.dot} />
+            <span className={styles.dot} />
+            <span className={styles.dot} />
+          </div>
+          <span>Generating suggestions...</span>
+        </Menu.Item>
+      ) : suggestions.length > 0 ? (
+        suggestions.map((suggestion, index) => (
+          <Menu.Item
+            key={index}
+            onClick={() => handleSuggestionClick(suggestion)}
+            className={styles.suggestionItem}
+          >
+            {suggestion}
+          </Menu.Item>
+        ))
+      ) : (
+        <Menu.Item key="empty" disabled className={styles.emptyItem}>
+          No suggestions available
+        </Menu.Item>
+      )}
+    </Menu>
+  );
 
   return (
     <div className={styles.chatInputContainer}>
@@ -205,6 +283,26 @@ const ChatInput: React.FC<ChatInputProps> = ({
             title="Attach files"
           />
         </Upload>
+
+        {/* Lightbulb button with dropdown */}
+        <Dropdown
+          overlay={suggestionsMenu}
+          trigger={["click"]}
+          visible={dropdownVisible}
+          onVisibleChange={setDropdownVisible}
+          placement="topLeft"
+          disabled={!conversationId || disabled}
+        >
+          <Button
+            type="text"
+            icon={<BulbOutlined />}
+            onClick={handleRequestSuggestions}
+            disabled={!conversationId || disabled || isLoadingSuggestions}
+            loading={isLoadingSuggestions}
+            className={styles.suggestButton}
+            title="Get AI suggestions"
+          />
+        </Dropdown>
 
         {/* Textarea with auto-resize */}
         <TextArea

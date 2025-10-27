@@ -123,6 +123,15 @@ const ChatPage: React.FC = () => {
     new Set()
   );
 
+  // Conversation followup suggestions state
+  const [conversationSuggestions, setConversationSuggestions] = useState<
+    string[]
+  >([]);
+  const [
+    isLoadingConversationSuggestions,
+    setIsLoadingConversationSuggestions,
+  ] = useState(false);
+
   // Sidebar is rendered by the new Sidebar component
 
   // Modal/form state for creating conversation - deprecated in draft mode
@@ -771,6 +780,10 @@ const ChatPage: React.FC = () => {
       );
       return;
     }
+
+    // Clear conversation suggestions when sending a message
+    setConversationSuggestions([]);
+    setIsLoadingConversationSuggestions(false);
 
     // ============ NEW CONVERSATION FLOW ============
     if (!currentConversation) {
@@ -1726,6 +1739,51 @@ const ChatPage: React.FC = () => {
   };
 
   /**
+   * Handle requesting conversation-based follow-up suggestions (for input lightbulb)
+   */
+  const handleRequestConversationSuggestions = () => {
+    if (!isConnected) {
+      antdMessage.warning("Not connected to server");
+      return;
+    }
+
+    if (!user?.id) {
+      antdMessage.warning("User not authenticated");
+      return;
+    }
+
+    if (!currentConversation) {
+      antdMessage.warning("No active conversation");
+      return;
+    }
+
+    // Get up to 10 recent messages
+    const recentMessages = messages
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .slice(-10)
+      .map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+    if (recentMessages.length === 0) {
+      antdMessage.info("Start a conversation to get suggestions");
+      return;
+    }
+
+    setIsLoadingConversationSuggestions(true);
+    setConversationSuggestions([]);
+
+    // Request suggestions via websocket
+    const sessionId = String(user.id);
+    websocketService.requestConversationFollowups(
+      currentConversation.id,
+      recentMessages,
+      sessionId
+    );
+  };
+
+  /**
    * Handle clicking a follow-up suggestion
    */
   const handleFollowupClick = (suggestion: string) => {
@@ -1805,7 +1863,48 @@ const ChatPage: React.FC = () => {
         );
       },
     });
-  }, []);
+
+    // Listen for conversation followup responses
+    const handleConversationFollowupsResponse = (event: CustomEvent) => {
+      const { conversationId, suggestions } = event.detail;
+      if (conversationId === currentConversation?.id) {
+        setConversationSuggestions(suggestions);
+        setIsLoadingConversationSuggestions(false);
+      }
+    };
+
+    const handleConversationFollowupsError = (event: CustomEvent) => {
+      const { conversationId, error } = event.detail;
+      if (conversationId === currentConversation?.id) {
+        setIsLoadingConversationSuggestions(false);
+        const errorMsg =
+          typeof error === "string"
+            ? error
+            : "Unable to generate suggestions. Please try again.";
+        antdMessage.error(errorMsg);
+      }
+    };
+
+    window.addEventListener(
+      "conversation_followups_response",
+      handleConversationFollowupsResponse as EventListener
+    );
+    window.addEventListener(
+      "conversation_followups_error",
+      handleConversationFollowupsError as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "conversation_followups_response",
+        handleConversationFollowupsResponse as EventListener
+      );
+      window.removeEventListener(
+        "conversation_followups_error",
+        handleConversationFollowupsError as EventListener
+      );
+    };
+  }, [currentConversation?.id, antdMessage]);
 
   /**
    * Handle pin toggle from MessageBubble
@@ -1940,6 +2039,9 @@ const ChatPage: React.FC = () => {
                 placeholder="Type your message to start a new conversation..."
                 onTypingStart={() => isConnected && startTyping()}
                 onTypingStop={() => isConnected && stopTyping()}
+                onRequestSuggestions={handleRequestConversationSuggestions}
+                suggestions={conversationSuggestions}
+                isLoadingSuggestions={isLoadingConversationSuggestions}
               />
             </>
           ) : (
@@ -1995,6 +2097,9 @@ const ChatPage: React.FC = () => {
                 placeholder="Type your message here..."
                 onTypingStart={() => isConnected && startTyping()}
                 onTypingStop={() => isConnected && stopTyping()}
+                onRequestSuggestions={handleRequestConversationSuggestions}
+                suggestions={conversationSuggestions}
+                isLoadingSuggestions={isLoadingConversationSuggestions}
               />
             </>
           )}

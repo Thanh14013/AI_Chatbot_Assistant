@@ -111,6 +111,14 @@ interface ServerToClientEvents {
     suggestions: string[];
   }) => void;
   followups_error: (data: { messageId: string; error: string }) => void;
+  conversation_followups_response: (data: {
+    conversationId: string;
+    suggestions: string[];
+  }) => void;
+  conversation_followups_error: (data: {
+    conversationId: string;
+    error: string;
+  }) => void;
 }
 
 // Client events interface
@@ -143,6 +151,11 @@ interface ClientToServerEvents {
     messageId: string;
     lastUserMessage: string;
     lastBotMessage: string;
+    sessionId: string;
+  }) => void;
+  request_conversation_followups: (data: {
+    conversationId: string;
+    messages: Array<{ role: string; content: string }>;
     sessionId: string;
   }) => void;
 
@@ -529,6 +542,27 @@ class WebSocketService {
         }
       });
 
+      // Conversation follow-up suggestion events
+      this.socket.on("conversation_followups_response", (data) => {
+        try {
+          window.dispatchEvent(
+            new CustomEvent("conversation_followups_response", { detail: data })
+          );
+        } catch {
+          // logging removed
+        }
+      });
+
+      this.socket.on("conversation_followups_error", (data) => {
+        try {
+          window.dispatchEvent(
+            new CustomEvent("conversation_followups_error", { detail: data })
+          );
+        } catch {
+          // logging removed
+        }
+      });
+
       // Start connection
       this.socket.connect();
 
@@ -747,6 +781,24 @@ class WebSocketService {
       messageId,
       lastUserMessage,
       lastBotMessage,
+      sessionId,
+    });
+  }
+
+  /**
+   * Request conversation-based follow-up suggestions (for input lightbulb)
+   */
+  requestConversationFollowups(
+    conversationId: string,
+    messages: Array<{ role: string; content: string }>,
+    sessionId: string
+  ): void {
+    if (!this.socket?.connected) {
+      throw new Error("WebSocket not connected");
+    }
+    this.socket.emit("request_conversation_followups", {
+      conversationId,
+      messages,
       sessionId,
     });
   }

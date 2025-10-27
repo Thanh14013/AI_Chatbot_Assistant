@@ -12,19 +12,26 @@
   padding: 8px 16px;
   min-height: 36px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   user-select: none;
+  will-change: background-color, transform;
 }
 
 .compactHeader:hover {
   background-color: rgba(0, 0, 0, 0.02);
+  transform: translateX(2px);
+}
+
+.compactHeader:active {
+  transform: translateX(0) scale(0.99);
 }
 
 .toggleIcon {
   margin-left: 8px;
   font-size: 10px;
   color: rgba(0, 0, 0, 0.45);
-  transition: transform 0.2s;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
 }
 
 .headerLeft {
@@ -55,12 +62,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: color, background-color, transform;
 }
 
 .addButton:hover {
   color: #1890ff;
   background: rgba(24, 144, 255, 0.1);
+  transform: scale(1.15) rotate(90deg);
+}
+
+.addButton:active {
+  transform: scale(0.9) rotate(90deg);
 }
 
 /* Projects List - No scroll, let parent handle it */

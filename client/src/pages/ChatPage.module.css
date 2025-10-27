@@ -139,13 +139,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #d9d9d9; /* Thêm border */
-  transition: all 0.3s ease; /* Hiệu ứng chuyển đổi */
+  border: 1px solid #d9d9d9;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform, box-shadow, background-color, border-color;
 }
 
 .desktopToggleBtn:hover {
-  background-color: #f0f0f0; /* Hiệu ứng hover */
-  border-color: #1890ff; /* Border đổi màu khi hover */
+  background-color: #f0f0f0;
+  border-color: #1890ff;
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 4px 16px rgba(24, 144, 255, 0.2);
+}
+
+.desktopToggleBtn:active {
+  transform: translateY(0) scale(0.95);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 /* Mobile menu button */

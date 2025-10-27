@@ -365,7 +365,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   return (
     <Sider
       trigger={null}
-      width={collapsed ? 60 : 280}
+      width={collapsed ? 60 : 260}
       className={`${styles.sidebar} ${collapsed ? styles.collapsed : ""}`}
     >
       {/* Header Section */}

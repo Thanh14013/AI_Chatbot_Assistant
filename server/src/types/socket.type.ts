@@ -100,8 +100,19 @@ export interface RequestFollowupsData {
   lastBotMessage: string;
 }
 
+export interface RequestConversationFollowupsData {
+  sessionId: string;
+  conversationId: string;
+  messages: Array<{ role: string; content: string }>;
+}
+
 export interface FollowupsResponseData {
   messageId: string;
+  suggestions: string[];
+}
+
+export interface ConversationFollowupsResponseData {
+  conversationId: string;
   suggestions: string[];
 }
 
@@ -146,6 +157,8 @@ export interface ServerToClientEvents {
   // Follow-up suggestions
   followups_response: (data: FollowupsResponseData) => void;
   followups_error: (data: { messageId: string; error: string }) => void;
+  conversation_followups_response: (data: ConversationFollowupsResponseData) => void;
+  conversation_followups_error: (data: { conversationId: string; error: string }) => void;
 
   // Connection events
   pong: () => void;
@@ -173,6 +186,7 @@ export interface ClientToServerEvents {
 
   // Follow-up suggestions
   request_followups: (data: RequestFollowupsData) => void;
+  request_conversation_followups: (data: RequestConversationFollowupsData) => void;
 
   // Connection events
   ping: () => void;

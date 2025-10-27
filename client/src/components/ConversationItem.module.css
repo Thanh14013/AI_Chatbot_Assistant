@@ -91,7 +91,7 @@
 
 /* Tags - plain text with bullet separators */
 .tags {
-  font-size: 12px;
+  font-size: 10px;
   color: #666;
   line-height: 1.3;
   overflow: hidden;
@@ -144,7 +144,7 @@
   }
 
   .tags {
-    font-size: 11px;
+    font-size: 9px;
   }
 }
 

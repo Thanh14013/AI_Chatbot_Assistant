@@ -342,19 +342,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               />
             )}
 
-            {/* Follow-up button positioned in top-right corner for assistant messages */}
-            {!isUser && !isTyping && message.content && (
-              <Button
-                type="text"
-                size="small"
-                icon={<BulbOutlined />}
-                onClick={handleRequestFollowups}
-                loading={isLoadingFollowups}
-                className={styles.followupButtonCorner}
-                title="Get follow-up suggestions"
-              />
-            )}
-
             <div className={styles.messageContent}>
               {message.role === "assistant" &&
               (!displayedContent || displayedContent.trim() === "") ? (

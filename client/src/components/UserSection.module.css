@@ -4,7 +4,8 @@
   border-top: 1px solid #f0f0f0;
   background: #fff;
   width: 100%;
-  transition: all 0.3s ease;
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: padding;
 }
 
 /* Collapsed state - center avatar */
@@ -26,8 +27,9 @@
   padding: 0px;
   border-radius: 8px;
   cursor: pointer;
-  transition: background 0.12s ease;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   width: 100%;
+  will-change: background-color, transform;
 }
 
 /* Collapsed userInfo - center avatar */
@@ -38,6 +40,11 @@
 
 .userInfo:hover {
   background-color: #f5f5f5;
+  transform: translateY(-1px);
+}
+
+.userInfo:active {
+  transform: translateY(0) scale(0.98);
 }
 
 .userInfo:focus {
@@ -53,7 +60,13 @@
   flex-shrink: 0;
   border: 1px solid #fff;
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
-  transition: all 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform, box-shadow;
+}
+
+.userInfo:hover .avatar {
+  transform: scale(1.08) rotate(-3deg);
+  box-shadow: 0 3px 12px rgba(24, 144, 255, 0.25);
 }
 
 .userDetails {

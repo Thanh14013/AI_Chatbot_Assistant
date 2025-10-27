@@ -7,7 +7,8 @@
   border-bottom: 1px solid #e5e5e6;
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
     sans-serif;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: padding;
 }
 
 .header.collapsed {
@@ -21,7 +22,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  transition: gap 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: gap 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: gap;
 }
 
 /* Toggle button (menu icon) - far left */
@@ -36,22 +38,25 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform, background-color;
 }
 
 .toggleButton:hover {
   background: #f7f7f8;
-  transform: scale(1.05);
+  transform: scale(1.1) rotate(5deg);
 }
 
 .toggleButton:active {
   background: #ececed;
-  transform: scale(0.95);
+  transform: scale(0.9) rotate(-5deg);
 }
 
 .toggleIcon {
   font-size: 14px;
   color: #666;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
 }
 
 /* New Conversation button - small, blue, rounded */
@@ -66,16 +71,18 @@
   align-items: center;
   gap: 4px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform, box-shadow, opacity;
 }
 
 .newButton:hover {
-  transform: translateY(-1px) scale(1.02);
-  box-shadow: 0 2px 6px rgba(24, 144, 255, 0.25);
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
 }
 
 .newButton:active {
-  transform: translateY(0) scale(0.98);
+  transform: translateY(0) scale(0.95);
+  box-shadow: 0 1px 3px rgba(24, 144, 255, 0.2);
 }
 
 /* Search bar - expands to fill available space */
@@ -88,17 +95,20 @@
   padding: 0 8px;
   gap: 4px;
   min-height: 28px;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: background-color, box-shadow, transform;
 }
 
 .searchBar:hover {
   background: #f0f1f2;
+  transform: scale(1.01);
 }
 
 .searchBar:focus-within {
   background: #fff;
-  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.12);
-  transform: scale(1.01);
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.15),
+    0 2px 8px rgba(24, 144, 255, 0.08);
+  transform: scale(1.02);
 }
 
 /* Search icon inside input */
