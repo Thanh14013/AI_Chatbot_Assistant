@@ -18,7 +18,6 @@
 - [API Documentation](#-api-documentation)
 - [Project Structure](#-project-structure)
 - [Environment Variables](#-environment-variables)
-- [Screenshots](#-screenshots)
 - [Contributing](#-contributing)
 - [License](#-license)
 
@@ -536,10 +535,6 @@ AI_Chatbot_Assistant/
 | ----------------- | -------------------- | -------- |
 | `VITE_API_URL`    | Backend API URL      | Yes      |
 | `VITE_SOCKET_URL` | WebSocket server URL | Yes      |
-
-## 📸 Screenshots
-
-> Add screenshots of your application here
 
 ## 🤝 Contributing
 
