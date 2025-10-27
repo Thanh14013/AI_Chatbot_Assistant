@@ -362,6 +362,10 @@ export const sendMessageAndStreamResponse = async (
     }
   }
 
+  // Invalidate message-related caches BEFORE broadcasting to prevent stale reads
+  await invalidateCachePattern(messageHistoryPattern(conversationId));
+  await invalidateCachePattern(contextPattern(conversationId));
+
   // Invoke callback so callers (socket server) can broadcast the persisted user message
   try {
     if (onUserMessageCreated) {
@@ -408,9 +412,7 @@ export const sendMessageAndStreamResponse = async (
   conversation.message_count += 1;
   await conversation.save();
 
-  // Invalidate related caches
-  await invalidateCachePattern(messageHistoryPattern(conversationId));
-  await invalidateCachePattern(contextPattern(conversationId));
+  // Invalidate conversation list cache AFTER updating totals
   await invalidateCachePattern(conversationListPattern(conversation.user_id));
 
   // Generate and store embedding for user message (async, non-blocking)

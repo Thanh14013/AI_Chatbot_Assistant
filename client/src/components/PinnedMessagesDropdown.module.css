@@ -1,47 +1,63 @@
-/* PinnedMessagesDropdown Component Styles */
+/* PinnedMessagesDropdown Component Styles - Modern Design */
 
 .pinnedMessagesButton {
-  color: #faad14;
-  transition: all 0.3s ease;
+  color: #f59e0b;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(
+    135deg,
+    rgba(251, 191, 36, 0.1),
+    rgba(245, 158, 11, 0.1)
+  );
+  border-radius: 8px;
 }
 
 .pinnedMessagesButton:hover {
-  color: #ffc53d;
-  background: rgba(250, 173, 20, 0.1);
+  color: #fbbf24;
+  background: linear-gradient(
+    135deg,
+    rgba(251, 191, 36, 0.2),
+    rgba(245, 158, 11, 0.15)
+  );
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
 }
 
 .pinnedMessagesDropdown {
-  max-width: 400px;
+  max-width: 420px;
 }
 
 .pinnedMessagesDropdown :global(.ant-dropdown-menu) {
   max-height: 500px;
   overflow-y: auto;
   padding: 8px;
-  min-width: 320px;
+  min-width: 340px;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1), 0 4px 10px rgba(0, 0, 0, 0.05);
 }
 
 .emptyState {
-  padding: 20px;
+  padding: 24px;
   text-align: center;
+  color: #9ca3af;
 }
 
 .pinnedMessageItem {
   position: relative;
-  padding: 12px;
-  padding-right: 32px;
-  border-radius: 8px;
+  padding: 12px 36px 12px 12px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  background: #ffffff;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1.5px solid #fef3c7;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
   margin-bottom: 8px;
+  box-shadow: 0 2px 4px rgba(245, 158, 11, 0.1);
 }
 
 .pinnedMessageItem:hover {
-  background: rgba(250, 173, 20, 0.05);
-  border-color: #faad14;
-  transform: translateX(2px);
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-color: #fbbf24;
+  transform: translateX(4px);
+  box-shadow: 0 4px 8px rgba(245, 158, 11, 0.2);
 }
 
 .messageHeader {
@@ -54,19 +70,20 @@
 .messageRole {
   font-weight: 600;
   font-size: 12px;
-  color: rgba(0, 0, 0, 0.65);
+  color: #92400e;
   text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .messageTime {
   font-size: 11px;
-  color: rgba(0, 0, 0, 0.45);
+  color: #b45309;
 }
 
 .messageContent {
   font-size: 13px;
-  color: rgba(0, 0, 0, 0.85);
-  line-height: 1.5;
+  color: #78350f;
+  line-height: 1.6;
   word-break: break-word;
 }
 
@@ -75,11 +92,13 @@
   top: 8px;
   right: 8px;
   opacity: 0;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 4px;
-  height: 20px;
-  width: 20px;
+  height: 24px;
+  width: 24px;
   min-width: auto;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.8);
 }
 
 .pinnedMessageItem:hover .unpinButton {
@@ -88,30 +107,41 @@
 
 .unpinButton:hover {
   opacity: 1 !important;
-  transform: scale(1.1);
+  transform: scale(1.15);
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
   .pinnedMessageItem {
-    background: #1f1f1f;
-    border-color: rgba(255, 255, 255, 0.1);
+    background: linear-gradient(135deg, #451a03 0%, #78350f 100%);
+    border-color: #92400e;
   }
 
   .pinnedMessageItem:hover {
-    background: rgba(250, 173, 20, 0.15);
+    background: linear-gradient(135deg, #78350f 0%, #92400e 100%);
+    border-color: #b45309;
   }
 
   .messageRole {
-    color: rgba(255, 255, 255, 0.65);
+    color: #fde68a;
   }
 
   .messageTime {
-    color: rgba(255, 255, 255, 0.45);
+    color: #fcd34d;
   }
 
   .messageContent {
-    color: rgba(255, 255, 255, 0.85);
+    color: #fef3c7;
+  }
+
+  .unpinButton {
+    background: rgba(0, 0, 0, 0.3);
+  }
+
+  .unpinButton:hover {
+    background: rgba(0, 0, 0, 0.5);
   }
 }
 
@@ -122,15 +152,35 @@
   }
 
   .pinnedMessagesDropdown :global(.ant-dropdown-menu) {
-    min-width: 280px;
+    min-width: 300px;
   }
 
   .pinnedMessageItem {
-    padding: 10px;
-    padding-right: 28px;
+    padding: 10px 32px 10px 10px;
   }
 
   .unpinButton {
-    opacity: 0.7;
+    opacity: 0.8;
   }
+}
+
+/* Modern scrollbar for dropdown */
+.pinnedMessagesDropdown :global(.ant-dropdown-menu)::-webkit-scrollbar {
+  width: 8px;
+}
+
+.pinnedMessagesDropdown :global(.ant-dropdown-menu)::-webkit-scrollbar-track {
+  background: #fef3c7;
+  border-radius: 4px;
+}
+
+.pinnedMessagesDropdown :global(.ant-dropdown-menu)::-webkit-scrollbar-thumb {
+  background: #fbbf24;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.pinnedMessagesDropdown
+  :global(.ant-dropdown-menu)::-webkit-scrollbar-thumb:hover {
+  background: #f59e0b;
 }

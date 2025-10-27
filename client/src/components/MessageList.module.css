@@ -1,4 +1,4 @@
-/* MessageList Component Styles */
+/* MessageList Component Styles - Modern Design */
 
 .messageListContainer {
   position: relative;
@@ -6,7 +6,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background-color: #fafafa;
+  background: linear-gradient(to bottom, #f9fafb 0%, #ffffff 100%);
 }
 
 /* load earlier button removed: message list auto-loads when scrolled near top */
@@ -14,26 +14,28 @@
 .messageList {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 20px 16px;
   scroll-behavior: smooth;
 }
 
-/* Custom scrollbar styling */
+/* Custom scrollbar styling - Modern thin scrollbar */
 .messageList::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 .messageList::-webkit-scrollbar-track {
-  background: transparent;
+  background: #f9fafb;
+  border-radius: 4px;
 }
 
 .messageList::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
+  background: #d1d5db;
+  border-radius: 4px;
+  transition: background 0.2s ease;
 }
 
 .messageList::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
+  background: #9ca3af;
 }
 
 /* Loading skeleton container */

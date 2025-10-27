@@ -1,13 +1,13 @@
-/* TypingIndicator.module.css */
+/* TypingIndicator.module.css - Compact Design */
 .typingIndicator {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
+  gap: 6px;
+  padding: 8px 12px;
   background: var(--ant-color-bg-container);
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid var(--ant-color-border-secondary);
-  margin: 8px 0;
+  margin: 6px 0;
   transition: all 0.3s ease;
   opacity: 1;
   transform: translateY(0);
@@ -15,7 +15,7 @@
 }
 
 .message {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--ant-color-text-secondary);
   font-weight: 500;
 }
@@ -23,12 +23,12 @@
 .dotsContainer {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
 }
 
 .dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background-color: var(--ant-color-primary);
   animation: bounce 1.4s infinite ease-in-out;
@@ -46,32 +46,32 @@
   animation-delay: 0s;
 }
 
-/* Size variations */
+/* Size variations - Compact */
 .small .message {
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .small .dot {
-  width: 4px;
-  height: 4px;
+  width: 3px;
+  height: 3px;
 }
 
 .medium .message {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .medium .dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 .large .message {
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .large .dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 /* Animations */
@@ -105,20 +105,20 @@
   border-color: var(--ant-color-border);
 }
 
-/* Responsive design */
+/* Responsive design - Compact */
 @media (max-width: 768px) {
   .typingIndicator {
-    padding: 10px 12px;
-    gap: 6px;
+    padding: 6px 10px;
+    gap: 4px;
   }
 
   .message {
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .dot {
-    width: 5px;
-    height: 5px;
+    width: 4px;
+    height: 4px;
   }
 }
 

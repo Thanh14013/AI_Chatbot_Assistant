@@ -1,8 +1,8 @@
-/* MessageBubble Component Styles */
+/* MessageBubble Component Styles - Modern Design */
 
 .messageContainer {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 16px;
   animation: slideIn 0.3s ease-out;
 }
@@ -36,50 +36,95 @@
   margin-top: 4px;
 }
 
-/* smaller avatar to reduce visual bulk */
+/* Modern avatar sizing - Smaller for compact design */
 .avatar,
 .avatar .ant-avatar {
-  width: 36px;
-  height: 36px;
-  line-height: 36px;
+  width: 32px;
+  height: 32px;
+  line-height: 32px;
+  font-size: 16px;
 }
 
 .userAvatar {
-  background-color: #1890ff;
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  box-shadow: 0 2px 4px rgba(79, 70, 229, 0.3);
 }
 
 .assistantAvatar {
-  background-color: #52c41a;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
 
-/* Message bubble container */
+/* Message bubble container - Modern rounded design - Compact */
 .messageBubble {
   max-width: 70%;
   min-width: 80px;
   padding: 10px 14px;
-  border-radius: 12px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   position: relative;
-  padding-top: 32px; /* Make room for corner button */
 }
 
-/* User message bubble styling */
+/* User message bubble styling - Gradient background */
 .userMessage .messageBubble {
-  background-color: #1890ff;
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
   color: white;
+  border-radius: 14px 14px 4px 14px;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
 }
 
-/* Assistant message bubble styling */
+/* Chat bubble tail for user */
+.userMessage .messageBubble::before {
+  content: "";
+  position: absolute;
+  right: -6px;
+  bottom: 8px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 6px 0 0 6px;
+  border-color: transparent transparent transparent #6366f1;
+}
+
+/* Assistant message bubble styling - Clean white with border */
 .assistantMessage .messageBubble {
-  background-color: #ffffff;
-  color: rgba(0, 0, 0, 0.87);
+  background: #ffffff;
+  color: #1f2937;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px 14px 14px 4px;
   max-width: 62%;
-  padding: 9px 12px;
+  padding: 10px 14px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-/* Message content */
+/* Chat bubble tail for assistant */
+.assistantMessage .messageBubble::before {
+  content: "";
+  position: absolute;
+  left: -7px;
+  bottom: 8px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 6px 6px 0;
+  border-color: transparent #e5e7eb transparent transparent;
+}
+
+.assistantMessage .messageBubble::after {
+  content: "";
+  position: absolute;
+  left: -6px;
+  bottom: 8px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 6px 6px 0;
+  border-color: transparent #ffffff transparent transparent;
+}
+
+/* Message content - Smaller font size for better readability */
 .messageContent {
-  font-size: 13px;
+  font-size: 13.5px;
   line-height: 1.6;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -89,19 +134,61 @@
   white-space: pre-wrap;
 }
 
-/* Code block styling */
+/* Code block styling - Modern dark theme */
 .codeBlock {
-  background-color: rgba(0, 0, 0, 0.05);
-  border-radius: 4px;
-  padding: 8px 12px;
-  margin: 8px 0;
-  overflow-x: auto;
-  font-family: "Courier New", Courier, monospace;
+  background: #1f2937;
+  border-radius: 8px;
+  padding: 0;
+  margin: 12px 0;
+  overflow: hidden;
+  font-family: "Fira Code", "Consolas", "Monaco", "Courier New", monospace;
   font-size: 13px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.codeBlock pre {
+  background: #1f2937;
+  padding: 16px;
+  margin: 0;
+  overflow-x: auto;
+  color: #f9fafb;
+  line-height: 1.6;
+}
+
+.codeBlock code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* Code block scrollbar */
+.codeBlock pre::-webkit-scrollbar {
+  height: 8px;
+}
+
+.codeBlock pre::-webkit-scrollbar-track {
+  background: #111827;
+  border-radius: 4px;
+}
+
+.codeBlock pre::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 4px;
+}
+
+.codeBlock pre::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
 }
 
 .userMessage .codeBlock {
-  background-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.userMessage .codeBlock pre {
+  background: rgba(0, 0, 0, 0.2);
 }
 
 /* Message footer with timestamp and actions */
@@ -127,13 +214,14 @@
   color: rgba(0, 0, 0, 0.45);
 }
 
-/* Copy button */
+/* Copy button - Hidden by default, shown on hover */
 .copyButton {
   opacity: 0;
-  transition: opacity 0.2s ease;
-  padding: 2px 6px;
+  transition: all 0.2s ease;
+  padding: 4px 8px;
   height: auto;
   min-width: auto;
+  font-size: 12px;
 }
 
 .userMessage .copyButton {
@@ -141,7 +229,7 @@
 }
 
 .assistantMessage .copyButton {
-  color: rgba(249, 246, 246, 0.45);
+  color: #6b7280;
 }
 
 /* Show copy button on hover */
@@ -151,6 +239,7 @@
 
 .copyButton:hover {
   opacity: 1 !important;
+  color: #4f46e5 !important;
 }
 
 /* Footer actions wrapper to hold copy + retry buttons */
@@ -181,91 +270,91 @@
   color: #ff7875;
 }
 
-/* Follow-up button positioned in top-right corner */
+/* Follow-up button positioned in top-right corner (left of pin button) */
 .followupButtonCorner {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 8px;
+  right: 36px; /* Position to the left of pin button */
   opacity: 0;
-  transition: all 0.3s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 4px;
   height: 24px;
   width: 24px;
   min-width: auto;
-  color: rgba(0, 0, 0, 0.35);
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  color: #6b7280;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
   z-index: 2;
 }
 
-/* Pin button positioned in top-right corner (next to followup button) */
+/* Pin button positioned in top-right corner */
 .pinButtonCorner {
   position: absolute;
-  top: 6px;
-  right: 36px; /* Position to the left of followup button */
+  top: 8px;
+  right: 8px;
   opacity: 0;
-  transition: all 0.3s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 4px;
   height: 24px;
   width: 24px;
   min-width: auto;
-  color: rgba(0, 0, 0, 0.35);
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  color: #f59e0b;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
   z-index: 2;
 }
 
 /* Show pin button on hover */
 .messageBubble:hover .pinButtonCorner {
   opacity: 1;
-  transform: scale(1.05);
 }
 
 .pinButtonCorner:hover {
   opacity: 1 !important;
-  color: #faad14;
+  color: #fbbf24;
   background: rgba(255, 255, 255, 1);
-  box-shadow: 0 2px 6px rgba(250, 173, 20, 0.3);
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3);
+  transform: scale(1.1);
 }
 
 /* Pinned state - always visible */
 .pinButtonCorner.pinned {
   opacity: 1;
-  color: #faad14;
-  background: rgba(255, 244, 224, 1);
+  color: #f59e0b;
+  background: #fef3c7;
 }
 
 /* Pinned message styling - highlight with golden border */
 .messageBubble.pinnedMessage {
-  border: 2px solid #faad14;
+  border: 2px solid #fbbf24;
   background: linear-gradient(
     to bottom,
-    rgba(255, 244, 224, 0.3) 0%,
-    rgba(255, 244, 224, 0.1) 50%,
+    rgba(254, 243, 199, 0.3) 0%,
+    rgba(254, 243, 199, 0.1) 50%,
     transparent 100%
   );
-  box-shadow: 0 2px 8px rgba(250, 173, 20, 0.2);
+  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.2);
 }
 
 /* User message pinned styling */
 .userMessage .messageBubble.pinnedMessage {
-  border-color: #ffd666;
-  background: #1890ff;
+  border-color: #fcd34d;
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
 }
 
 /* Show follow-up button on hover */
 .assistantMessage .messageBubble:hover .followupButtonCorner {
   opacity: 1;
-  transform: scale(1.05);
 }
 
 .followupButtonCorner:hover {
   opacity: 1 !important;
-  color: #1890ff;
+  color: #4f46e5;
   background: rgba(255, 255, 255, 1);
-  box-shadow: 0 2px 6px rgba(24, 144, 255, 0.3);
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.3);
+  transform: scale(1.1);
 }
 
 /* Follow-up suggestions card container with animation */

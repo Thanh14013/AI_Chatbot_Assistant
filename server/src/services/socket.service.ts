@@ -505,8 +505,8 @@ export const initializeSocketIO = (
           messageId,
         });
 
-        // Broadcast complete messages to conversation room
-        io.to(`conversation:${conversationId}`).emit("message:complete", {
+        // Broadcast complete messages to conversation room (EXCLUDE sender to prevent duplicates)
+        socket.to(`conversation:${conversationId}`).emit("message:complete", {
           userMessage: result.userMessage,
           assistantMessage: result.assistantMessage,
           conversation: result.conversation,

@@ -111,14 +111,6 @@ export const ConversationSearch: React.FC<ConversationSearchProps> = ({
             ✕
           </button>
         )}
-        <button
-          onClick={handleSearch}
-          disabled={isSearching || !query.trim()}
-          className={styles.searchButton}
-          title="Search"
-        >
-          {isSearching ? "⏳" : "🔍"}
-        </button>
       </div>
 
       {isExpanded && (
