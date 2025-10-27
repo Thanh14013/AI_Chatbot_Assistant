@@ -1,5 +1,6 @@
 import { Server as SocketIOServer } from "socket.io";
 import { verifyAccessToken } from "../utils/generateToken.js";
+import { setCache, deleteCache, pushToQueue, popQueue } from "../services/cache.service.js";
 // Store user socket mappings for room management
 const userSockets = new Map(); // userId -> Set<socketId>
 const socketUsers = new Map(); // socketId -> userId
@@ -57,6 +58,10 @@ const handleUserConnection = (socket) => {
     if (!socketUnreadConversations.has(socket.id)) {
         socketUnreadConversations.set(socket.id, new Set());
     }
+    // Set user online status in cache
+    setCache(`user:online:${userId}`, "true", 0); // 0 = no expiration
+    // Deliver queued messages when user comes online
+    deliverQueuedMessages(userId);
     // user connection handled
 };
 /**
@@ -71,6 +76,8 @@ const handleUserDisconnection = (socket) => {
             userSocketSet.delete(socket.id);
             if (userSocketSet.size === 0) {
                 userSockets.delete(userId);
+                // User is now offline - remove online status from cache
+                deleteCache(`user:online:${userId}`);
             }
         }
         socketUsers.delete(socket.id);
@@ -201,6 +208,48 @@ export const getConversationUsers = (conversationId) => {
  */
 export const isUserOnline = (userId) => {
     return userSockets.has(userId) && (userSockets.get(userId)?.size || 0) > 0;
+};
+/**
+ * Queue message for offline user
+ */
+export const queueMessageForOfflineUser = async (userId, messageData) => {
+    const queueKey = `user:queue:${userId}`;
+    await pushToQueue(queueKey, {
+        ...messageData,
+        queuedAt: new Date().toISOString(),
+    });
+};
+/**
+ * Deliver queued messages to user when they come online
+ */
+const deliverQueuedMessages = async (userId) => {
+    try {
+        const queueKey = `user:queue:${userId}`;
+        const queuedMessages = await popQueue(queueKey);
+        if (queuedMessages.length > 0) {
+            // Get user's sockets to deliver messages
+            const userSockets = getUserSockets(userId);
+            queuedMessages.forEach((messageData) => {
+                // Send complete message to all user's sockets
+                userSockets.forEach((socketId) => {
+                    const socket = io?.sockets.sockets.get(socketId);
+                    if (socket) {
+                        if (messageData.type === "message_complete") {
+                            socket.emit("message:complete", {
+                                userMessage: messageData.userMessage,
+                                assistantMessage: messageData.assistantMessage,
+                                conversation: messageData.conversation,
+                                messageId: messageData.messageId,
+                            });
+                        }
+                    }
+                });
+            });
+        }
+    }
+    catch (error) {
+        // Fail gracefully
+    }
 };
 /**
  * Get Socket.io server instance
@@ -386,11 +435,28 @@ export const initializeSocketIO = (httpServer) => {
                     }
                 }, enrichedAttachments // Pass ENRICHED attachments with openai_file_id
                 );
-                // Stop typing indicator for ALL users in conversation room (including sender) for sync
-                io.to(`conversation:${conversationId}`).emit("ai:typing:stop", {
-                    conversationId,
-                    messageId,
-                });
+                // Check if user is online (has active sockets)
+                const isUserCurrentlyOnline = isUserOnline(socket.userId);
+                // If user is offline, queue the message for later delivery
+                if (!isUserCurrentlyOnline) {
+                    await queueMessageForOfflineUser(socket.userId, {
+                        type: "message_complete",
+                        conversationId,
+                        userMessage: result.userMessage,
+                        assistantMessage: result.assistantMessage,
+                        conversation: result.conversation,
+                        messageId,
+                        queuedAt: new Date().toISOString(),
+                    });
+                    // Send confirmation to sender that message was queued
+                    socket.emit("message:queued", {
+                        conversationId,
+                        messageId,
+                        status: "queued_for_offline_delivery",
+                    });
+                    return; // Don't proceed with real-time broadcasting
+                }
+                // User is online, proceed with normal real-time message handling
                 // CRITICAL FIX: Broadcast complete messages with different content for sender vs others
                 // - Others (non-sender): Get both userMessage and assistantMessage
                 // - Sender: Get assistantMessage only (userMessage already in UI from optimistic update)

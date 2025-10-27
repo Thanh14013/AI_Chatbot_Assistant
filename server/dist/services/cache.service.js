@@ -174,6 +174,63 @@ export async function flushAllCache() {
     }
     catch (error) { }
 }
+/**
+ * Add item to Redis list (queue)
+ * @param key - Queue key
+ * @param value - Value to add
+ */
+export async function pushToQueue(key, value) {
+    try {
+        if (!isRedisConnected())
+            return;
+        await redisClient.lpush(key, JSON.stringify(value));
+    }
+    catch (error) {
+        // Fail gracefully
+    }
+}
+/**
+ * Get all items from Redis list (queue) and clear it
+ * @param key - Queue key
+ * @returns Array of queued items
+ */
+export async function popQueue(key) {
+    try {
+        if (!isRedisConnected())
+            return [];
+        const items = [];
+        while (true) {
+            const item = await redisClient.rpop(key);
+            if (!item)
+                break;
+            try {
+                items.push(JSON.parse(item));
+            }
+            catch {
+                // Skip invalid JSON
+            }
+        }
+        return items;
+    }
+    catch (error) {
+        return [];
+    }
+}
+/**
+ * Get queue length
+ * @param key - Queue key
+ * @returns Number of items in queue
+ */
+export async function getQueueLength(key) {
+    try {
+        if (!isRedisConnected())
+            return 0;
+        return await redisClient.llen(key);
+    }
+    catch (error) {
+        return 0;
+    }
+}
 export default {
     getCache,
     setCache,

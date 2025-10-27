@@ -2,9 +2,9 @@
 
 .chatInputContainer {
   padding: 6px 14px 8px 14px;
-  background-color: white;
-  border-top: 1px solid #e5e7eb;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+  background: linear-gradient(to top, #ffffff 0%, #f9fafb 100%);
+  /* Seamless transition with MessageList */
+  box-shadow: none;
   position: sticky;
   bottom: 0;
   z-index: 50;
@@ -16,7 +16,7 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: flex-end;
-  background: #f9fafb;
+  background: #ffffff;
   border: 2px solid #e5e7eb;
   border-radius: 12px;
   padding: 4px 6px 4px 10px;
