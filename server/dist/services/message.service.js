@@ -270,7 +270,9 @@ export const sendMessageAndStreamResponse = async (conversationId, userId, conte
 // optional callback invoked immediately after the user message is persisted
 onUserMessageCreated, 
 // optional attachments array
-attachments) => {
+attachments, 
+// optional metadata for resend/edit operations
+metadata) => {
     if (!content || content.trim().length === 0) {
         throw new Error("Message content cannot be empty");
     }
@@ -424,6 +426,72 @@ attachments) => {
             role: m.role,
             content: m.content,
         })));
+    }
+    // Handle resend/edit metadata - build context prompt
+    if (metadata && (metadata.resendMessageId || metadata.editMessageId)) {
+        try {
+            const targetMessageId = metadata.resendMessageId || metadata.editMessageId;
+            // Find the target message to get its timestamp
+            const targetMessage = await Message.findOne({
+                where: { id: targetMessageId, conversation_id: conversationId },
+            });
+            if (targetMessage) {
+                const targetTime = new Date(targetMessage.createdAt).getTime();
+                // Find all AI messages in this conversation
+                const aiMessages = await Message.findAll({
+                    where: {
+                        conversation_id: conversationId,
+                        role: "assistant",
+                    },
+                    order: [["createdAt", "ASC"]],
+                });
+                // Find AI message before target message
+                const aiBefore = aiMessages
+                    .filter((msg) => new Date(msg.createdAt).getTime() < targetTime)
+                    .pop();
+                // Find AI message after target message
+                const aiAfter = aiMessages.find((msg) => new Date(msg.createdAt).getTime() > targetTime);
+                // Build context prompt
+                let contextPrompt = "";
+                if (metadata.resendMessageId) {
+                    contextPrompt =
+                        "[User is resending a previous message because they want a better or different response]\n\n";
+                }
+                else if (metadata.editMessageId) {
+                    contextPrompt = "[User edited their previous message and wants a new response]\n\n";
+                }
+                if (aiBefore) {
+                    contextPrompt += `Previous AI response:\n${aiBefore.content}\n\n`;
+                }
+                if (metadata.editMessageId && metadata.originalContent) {
+                    contextPrompt += `User's original message:\n${metadata.originalContent}\n\n`;
+                    contextPrompt += `User's edited message:\n${content}\n\n`;
+                }
+                else {
+                    contextPrompt += `User's message (resent):\n${content}\n\n`;
+                }
+                if (aiAfter) {
+                    contextPrompt += `Your previous response to this:\n${aiAfter.content}\n\n`;
+                }
+                if (metadata.resendMessageId) {
+                    contextPrompt += `Please provide an improved or alternative response to the user's message.`;
+                }
+                else {
+                    contextPrompt += `Please provide a response to the user's edited message.`;
+                }
+                // Replace the last user message with the context prompt
+                if (contextMessages.length > 0) {
+                    const lastMessage = contextMessages[contextMessages.length - 1];
+                    if (lastMessage.role === "user") {
+                        lastMessage.content = contextPrompt;
+                    }
+                }
+            }
+        }
+        catch (err) {
+            // If context building fails, continue with normal message
+            // logging removed: failed to build resend/edit context
+        }
     }
     // Process attachments if present
     // Determine model to use - if attachments present, always use GPT-4o for multimodal support

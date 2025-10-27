@@ -105,20 +105,61 @@ export const pinMessage = async (req, res) => {
             }
             else {
                 const roomName = `conversation:${message.conversation_id}`;
-                io.to(roomName).emit("message:pinned", {
-                    conversationId: message.conversation_id,
-                    messageId: updatedMessage.id,
-                    message: {
-                        id: updatedMessage.id,
-                        conversation_id: updatedMessage.conversation_id,
-                        role: updatedMessage.role,
-                        content: updatedMessage.content,
-                        tokens_used: updatedMessage.tokens_used,
-                        model: updatedMessage.model,
-                        pinned: updatedMessage.pinned,
-                        createdAt: updatedMessage.createdAt,
-                    },
-                });
+                const senderSocketId = req.headers["x-socket-id"];
+                // Broadcast to all sockets in room except sender (to avoid duplication)
+                if (senderSocketId) {
+                    const senderSocket = io.sockets.sockets.get(senderSocketId);
+                    if (senderSocket) {
+                        senderSocket.broadcast.to(roomName).emit("message:pinned", {
+                            conversationId: message.conversation_id,
+                            messageId: updatedMessage.id,
+                            message: {
+                                id: updatedMessage.id,
+                                conversation_id: updatedMessage.conversation_id,
+                                role: updatedMessage.role,
+                                content: updatedMessage.content,
+                                tokens_used: updatedMessage.tokens_used,
+                                model: updatedMessage.model,
+                                pinned: updatedMessage.pinned,
+                                createdAt: updatedMessage.createdAt,
+                            },
+                        });
+                    }
+                    else {
+                        // Socket not found, broadcast to all
+                        io.to(roomName).emit("message:pinned", {
+                            conversationId: message.conversation_id,
+                            messageId: updatedMessage.id,
+                            message: {
+                                id: updatedMessage.id,
+                                conversation_id: updatedMessage.conversation_id,
+                                role: updatedMessage.role,
+                                content: updatedMessage.content,
+                                tokens_used: updatedMessage.tokens_used,
+                                model: updatedMessage.model,
+                                pinned: updatedMessage.pinned,
+                                createdAt: updatedMessage.createdAt,
+                            },
+                        });
+                    }
+                }
+                else {
+                    // No socket ID provided, broadcast to all
+                    io.to(roomName).emit("message:pinned", {
+                        conversationId: message.conversation_id,
+                        messageId: updatedMessage.id,
+                        message: {
+                            id: updatedMessage.id,
+                            conversation_id: updatedMessage.conversation_id,
+                            role: updatedMessage.role,
+                            content: updatedMessage.content,
+                            tokens_used: updatedMessage.tokens_used,
+                            model: updatedMessage.model,
+                            pinned: updatedMessage.pinned,
+                            createdAt: updatedMessage.createdAt,
+                        },
+                    });
+                }
             }
         }
         catch (socketError) {
@@ -225,10 +266,31 @@ export const unpinMessage = async (req, res) => {
             }
             else {
                 const roomName = `conversation:${message.conversation_id}`;
-                io.to(roomName).emit("message:unpinned", {
-                    conversationId: message.conversation_id,
-                    messageId: updatedMessage.id,
-                });
+                const senderSocketId = req.headers["x-socket-id"];
+                // Broadcast to all sockets in room except sender (to avoid duplication)
+                if (senderSocketId) {
+                    const senderSocket = io.sockets.sockets.get(senderSocketId);
+                    if (senderSocket) {
+                        senderSocket.broadcast.to(roomName).emit("message:unpinned", {
+                            conversationId: message.conversation_id,
+                            messageId: updatedMessage.id,
+                        });
+                    }
+                    else {
+                        // Socket not found, broadcast to all
+                        io.to(roomName).emit("message:unpinned", {
+                            conversationId: message.conversation_id,
+                            messageId: updatedMessage.id,
+                        });
+                    }
+                }
+                else {
+                    // No socket ID provided, broadcast to all
+                    io.to(roomName).emit("message:unpinned", {
+                        conversationId: message.conversation_id,
+                        messageId: updatedMessage.id,
+                    });
+                }
             }
         }
         catch (socketError) {

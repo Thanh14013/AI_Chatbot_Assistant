@@ -305,7 +305,8 @@ export const initializeSocketIO = (httpServer) => {
                 (chunk) => {
                     assistantContent += chunk;
                     // chunk received and will be broadcast
-                    // Broadcast chunk to conversation room (all users in conversation)
+                    // Broadcast chunks to ALL sockets in conversation room (including sender)
+                    // Sender NEEDS chunks to display streaming AI response
                     io.to(`conversation:${conversationId}`).emit("message:chunk", {
                         conversationId,
                         chunk,
@@ -390,13 +391,45 @@ export const initializeSocketIO = (httpServer) => {
                     conversationId,
                     messageId,
                 });
-                // Broadcast complete messages to conversation room (EXCLUDE sender to prevent duplicates)
+                // CRITICAL FIX: Broadcast complete messages with different content for sender vs others
+                // - Others (non-sender): Get both userMessage and assistantMessage
+                // - Sender: Get assistantMessage only (userMessage already in UI from optimistic update)
+                // 1. Broadcast to conversation room EXCLUDING sender
                 socket.to(`conversation:${conversationId}`).emit("message:complete", {
                     userMessage: result.userMessage,
                     assistantMessage: result.assistantMessage,
                     conversation: result.conversation,
                     messageId,
                 });
+                // 2. Send to sender socket with only assistantMessage to avoid duplicate userMessage
+                socket.emit("message:complete", {
+                    userMessage: null, // Don't send userMessage to avoid duplicate
+                    assistantMessage: result.assistantMessage,
+                    conversation: result.conversation,
+                    messageId,
+                });
+                // 3. Send to sender's OTHER sockets (other tabs of same user)
+                try {
+                    const userSocketIds = getUserSockets(socket.userId);
+                    for (const sid of userSocketIds) {
+                        // Skip current sender socket (already handled above)
+                        if (sid === socket.id) {
+                            continue;
+                        }
+                        const target = io.sockets.sockets.get(sid);
+                        if (target) {
+                            target.emit("message:complete", {
+                                userMessage: result.userMessage,
+                                assistantMessage: result.assistantMessage,
+                                conversation: result.conversation,
+                                messageId,
+                            });
+                        }
+                    }
+                }
+                catch (e) {
+                    // ignore per-socket notify failures
+                }
                 // Broadcast conversation update to user room for multi-tab conversation list sync
                 if (result.conversation) {
                     broadcastToUser(socket.userId, "conversation:activity", {
@@ -524,14 +557,14 @@ export const initializeSocketIO = (httpServer) => {
                 return;
             }
             // conversation update received
-            // Broadcast update to ALL sockets of the same user (including sender) via user room for complete sync
+            // Broadcast update to other sockets of the same user (excluding sender) via user room for multi-tab sync
             broadcastToUser(socket.userId, "conversation:updated", {
                 conversationId,
                 update,
-            });
-            // ALSO broadcast update to all participants in the conversation room
+            }, socket.id);
+            // ALSO broadcast update to all other participants in the conversation room (excluding sender)
             try {
-                io.to(`conversation:${conversationId}`).emit("conversation:updated", {
+                socket.broadcast.to(`conversation:${conversationId}`).emit("conversation:updated", {
                     conversationId,
                     update,
                 });
@@ -547,12 +580,14 @@ export const initializeSocketIO = (httpServer) => {
                 return;
             }
             // conversation creation received
-            // Broadcast creation to ALL sockets of the same user (including sender) via user room for complete sync
-            broadcastToUser(socket.userId, "conversation:created", conversation);
-            // ALSO broadcast creation to the conversation room (if any sockets already joined)
+            // Broadcast creation to other sockets of the same user (excluding sender) via user room for multi-tab sync
+            broadcastToUser(socket.userId, "conversation:created", conversation, socket.id);
+            // ALSO broadcast creation to the conversation room (if any other sockets already joined, excluding sender)
             try {
                 if (conversation?.id) {
-                    io.to(`conversation:${conversation.id}`).emit("conversation:created", conversation);
+                    socket.broadcast
+                        .to(`conversation:${conversation.id}`)
+                        .emit("conversation:created", conversation);
                 }
             }
             catch { }
@@ -564,11 +599,13 @@ export const initializeSocketIO = (httpServer) => {
                 return;
             }
             // conversation deletion requested
-            // Broadcast deletion to ALL sockets of the same user (including sender) via user room for complete sync
-            broadcastToUser(socket.userId, "conversation:deleted", { conversationId });
-            // ALSO broadcast deletion to the conversation room (all participants)
+            // Broadcast deletion to other sockets of the same user (excluding sender) via user room for multi-tab sync
+            broadcastToUser(socket.userId, "conversation:deleted", { conversationId }, socket.id);
+            // ALSO broadcast deletion to the conversation room (all other participants, excluding sender)
             try {
-                io.to(`conversation:${conversationId}`).emit("conversation:deleted", { conversationId });
+                socket.broadcast
+                    .to(`conversation:${conversationId}`)
+                    .emit("conversation:deleted", { conversationId });
             }
             catch { }
             // Remove all sockets from the conversation room

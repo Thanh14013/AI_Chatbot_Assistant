@@ -31,6 +31,7 @@ async function testModels() {
       model: "gpt-3.5-turbo",
       context_window: 10,
       tags: [], // Add required tags field
+      order_in_project: 0, // Default order in project
     });
     // created conversation
 

@@ -36,7 +36,7 @@ export async function searchAllConversations(userIdOrEmail, searchParams) {
     const results = await sequelize.query(`
     WITH user_conversations AS (
       SELECT id FROM conversations 
-      WHERE user_id = $1 AND deleted_at IS NULL
+      WHERE user_id = $1 AND deleted_at IS NULL AND project_id IS NULL
     ),
     ranked_messages AS (
       SELECT 
