@@ -555,8 +555,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **Nguyen Vu Thanh**
 
 - GitHub: [@Thanh14013](https://github.com/Thanh14013)
-- LinkedIn: [Add your LinkedIn]
-- Portfolio: [Add your portfolio]
+- Gmail: Thanh14704@gmail.com
+- Phone Number: 0961515419
 
 ## 🙏 Acknowledgments
 
