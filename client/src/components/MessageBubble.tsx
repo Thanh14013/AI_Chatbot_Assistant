@@ -22,6 +22,7 @@ import { Message } from "../types/chat.type";
 import { PendingMessage } from "../types/offline-message.type";
 import styles from "./MessageBubble.module.css";
 import { pinMessage, unpinMessage } from "../services/chat.service";
+import SelectionAskButton from "./SelectionAskButton";
 
 const { Text } = Typography;
 
@@ -35,6 +36,8 @@ interface MessageBubbleProps {
   onFollowupClick?: (suggestion: string) => void;
   // Optional handler for when a message is pinned/unpinned
   onPinToggle?: (messageId: string, isPinned: boolean) => void;
+  // Optional handler for asking about selected text
+  onAskAboutSelection?: (selectedText: string) => void;
 }
 
 /**
@@ -47,6 +50,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   onRequestFollowups,
   onFollowupClick,
   onPinToggle,
+  onAskAboutSelection,
 }) => {
   const { message: antMessage } = App.useApp();
   const [isCopied, setIsCopied] = useState(false);
@@ -58,6 +62,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   // Render-time debug logging removed
   const lastStreamedMessageId = useRef<string | null>(null);
   const displayedContentRef = useRef<string>(displayedContent);
+  // Reference to message content container for selection detection
+  const messageContentRef = useRef<HTMLDivElement>(null);
   // MessageRole is a string union ('user' | 'assistant' | 'system')
   // compare against the literal value
   const isUser = message.role === "user";
@@ -342,7 +348,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               />
             )}
 
-            <div className={styles.messageContent}>
+            <div className={styles.messageContent} ref={messageContentRef}>
               {message.role === "assistant" &&
               (!displayedContent || displayedContent.trim() === "") ? (
                 <em className={styles.emptyAssistant}>
@@ -534,6 +540,16 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Selection Ask Button - only for AI messages */}
+      {!isUser && onAskAboutSelection && (
+        <SelectionAskButton
+          containerRef={messageContentRef}
+          onAskAboutSelection={onAskAboutSelection}
+          isAIMessage={!isUser}
+          messageId={message.id}
+        />
       )}
     </div>
   );

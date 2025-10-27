@@ -1791,6 +1791,15 @@ const ChatPage: React.FC = () => {
     handleSendMessage(suggestion);
   };
 
+  /**
+   * Handle asking about selected text from AI message
+   */
+  const handleAskAboutSelection = (selectedText: string) => {
+    if (!currentConversation) return;
+    const message = `Tôi chưa rõ đoạn này, giải thích lại cho tôi: "${selectedText}"`;
+    handleSendMessage(message);
+  };
+
   // Listen for follow-up response events
   useEffect(() => {
     const handleFollowupsResponse = (event: CustomEvent) => {
@@ -2029,6 +2038,7 @@ const ChatPage: React.FC = () => {
                 onRequestFollowups={handleRequestFollowups}
                 onFollowupClick={handleFollowupClick}
                 onPinToggle={handlePinToggle}
+                onAskAboutSelection={handleAskAboutSelection}
               />
 
               {/* Chat input for new conversation */}
@@ -2085,6 +2095,7 @@ const ChatPage: React.FC = () => {
                 onRequestFollowups={handleRequestFollowups}
                 onFollowupClick={handleFollowupClick}
                 onPinToggle={handlePinToggle}
+                onAskAboutSelection={handleAskAboutSelection}
               />
 
               {/* Chat input - disable while AI is typing to mirror sender tab behaviour */}

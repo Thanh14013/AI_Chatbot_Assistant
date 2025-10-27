@@ -28,6 +28,8 @@ interface MessageListProps {
   onFollowupClick?: (suggestion: string) => void;
   // Pin toggle handler
   onPinToggle?: (messageId: string, isPinned: boolean) => void;
+  // Selection ask handler
+  onAskAboutSelection?: (selectedText: string) => void;
 }
 
 /**
@@ -47,6 +49,7 @@ const MessageList: React.FC<MessageListProps> = ({
   onRequestFollowups,
   onFollowupClick,
   onPinToggle,
+  onAskAboutSelection,
 }) => {
   // Merge pending messages with real messages and sort by timestamp
   const allMessages = React.useMemo(() => {
@@ -357,6 +360,7 @@ const MessageList: React.FC<MessageListProps> = ({
               onRequestFollowups={onRequestFollowups}
               onFollowupClick={onFollowupClick}
               onPinToggle={onPinToggle}
+              onAskAboutSelection={onAskAboutSelection}
             />
           </div>
         ))}

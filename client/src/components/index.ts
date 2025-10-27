@@ -25,3 +25,4 @@ export { SearchResultsList } from "./SearchResultsList";
 export { AvatarUpload } from "./AvatarUpload";
 export { ChangePasswordModal } from "./ChangePasswordModal";
 export { FileAttachmentPreview } from "./FileAttachmentPreview";
+export { default as SelectionAskButton } from "./SelectionAskButton";
