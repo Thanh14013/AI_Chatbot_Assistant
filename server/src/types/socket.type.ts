@@ -127,6 +127,13 @@ export interface ServerToClientEvents {
   "message:pinned": (data: { conversationId: string; messageId: string; message?: any }) => void;
   "message:unpinned": (data: { conversationId: string; messageId: string }) => void;
 
+  // Message state update (for sender socket only - no duplicate messages)
+  "message:state_update": (data: {
+    conversationId: string;
+    messageId?: string;
+    status: "complete" | "failed";
+  }) => void;
+
   // Conversation events
   "conversation:joined": (data: { conversationId: string }) => void;
   "conversation:left": (data: { conversationId: string }) => void;

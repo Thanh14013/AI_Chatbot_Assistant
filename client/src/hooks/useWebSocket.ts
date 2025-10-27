@@ -27,6 +27,11 @@ interface UseWebSocketOptions {
       message_count: number;
     };
   }) => void;
+  onMessageStateUpdate?: (data: {
+    conversationId: string;
+    messageId?: string;
+    status: "complete" | "failed";
+  }) => void;
   onAITypingStart?: (data: { conversationId: string }) => void;
   onAITypingStop?: (data: { conversationId: string }) => void;
   onConversationCreated?: (conversation: ConversationListItem) => void;
@@ -113,6 +118,10 @@ export const useWebSocket = (
 
       onMessageComplete: (data) => {
         handlersRef.current.onMessageComplete?.(data);
+      },
+
+      onMessageStateUpdate: (data) => {
+        handlersRef.current.onMessageStateUpdate?.(data);
       },
 
       onAITypingStart: (data) => {

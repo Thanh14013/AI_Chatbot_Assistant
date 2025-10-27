@@ -38,6 +38,7 @@ export const create = async (req, res) => {
             return;
         }
         // Validate tags if provided
+        let validatedTags = undefined;
         if (tags !== undefined) {
             const tagValidation = validateAndNormalizeTags(tags);
             if (!tagValidation.isValid) {
@@ -48,6 +49,7 @@ export const create = async (req, res) => {
                 });
                 return;
             }
+            validatedTags = tagValidation.normalizedTags;
         }
         // Create conversation
         const conversationData = {
@@ -55,7 +57,7 @@ export const create = async (req, res) => {
             title: title.trim(),
             model: model || "gpt-5-nano",
             context_window: context_window || 10,
-            tags: tags || [],
+            tags: validatedTags || [],
             ...(project_id && { project_id }), // Assign to project if provided
         };
         const conversation = await createConversation(conversationData);
@@ -100,6 +102,9 @@ export const getAll = async (req, res) => {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
         const search = req.query.search;
+        // Extract standalone filter (for filtering by project_id)
+        const standaloneParam = req.query.standalone;
+        const standalone = standaloneParam === "true" ? true : standaloneParam === "false" ? false : undefined;
         // Extract tag filtering params
         const tagsParam = req.query.tags;
         const tagMode = req.query.tagMode || "any";
@@ -126,7 +131,7 @@ export const getAll = async (req, res) => {
             return;
         }
         // Get conversations with optional search and tag filtering
-        const result = await getUserConversations(userId, page, limit, search, tags, tagMode);
+        const result = await getUserConversations(userId, page, limit, search, tags, tagMode, standalone);
         // Send success response
         res.status(200).json({
             success: true,
@@ -241,6 +246,7 @@ export const update = async (req, res) => {
             return;
         }
         // Validate tags if provided
+        let validatedTags = undefined;
         if (tags !== undefined) {
             const tagValidation = validateAndNormalizeTags(tags);
             if (!tagValidation.isValid) {
@@ -251,6 +257,7 @@ export const update = async (req, res) => {
                 });
                 return;
             }
+            validatedTags = tagValidation.normalizedTags;
         }
         // Update conversation
         const updateData = {};
@@ -260,8 +267,8 @@ export const update = async (req, res) => {
             updateData.model = model;
         if (context_window !== undefined)
             updateData.context_window = context_window;
-        if (tags !== undefined)
-            updateData.tags = tags;
+        if (validatedTags !== undefined)
+            updateData.tags = validatedTags;
         const conversation = await updateConversation(conversationId, userId, updateData);
         // Broadcast conversation updated event to user via WebSocket, excluding sender
         const socketId = req.headers["x-socket-id"];

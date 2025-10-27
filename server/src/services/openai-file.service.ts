@@ -70,12 +70,6 @@ export async function uploadFileToOpenAI(
   resourceType: string,
   format?: string
 ): Promise<OpenAIFileUploadResult> {
-  console.log("📤 [OpenAI File Service] Starting upload to OpenAI File API", {
-    filename: originalFilename,
-    resourceType,
-    format,
-  });
-
   if (!openai) {
     return {
       success: false,
@@ -92,10 +86,6 @@ export async function uploadFileToOpenAI(
 
   // Check if file type is supported
   if (!isFileSupportedByOpenAI(resourceType, format)) {
-    console.log("⚠️ [OpenAI File Service] File type not supported by OpenAI", {
-      resourceType,
-      format,
-    });
     return {
       success: false,
       error: `File type ${format} not supported by OpenAI File API`,
@@ -104,7 +94,6 @@ export async function uploadFileToOpenAI(
 
   try {
     // Download file from Cloudinary URL
-    console.log("⬇️ [OpenAI File Service] Downloading file from Cloudinary", { secureUrl });
     const response = await fetch(secureUrl);
 
     if (!response.ok) {
@@ -134,22 +123,10 @@ export async function uploadFileToOpenAI(
     fs.writeFileSync(tempFilePath, buffer);
 
     try {
-      console.log("🚀 [OpenAI File Service] Uploading to OpenAI File API", {
-        filename: originalFilename,
-        purpose,
-        fileSize: buffer.length,
-      });
-
       // Upload to OpenAI File API
       const file = await openai.files.create({
         file: fs.createReadStream(tempFilePath),
         purpose: purpose,
-      });
-
-      console.log("✅ [OpenAI File Service] Successfully uploaded to OpenAI", {
-        file_id: file.id,
-        filename: file.filename,
-        purpose: file.purpose,
       });
 
       return {
@@ -165,15 +142,10 @@ export async function uploadFileToOpenAI(
           fs.unlinkSync(tempFilePath);
         }
       } catch (cleanupError) {
-        console.warn("⚠️ [OpenAI File Service] Failed to clean up temp file", cleanupError);
+        // Ignore cleanup errors
       }
     }
   } catch (error: any) {
-    console.error("❌ [OpenAI File Service] Upload failed", {
-      error: error.message,
-      filename: originalFilename,
-    });
-
     return {
       success: false,
       error: error.message || "Unknown error occurred during upload",
@@ -190,11 +162,6 @@ export async function getExistingOpenAIFile(
   uploadedBy: string
 ): Promise<string | null> {
   try {
-    console.log("🔍 [OpenAI File Service] Checking for existing OpenAI file", {
-      filename: originalFilename,
-      uploadedBy,
-    });
-
     if (!openai) {
       return null;
     }
@@ -206,16 +173,11 @@ export async function getExistingOpenAIFile(
     const existingFile = files.data.find((file: any) => file.filename === originalFilename);
 
     if (existingFile) {
-      console.log("✅ [OpenAI File Service] Found existing file", {
-        file_id: existingFile.id,
-        filename: existingFile.filename,
-      });
       return existingFile.id;
     }
 
     return null;
   } catch (error: any) {
-    console.warn("⚠️ [OpenAI File Service] Failed to check existing files", error.message);
     return null;
   }
 }
@@ -225,21 +187,14 @@ export async function getExistingOpenAIFile(
  */
 export async function deleteOpenAIFile(fileId: string): Promise<boolean> {
   try {
-    console.log("🗑️ [OpenAI File Service] Deleting file from OpenAI", { file_id: fileId });
-
     if (!openai) {
       return false;
     }
 
     await openai.files.del(fileId);
 
-    console.log("✅ [OpenAI File Service] Successfully deleted from OpenAI", { file_id: fileId });
     return true;
-  } catch (error: any) {
-    console.error("❌ [OpenAI File Service] Failed to delete from OpenAI", {
-      file_id: fileId,
-      error: error.message,
-    });
+  } catch (error) {
     return false;
   }
 }
@@ -256,10 +211,6 @@ export async function getOpenAIFileInfo(fileId: string): Promise<any> {
     const file = await openai.files.retrieve(fileId);
     return file;
   } catch (error: any) {
-    console.error("❌ [OpenAI File Service] Failed to get file info", {
-      file_id: fileId,
-      error: error.message,
-    });
     return null;
   }
 }

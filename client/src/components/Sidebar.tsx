@@ -442,10 +442,11 @@ const Sidebar: React.FC<SidebarProps> = ({
             query={currentSearchQuery}
             searchType={currentSearchType}
             onMessageClick={(conversationId, messageId) => {
-              // Navigate to conversation and highlight message
-              navigate(
-                `/conversations/${conversationId}?highlight=${messageId}`
-              );
+              // Navigate to conversation and highlight message (if messageId provided)
+              const url = messageId
+                ? `/conversations/${conversationId}?highlight=${messageId}`
+                : `/conversations/${conversationId}`;
+              navigate(url);
             }}
           />
         )}

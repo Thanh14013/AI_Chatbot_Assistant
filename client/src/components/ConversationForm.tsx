@@ -282,36 +282,52 @@ const ConversationForm: React.FC<ConversationFormProps> = ({
             value={currentTags}
             open={false}
             onChange={(values: string[]) => {
-              // Completely replace with new logic
-              if (values.length > currentTags.length) {
-                // User added tag(s)
-                const newTags = values.filter((v) => !currentTags.includes(v));
+              // Create a map to track normalized tags and preserve original casing
+              const tagMap = new Map<string, string>();
+              const duplicatesFound: string[] = [];
 
-                // Collect valid tags
-                const validNewTags: string[] = [];
+              // Process all tags, keeping the first occurrence of each normalized tag
+              for (const tag of values) {
+                const normalized = tag.toLowerCase().trim();
+                if (!tagMap.has(normalized)) {
+                  tagMap.set(normalized, tag.trim());
+                } else {
+                  duplicatesFound.push(tag.trim());
+                }
+              }
 
-                for (const tag of newTags) {
-                  const normalizedTag = tag.toLowerCase().trim();
+              // Convert map back to array, limited to 4 tags
+              const uniqueTags = Array.from(tagMap.values()).slice(0, 4);
 
-                  // Check if duplicate (against current + already validated)
-                  const exists = [...currentTags, ...validNewTags].some(
-                    (t) => t.toLowerCase().trim() === normalizedTag
+              // Show warning for duplicates found
+              if (duplicatesFound.length > 0) {
+                message.warning(
+                  `Duplicate tag${
+                    duplicatesFound.length > 1 ? "s" : ""
+                  } removed: ${duplicatesFound.join(", ")}`
+                );
+              }
+
+              setCurrentTags(uniqueTags);
+            }}
+            onInputKeyDown={(e) => {
+              // Prevent adding duplicate tags when pressing Enter
+              if (e.key === "Enter") {
+                const inputElement = e.currentTarget as HTMLInputElement;
+                const inputValue = inputElement.value.trim();
+
+                if (inputValue) {
+                  const normalizedInput = inputValue.toLowerCase().trim();
+                  const exists = currentTags.some(
+                    (tag) => tag.toLowerCase().trim() === normalizedInput
                   );
 
                   if (exists) {
-                    message.warning(`Tag "${tag}" already exists!`);
-                  } else {
-                    validNewTags.push(normalizedTag);
+                    message.warning(`Tag "${inputValue}" already exists!`);
+                    e.preventDefault(); // Prevent the tag from being added
+                    inputElement.value = ""; // Clear the input
                   }
                 }
-
-                // Add all valid tags at once
-                if (validNewTags.length > 0) {
-                  setCurrentTags([...currentTags, ...validNewTags]);
-                }
-              } else {
-                // User removed a tag - update directly
-                setCurrentTags(values);
               }
             }}
           />

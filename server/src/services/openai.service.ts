@@ -117,22 +117,6 @@ export async function getChatCompletion(
     throw new Error("Messages array cannot be empty");
   }
 
-  console.log("🚀 [OpenAI Service] Starting chat completion request", {
-    model,
-    messageCount: messages.length,
-    hasAttachments: messages.some((msg) => Array.isArray(msg.content)),
-    stream,
-    temperature,
-    max_completion_tokens,
-    messages: messages.map((msg) => ({
-      role: msg.role,
-      contentType: Array.isArray(msg.content) ? "multimodal" : "text",
-      contentPreview: Array.isArray(msg.content)
-        ? msg.content.map((item) => item.type).join(", ")
-        : msg.content.substring(0, 100) + (msg.content.length > 100 ? "..." : ""),
-    })),
-  });
-
   try {
     // If streaming is enabled, handle stream response
     if (stream) {
@@ -189,16 +173,6 @@ export async function getChatCompletion(
 
     const finish_reason = response.choices[0]?.finish_reason || "stop";
 
-    console.log("✅ [OpenAI Service] Chat completion response received", {
-      contentLength: content.length,
-      contentPreview: content.substring(0, 200) + (content.length > 200 ? "..." : ""),
-      tokens_used: total_tokens,
-      prompt_tokens,
-      completion_tokens,
-      model,
-      finish_reason,
-    });
-
     return {
       content,
       tokens_used: total_tokens,
@@ -210,14 +184,6 @@ export async function getChatCompletion(
     };
   } catch (error: any) {
     // Handle different types of errors
-    console.error("❌ [OpenAI Service] Chat completion failed", {
-      error: error?.message || "Unknown error",
-      status: error?.status,
-      code: error?.code,
-      model,
-      messageCount: messages.length,
-      hasAttachments: messages.some((msg) => Array.isArray(msg.content)),
-    });
 
     if (error?.status === 401) {
       throw new Error("Invalid OpenAI API key");
@@ -306,16 +272,6 @@ async function handleStreamingResponse(params: {
     if (!fullContent || fullContent.trim() === "") {
       throw new Error("OpenAI streaming returned empty content");
     }
-
-    console.log("✅ [OpenAI Service] Streaming chat completion completed", {
-      contentLength: fullContent.length,
-      contentPreview: fullContent.substring(0, 200) + (fullContent.length > 200 ? "..." : ""),
-      tokens_used,
-      estimated_prompt_tokens,
-      estimated_completion_tokens,
-      model,
-      finish_reason,
-    });
 
     return {
       content: fullContent,
@@ -447,19 +403,6 @@ export function buildMessageContentWithAttachments(
   if (!attachments || attachments.length === 0) {
     return textContent;
   }
-
-  console.log("🔧 [OpenAI Service] Building message content with attachments", {
-    textContent: textContent.substring(0, 100) + (textContent.length > 100 ? "..." : ""),
-    attachmentCount: attachments.length,
-    attachments: attachments.map((att) => ({
-      resource_type: att.resource_type,
-      format: att.format,
-      has_file_id: !!att.openai_file_id,
-      file_id: att.openai_file_id,
-      has_extracted_text: !!att.extracted_text,
-      extracted_text_length: att.extracted_text?.length || 0,
-    })),
-  });
 
   // Check if any attachment is a REAL image (not PDF)
   // Only PNG, JPEG, GIF, WEBP are supported by image_url

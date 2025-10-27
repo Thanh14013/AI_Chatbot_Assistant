@@ -294,7 +294,6 @@ export const initializeSocketIO = (httpServer) => {
                         }
                     }
                     catch (err) {
-                        console.error("❌ [Socket Service] Failed to fetch attachments from DB:", err.message);
                         // Fallback to client attachments if DB fetch fails
                         enrichedAttachments = attachments;
                     }
@@ -391,8 +390,8 @@ export const initializeSocketIO = (httpServer) => {
                     conversationId,
                     messageId,
                 });
-                // Broadcast complete messages to conversation room
-                io.to(`conversation:${conversationId}`).emit("message:complete", {
+                // Broadcast complete messages to conversation room (EXCLUDE sender to prevent duplicates)
+                socket.to(`conversation:${conversationId}`).emit("message:complete", {
                     userMessage: result.userMessage,
                     assistantMessage: result.assistantMessage,
                     conversation: result.conversation,
@@ -462,6 +461,52 @@ export const initializeSocketIO = (httpServer) => {
                     socket.emit("followups_error", {
                         messageId,
                         error: error?.message || "Failed to generate suggestions",
+                    });
+                }
+            }
+        });
+        // Handle conversation-based follow-up suggestions request (for input lightbulb)
+        socket.on("request_conversation_followups", async (data) => {
+            try {
+                const { sessionId, conversationId, messages } = data;
+                if (!sessionId || !conversationId) {
+                    socket.emit("conversation_followups_error", {
+                        conversationId: conversationId || "",
+                        error: "Session ID and conversation ID are required",
+                    });
+                    return;
+                }
+                if (!messages || !Array.isArray(messages) || messages.length === 0) {
+                    socket.emit("conversation_followups_error", {
+                        conversationId,
+                        error: "At least one message is required for context",
+                    });
+                    return;
+                }
+                // Import followup service dynamically
+                const { generateConversationFollowups } = await import("./followup.service.js");
+                // Generate suggestions based on conversation history
+                const suggestions = await generateConversationFollowups(messages);
+                // Broadcast suggestions to all sockets in the same session (multi-tab sync)
+                io.to(`session:${sessionId}`).emit("conversation_followups_response", {
+                    conversationId,
+                    suggestions,
+                });
+            }
+            catch (error) {
+                const conversationId = data?.conversationId || "";
+                const sessionId = data?.sessionId || "";
+                // Broadcast error to all sockets in the same session
+                if (sessionId) {
+                    io.to(`session:${sessionId}`).emit("conversation_followups_error", {
+                        conversationId,
+                        error: error?.message || "Failed to generate conversation suggestions",
+                    });
+                }
+                else {
+                    socket.emit("conversation_followups_error", {
+                        conversationId,
+                        error: error?.message || "Failed to generate conversation suggestions",
                     });
                 }
             }

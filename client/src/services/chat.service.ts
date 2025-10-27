@@ -159,7 +159,12 @@ export const sendMessageStream = async (
     resource_type: string;
     format?: string;
     extracted_text?: string;
-  }>
+  }>,
+  metadata?: {
+    resendMessageId?: string;
+    editMessageId?: string;
+    originalContent?: string;
+  }
 ): Promise<{ abort: () => void }> => {
   const controller = new AbortController();
 
@@ -189,7 +194,7 @@ export const sendMessageStream = async (
       fetch(url, {
         method: "POST",
         headers,
-        body: JSON.stringify({ content, attachments }),
+        body: JSON.stringify({ content, attachments, metadata }),
         signal: controller.signal,
         credentials: "include", // Include cookies for potential refresh token
       });

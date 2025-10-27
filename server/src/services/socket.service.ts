@@ -394,7 +394,6 @@ export const initializeSocketIO = (
               }
             }
           } catch (err: any) {
-            console.error("❌ [Socket Service] Failed to fetch attachments from DB:", err.message);
             // Fallback to client attachments if DB fetch fails
             enrichedAttachments = attachments;
           }
@@ -411,7 +410,8 @@ export const initializeSocketIO = (
             assistantContent += chunk;
             // chunk received and will be broadcast
 
-            // Broadcast chunk to conversation room (all users in conversation)
+            // Broadcast chunks to ALL sockets in conversation room (including sender)
+            // Sender NEEDS chunks to display streaming AI response
             io.to(`conversation:${conversationId}`).emit("message:chunk", {
               conversationId,
               chunk,
@@ -505,13 +505,48 @@ export const initializeSocketIO = (
           messageId,
         });
 
-        // Broadcast complete messages to conversation room (EXCLUDE sender to prevent duplicates)
+        // CRITICAL FIX: Broadcast complete messages with different content for sender vs others
+        // - Others (non-sender): Get both userMessage and assistantMessage
+        // - Sender: Get assistantMessage only (userMessage already in UI from optimistic update)
+
+        // 1. Broadcast to conversation room EXCLUDING sender
         socket.to(`conversation:${conversationId}`).emit("message:complete", {
           userMessage: result.userMessage,
           assistantMessage: result.assistantMessage,
           conversation: result.conversation,
           messageId,
         });
+
+        // 2. Send to sender socket with only assistantMessage to avoid duplicate userMessage
+        socket.emit("message:complete", {
+          userMessage: null as any, // Don't send userMessage to avoid duplicate
+          assistantMessage: result.assistantMessage,
+          conversation: result.conversation,
+          messageId,
+        });
+
+        // 3. Send to sender's OTHER sockets (other tabs of same user)
+        try {
+          const userSocketIds = getUserSockets(socket.userId!);
+          for (const sid of userSocketIds) {
+            // Skip current sender socket (already handled above)
+            if (sid === socket.id) {
+              continue;
+            }
+
+            const target = io.sockets.sockets.get(sid);
+            if (target) {
+              (target as any).emit("message:complete", {
+                userMessage: result.userMessage,
+                assistantMessage: result.assistantMessage,
+                conversation: result.conversation,
+                messageId,
+              });
+            }
+          }
+        } catch (e) {
+          // ignore per-socket notify failures
+        }
 
         // Broadcast conversation update to user room for multi-tab conversation list sync
         if (result.conversation) {

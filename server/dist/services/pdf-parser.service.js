@@ -42,36 +42,21 @@ function downloadPDF(url) {
  */
 export async function extractTextFromPDF(pdfUrl) {
     try {
-        console.log("📄 [PDF Parser] Starting PDF text extraction", { pdfUrl });
         // Download PDF as buffer using https/http
         const pdfBuffer = await downloadPDF(pdfUrl);
-        console.log("✅ [PDF Parser] PDF downloaded", {
-            size: pdfBuffer.length,
-            sizeKB: Math.round(pdfBuffer.length / 1024),
-        });
         // Parse PDF using PDFParse class
         const pdfParser = new PDFParse({ data: pdfBuffer });
         const data = await pdfParser.getText();
         const extractedText = data.text.trim();
         const pageCount = data.total;
         const textLength = extractedText.length;
-        console.log("✅ [PDF Parser] Text extraction completed", {
-            pageCount,
-            textLength,
-            textPreview: extractedText.substring(0, 200) + (textLength > 200 ? "..." : ""),
-        });
         // If no text extracted, return helpful message
         if (!extractedText || extractedText.length === 0) {
-            console.warn("⚠️ [PDF Parser] No text extracted from PDF (might be image-based)");
             return "[This PDF appears to be image-based or encrypted. Text extraction not available.]";
         }
         return extractedText;
     }
     catch (error) {
-        console.error("❌ [PDF Parser] Failed to extract text from PDF", {
-            error: error?.message,
-            url: pdfUrl,
-        });
         // Return error message instead of throwing
         return `[Failed to extract text from PDF: ${error?.message || "Unknown error"}]`;
     }
@@ -84,27 +69,16 @@ export async function extractTextFromPDF(pdfUrl) {
  */
 export async function extractTextFromPDFBuffer(pdfBuffer) {
     try {
-        console.log("📄 [PDF Parser] Parsing PDF from buffer", {
-            size: pdfBuffer.length,
-            sizeKB: Math.round(pdfBuffer.length / 1024),
-        });
         // Parse PDF using PDFParse class
         const pdfParser = new PDFParse({ data: pdfBuffer });
         const data = await pdfParser.getText();
         const extractedText = data.text.trim();
-        console.log("✅ [PDF Parser] Text extraction completed", {
-            pageCount: data.total,
-            textLength: extractedText.length,
-        });
         if (!extractedText || extractedText.length === 0) {
             return "[This PDF appears to be image-based or encrypted. Text extraction not available.]";
         }
         return extractedText;
     }
     catch (error) {
-        console.error("❌ [PDF Parser] Failed to extract text from PDF buffer", {
-            error: error?.message,
-        });
         return `[Failed to extract text from PDF: ${error?.message || "Unknown error"}]`;
     }
 }

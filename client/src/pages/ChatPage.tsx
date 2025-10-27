@@ -458,22 +458,29 @@ const ChatPage: React.FC = () => {
     const handleMessageComplete = (event: CustomEvent) => {
       const { userMessage, assistantMessage, conversation } = event.detail;
 
-      if (userMessage.conversation_id !== currentConversation.id) {
+      // Skip if userMessage is null or doesn't belong to current conversation
+      if (
+        !userMessage ||
+        userMessage.conversation_id !== currentConversation.id
+      ) {
         return;
       }
 
       // Replace streaming message with final messages
       setMessages((prev) => {
-        // Remove any typing messages
-        const withoutTyping = prev.filter((msg) => !msg.isTyping);
-
         // Build a set of existing message IDs to avoid duplicates
-        const existingIds = new Set(withoutTyping.map((m) => m.id));
+        const existingIds = new Set<string>();
 
-        // Try to replace an optimistic pending user message (localStatus === 'pending')
-        // with the server-provided userMessage to avoid duplicates when using WebSocket.
+        // First pass: collect IDs and handle replacements
         let replaced = false;
-        const replacedList = withoutTyping.map((m) => {
+        const processedMessages = prev.map((m) => {
+          // If this is a typing assistant message with content, replace with final assistant message
+          if (m.isTyping && m.role === "assistant" && assistantMessage) {
+            existingIds.add(assistantMessage.id);
+            return { ...assistantMessage, isTyping: false };
+          }
+
+          // Replace optimistic pending user message with server version
           if (
             !replaced &&
             m.localStatus === "pending" &&
@@ -481,25 +488,38 @@ const ChatPage: React.FC = () => {
             m.conversation_id === userMessage.conversation_id
           ) {
             replaced = true;
-            // mark the server id as existing
             existingIds.add(userMessage.id);
             return userMessage;
+          }
+
+          // Keep existing message
+          if (m.id) {
+            existingIds.add(m.id);
           }
           return m;
         });
 
+        // Filter out empty typing placeholders only
+        const withoutEmptyTyping = processedMessages.filter(
+          (m) => !(m.isTyping && !m.content)
+        );
+
         // If no optimistic user message found to replace, append the server userMessage
         if (!replaced && userMessage && !existingIds.has(userMessage.id)) {
-          replacedList.push(userMessage);
+          withoutEmptyTyping.push(userMessage);
           existingIds.add(userMessage.id);
         }
 
-        // Append assistant message if present and not duplicate
-        if (assistantMessage && !existingIds.has(assistantMessage.id)) {
-          replacedList.push(assistantMessage);
+        // Append assistant message if not already added and not duplicate
+        if (
+          assistantMessage &&
+          !existingIds.has(assistantMessage.id) &&
+          !processedMessages.some((m) => m.isTyping && m.role === "assistant")
+        ) {
+          withoutEmptyTyping.push(assistantMessage);
         }
 
-        return replacedList;
+        return withoutEmptyTyping;
       });
 
       // Update conversation metadata
@@ -621,8 +641,23 @@ const ChatPage: React.FC = () => {
       const { conversationId } = event.detail;
       if (conversationId !== currentConversation?.id) return;
 
-      // Remove AI typing messages
-      setMessages((prev) => prev.filter((m) => !m.isTyping));
+      // IMPORTANT: Don't remove typing messages that have content - just mark them as finalized
+      // This prevents losing streamed content in the sender tab
+      setMessages((prev) =>
+        prev
+          .map((m) => {
+            if (m.isTyping && m.role === "assistant") {
+              // If typing message has content, keep it but mark as finalized
+              if (m.content && m.content.trim().length > 0) {
+                return { ...m, isTyping: false };
+              }
+              // If typing message is empty, it's a stale placeholder - remove it
+              return null;
+            }
+            return m;
+          })
+          .filter((m): m is Message => m !== null)
+      );
     };
 
     window.addEventListener("message:new", handleMessageNew as EventListener);
@@ -768,7 +803,12 @@ const ChatPage: React.FC = () => {
    */
   const handleSendMessage = async (
     content: string,
-    attachments?: FileAttachment[]
+    attachments?: FileAttachment[],
+    metadata?: {
+      resendMessageId?: string;
+      editMessageId?: string;
+      originalContent?: string;
+    }
   ) => {
     // Prevent sending if already sending
     if (isSendingMessage || isSendingRealtimeMessage) return;
@@ -1051,7 +1091,9 @@ const ChatPage: React.FC = () => {
               resource_type: att.resource_type,
               format: att.format,
               extracted_text: att.extracted_text,
-            }))
+            })),
+            // metadata for resend/edit
+            metadata
           );
         } catch (err) {
           antdMessage.error("Failed to send message");
@@ -1326,7 +1368,17 @@ const ChatPage: React.FC = () => {
               })
             );
           } catch {}
-        }
+        },
+        // attachments
+        attachments?.map((att) => ({
+          public_id: att.public_id,
+          secure_url: att.secure_url,
+          resource_type: att.resource_type,
+          format: att.format,
+          extracted_text: att.extracted_text,
+        })),
+        // metadata for resend/edit
+        metadata
       );
     } catch (err) {
       antdMessage.error("Failed to send message");
@@ -1400,7 +1452,9 @@ const ChatPage: React.FC = () => {
         },
         (err) => {
           /* handle error */
-        }
+        },
+        undefined, // attachments
+        undefined // metadata
       );
       return true;
     } catch (err) {
@@ -1628,7 +1682,9 @@ const ChatPage: React.FC = () => {
               })
             );
           } catch {}
-        }
+        },
+        undefined, // attachments
+        undefined // metadata
       );
     } catch (err: unknown) {
       const error = err as Error;
@@ -1668,6 +1724,44 @@ const ChatPage: React.FC = () => {
     } finally {
       setIsSendingMessage(false);
     }
+  };
+
+  /**
+   * Handle resending a user message (with AI context)
+   */
+  const handleResendMessage = async (
+    message: Message | PendingMessage
+  ): Promise<void> => {
+    if (!currentConversation) return;
+
+    // Only allow resending user messages
+    if (message.role !== "user") return;
+
+    // Send the original message content with resend metadata
+    // The server will handle building the context prompt
+    await handleSendMessage(message.content, undefined, {
+      resendMessageId: message.id,
+    });
+  };
+
+  /**
+   * Handle editing and resending a user message (with AI context)
+   */
+  const handleEditMessage = async (
+    message: Message | PendingMessage,
+    newContent: string
+  ): Promise<void> => {
+    if (!currentConversation) return;
+
+    // Only allow editing user messages
+    if (message.role !== "user") return;
+
+    // Send the edited message with edit metadata
+    // The server will handle building the context prompt
+    await handleSendMessage(newContent, undefined, {
+      editMessageId: message.id,
+      originalContent: message.content,
+    });
   };
 
   /**
@@ -2039,6 +2133,8 @@ const ChatPage: React.FC = () => {
                 onFollowupClick={handleFollowupClick}
                 onPinToggle={handlePinToggle}
                 onAskAboutSelection={handleAskAboutSelection}
+                onResend={handleResendMessage}
+                onEdit={handleEditMessage}
               />
 
               {/* Chat input for new conversation */}
@@ -2096,6 +2192,8 @@ const ChatPage: React.FC = () => {
                 onFollowupClick={handleFollowupClick}
                 onPinToggle={handlePinToggle}
                 onAskAboutSelection={handleAskAboutSelection}
+                onResend={handleResendMessage}
+                onEdit={handleEditMessage}
               />
 
               {/* Chat input - disable while AI is typing to mirror sender tab behaviour */}

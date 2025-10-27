@@ -71,9 +71,9 @@ export function validateAndNormalizeTags(tags) {
             errors.push(`Tag too long (max ${MAX_TAG_LENGTH} characters): "${tag}" (normalized: "${normalized}")`);
             continue;
         }
-        // Check for duplicates (after normalization)
+        // Skip duplicates (after normalization) instead of adding error
+        // This allows the server to auto-remove duplicates silently
         if (seenTags.has(normalized)) {
-            errors.push(`Duplicate tag: "${normalized}"`);
             continue;
         }
         // Add to normalized tags

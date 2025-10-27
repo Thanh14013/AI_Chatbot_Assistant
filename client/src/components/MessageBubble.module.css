@@ -130,6 +130,103 @@
   overflow-wrap: break-word;
 }
 
+/* Clickable content for user messages */
+.clickableContent {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  border-radius: 8px;
+  padding: 2px;
+  margin: -2px;
+}
+
+.userMessage .clickableContent:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Editing mode - disable hover effects */
+.editingMode .clickableContent {
+  cursor: default;
+}
+
+.editingMode .clickableContent:hover {
+  background-color: transparent !important;
+}
+
+/* Visual feedback for editing mode */
+.editingMode {
+  position: relative;
+}
+
+.editingMode::after {
+  content: "✏️";
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  animation: editingPulse 1.5s ease-in-out infinite;
+  z-index: 10;
+}
+
+@keyframes editingPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+/* Edit textarea - maintain bubble size */
+.editTextArea {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  resize: none;
+  min-height: auto;
+  box-sizing: border-box; /* Include padding in width calculation */
+  font-family: inherit; /* Match the font */
+  transition: all 0.2s ease;
+  animation: fadeInEdit 0.2s ease-out;
+}
+
+.editTextArea:focus {
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.2);
+  outline: none;
+}
+
+.editTextArea::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+@keyframes fadeInEdit {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .textContent {
   white-space: pre-wrap;
 }
@@ -237,9 +334,46 @@
   opacity: 1;
 }
 
+/* Hide buttons in editing mode */
+.editingMode .copyButton,
+.editingMode .resendButton,
+.editingMode .pinButtonCorner {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
 .copyButton:hover {
   opacity: 1 !important;
   color: #4f46e5 !important;
+}
+
+/* Resend button - Hidden by default, shown on hover like copy button */
+.resendButton {
+  opacity: 0;
+  transition: all 0.2s ease;
+  padding: 4px 8px;
+  height: auto;
+  min-width: auto;
+  font-size: 12px;
+}
+
+.userMessage .resendButton {
+  color: white;
+}
+
+/* Show resend button on hover */
+.messageBubble:hover .resendButton {
+  opacity: 1;
+}
+
+/* Don't show resend button on hover when editing */
+.editingMode:hover .resendButton {
+  opacity: 0 !important;
+}
+
+.resendButton:hover {
+  opacity: 1 !important;
+  color: #10b981 !important;
 }
 
 /* Footer actions wrapper to hold copy + retry buttons */
@@ -309,6 +443,11 @@
 /* Show pin button on hover */
 .messageBubble:hover .pinButtonCorner {
   opacity: 1;
+}
+
+/* Don't show pin button on hover when editing */
+.editingMode:hover .pinButtonCorner {
+  opacity: 0 !important;
 }
 
 .pinButtonCorner:hover {

@@ -85,6 +85,7 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
             tags: [normalizedQuery],
             tagMode: "any",
             limit: 20,
+            standalone: true, // Only search in standalone conversations (not in projects)
           });
 
           // Convert to search result format

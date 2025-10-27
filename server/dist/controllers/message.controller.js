@@ -151,7 +151,6 @@ export const sendMessageStream = async (req, res) => {
                 }
             }
             catch (err) {
-                console.error("❌ [Message Controller] Failed to fetch attachments from DB:", err.message);
                 // Fallback to client attachments if DB fetch fails
                 enrichedAttachments = attachments;
             }

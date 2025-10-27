@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from "react";
-import { Avatar, Typography, Button, App } from "antd";
+import { Avatar, Typography, Button, App, Input } from "antd";
 import {
   UserOutlined,
   RobotOutlined,
@@ -17,6 +17,7 @@ import {
   WarningOutlined,
   PushpinOutlined,
   PushpinFilled,
+  RedoOutlined,
 } from "@ant-design/icons";
 import { Message } from "../types/chat.type";
 import { PendingMessage } from "../types/offline-message.type";
@@ -24,7 +25,8 @@ import styles from "./MessageBubble.module.css";
 import { pinMessage, unpinMessage } from "../services/chat.service";
 import SelectionAskButton from "./SelectionAskButton";
 
-const { Text } = Typography;
+const { Text, Paragraph } = Typography;
+const { TextArea } = Input;
 
 interface MessageBubbleProps {
   message: Message | PendingMessage;
@@ -38,6 +40,10 @@ interface MessageBubbleProps {
   onPinToggle?: (messageId: string, isPinned: boolean) => void;
   // Optional handler for asking about selected text
   onAskAboutSelection?: (selectedText: string) => void;
+  // Optional handler for resending a user message
+  onResend?: (message: Message | PendingMessage) => void;
+  // Optional handler for editing and resending a user message
+  onEdit?: (message: Message | PendingMessage, newContent: string) => void;
 }
 
 /**
@@ -51,10 +57,18 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   onFollowupClick,
   onPinToggle,
   onAskAboutSelection,
+  onResend,
+  onEdit,
 }) => {
   const { message: antMessage } = App.useApp();
   const [isCopied, setIsCopied] = useState(false);
   const [isPinning, setIsPinning] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState("");
+  const editTextAreaRef = useRef<any>(null);
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  const [bubbleWidth, setBubbleWidth] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   // Client-side streaming display (progressive reveal)
   const [displayedContent, setDisplayedContent] = useState<string>(
     message.content || ""
@@ -182,6 +196,69 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   /**
+   * Handle resend button click
+   */
+  const handleResend = () => {
+    if (onResend && isUser) {
+      onResend(message);
+    }
+  };
+
+  /**
+   * Handle message content click to enable editing
+   */
+  const handleMessageClick = () => {
+    if (isUser && !isEditing && !isFailed && !isPending && !isSending) {
+      // Capture current bubble width before entering edit mode
+      if (bubbleRef.current) {
+        const currentWidth = bubbleRef.current.offsetWidth;
+        setBubbleWidth(currentWidth);
+      }
+      setIsEditing(true);
+      setEditContent(message.content);
+      // Focus textarea after state update
+      setTimeout(() => {
+        editTextAreaRef.current?.focus();
+      }, 50);
+    }
+  };
+
+  /**
+   * Handle edit submit (Enter key)
+   */
+  const handleEditSubmit = () => {
+    const trimmedContent = editContent.trim();
+    if (trimmedContent && onEdit && trimmedContent !== message.content) {
+      onEdit(message, trimmedContent);
+    }
+    setIsEditing(false);
+    setEditContent("");
+    setBubbleWidth(null);
+  };
+
+  /**
+   * Handle edit cancel (Escape key)
+   */
+  const handleEditCancel = () => {
+    setIsEditing(false);
+    setEditContent("");
+    setBubbleWidth(null);
+  };
+
+  /**
+   * Handle edit textarea key down
+   */
+  const handleEditKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleEditSubmit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      handleEditCancel();
+    }
+  };
+
+  /**
    * Copy message content to clipboard
    */
   const handleCopy = async () => {
@@ -241,6 +318,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         // Ignore debug logging errors
       }
       setDisplayedContent(full);
+      lastStreamedMessageId.current = message.id;
       // No token timer while streaming via chunks
       return;
     }
@@ -249,6 +327,17 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     // If there's no content, nothing to stream
     if (!full) {
       setDisplayedContent("");
+      return;
+    }
+
+    // If this message was just streamed (lastStreamedMessageId matches and isTyping just turned false),
+    // skip the tokenized reveal and just show full content immediately
+    if (
+      lastStreamedMessageId.current === message.id &&
+      displayedContentRef.current === full
+    ) {
+      // Already fully displayed during streaming, no need to re-animate
+      setDisplayedContent(full);
       return;
     }
 
@@ -309,8 +398,29 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     displayedContentRef.current = displayedContent;
   }, [displayedContent]);
 
+  // Handle clicking outside to exit edit mode
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        isEditing &&
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        handleEditCancel();
+      }
+    };
+
+    if (isEditing) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+      };
+    }
+  }, [isEditing]);
+
   return (
     <div
+      ref={containerRef}
       className={`${styles.messageContainer} ${
         isUser ? styles.userMessage : styles.assistantMessage
       }`}
@@ -329,8 +439,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
           {/* Message content bubble */}
           <div
+            ref={bubbleRef}
             className={`${styles.messageBubble} ${
               isPinned ? styles.pinnedMessage : ""
+            } ${isUser ? styles.userBubble : ""} ${
+              isEditing ? styles.editingMode : ""
             }`}
           >
             {/* Pin button positioned in top-right corner */}
@@ -348,16 +461,36 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               />
             )}
 
-            <div className={styles.messageContent} ref={messageContentRef}>
-              {message.role === "assistant" &&
-              (!displayedContent || displayedContent.trim() === "") ? (
-                <em className={styles.emptyAssistant}>
-                  Assistant did not return content. Try retrying the message.
-                </em>
-              ) : (
-                renderContent(displayedContent)
-              )}
-            </div>
+            {/* Message content - clickable for user messages to edit */}
+            {isEditing ? (
+              <TextArea
+                ref={editTextAreaRef}
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                onKeyDown={handleEditKeyDown}
+                autoSize={{ minRows: 1, maxRows: 6 }}
+                className={styles.editTextArea}
+                placeholder="Edit your message..."
+                style={bubbleWidth ? { width: bubbleWidth - 28 } : undefined}
+              />
+            ) : (
+              <div
+                className={`${styles.messageContent} ${
+                  isUser ? styles.clickableContent : ""
+                }`}
+                ref={messageContentRef}
+                onClick={handleMessageClick}
+              >
+                {message.role === "assistant" &&
+                (!displayedContent || displayedContent.trim() === "") ? (
+                  <em className={styles.emptyAssistant}>
+                    Assistant did not return content. Try retrying the message.
+                  </em>
+                ) : (
+                  renderContent(displayedContent)
+                )}
+              </div>
+            )}
 
             {/* Attachments display - show files attached to message */}
             {!isPendingMessage(message) &&
@@ -426,6 +559,19 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                   className={styles.copyButton}
                   disabled={isSending}
                 />
+
+                {/* Resend button for user messages - show on hover like copy button */}
+                {isUser && onResend && !isEditing && (
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<RedoOutlined />}
+                    onClick={handleResend}
+                    className={styles.resendButton}
+                    disabled={isSending || isPending}
+                    title="Resend this message"
+                  />
+                )}
 
                 {/* Retry button shown for failed messages, placed next to copy */}
                 {isFailed && (

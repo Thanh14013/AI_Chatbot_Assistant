@@ -31,6 +31,12 @@ interface ServerToClientEvents {
       message_count: number;
     };
   }) => void;
+  // State update for sender socket (no duplicate messages)
+  "message:state_update": (data: {
+    conversationId: string;
+    messageId?: string;
+    status: "complete" | "failed";
+  }) => void;
   // Notification for a newly created/sent message (other sockets should render it)
   "message:new": (data: { conversationId: string; message: Message }) => void;
 
@@ -188,6 +194,11 @@ export interface WebSocketEventHandlers {
       total_tokens_used: number;
       message_count: number;
     };
+  }) => void;
+  onMessageStateUpdate?: (data: {
+    conversationId: string;
+    messageId?: string;
+    status: "complete" | "failed";
   }) => void;
 
   // Typing handlers
@@ -357,6 +368,21 @@ class WebSocketService {
         this.handlers.onMessageComplete?.(data);
       });
 
+      this.socket.on("message:state_update", (data) => {
+        try {
+          this.handlers.onMessageStateUpdate?.(data);
+        } catch {
+          // logging removed
+        }
+        try {
+          window.dispatchEvent(
+            new CustomEvent("message:state_update", { detail: data })
+          );
+        } catch {
+          // logging removed
+        }
+      });
+
       // Typing events
       this.socket.on("ai:typing:start", (data) => {
         this.handlers.onAITypingStart?.(data);
@@ -376,7 +402,6 @@ class WebSocketService {
 
       // Conversation events (multi-tab sync)
       this.socket.on("conversation:created", (conversation) => {
-        console.log("🎉 Conversation created via WebSocket:", conversation);
         this.handlers.onConversationCreated?.(conversation);
         window.dispatchEvent(
           new CustomEvent("conversation:created", { detail: conversation })
@@ -384,7 +409,6 @@ class WebSocketService {
       });
 
       this.socket.on("conversation:updated", (data) => {
-        console.log("✏️ Conversation updated via WebSocket:", data);
         this.handlers.onConversationUpdated?.(data);
         window.dispatchEvent(
           new CustomEvent("conversation:updated", { detail: data })
@@ -392,7 +416,6 @@ class WebSocketService {
       });
 
       this.socket.on("conversation:deleted", (data) => {
-        console.log("🗑️ Conversation deleted via WebSocket:", data);
         this.handlers.onConversationDeleted?.(data);
         window.dispatchEvent(
           new CustomEvent("conversation:deleted", { detail: data })
@@ -401,7 +424,6 @@ class WebSocketService {
 
       // Conversation moved event (between projects or to/from standalone)
       this.socket.on("conversation:moved", (data) => {
-        console.log("🚚 Conversation moved via WebSocket:", data);
         window.dispatchEvent(
           new CustomEvent("conversation:moved", { detail: data })
         );

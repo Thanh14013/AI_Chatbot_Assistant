@@ -110,13 +110,11 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
   useEffect(() => {
     const handleProjectCreated = (e: Event) => {
       const project = (e as CustomEvent).detail as Project;
-      console.log("🎉 Project created event received:", project);
       setProjects((prev) => [...prev, project]);
     };
 
     const handleProjectUpdated = (e: Event) => {
       const project = (e as CustomEvent).detail as Project;
-      console.log("✏️ Project updated event received:", project);
       setProjects((prev) =>
         prev.map((p) => (p.id === project.id ? project : p))
       );
@@ -124,7 +122,6 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
 
     const handleProjectDeleted = (e: Event) => {
       const data = (e as CustomEvent).detail as { projectId: string };
-      console.log("🗑️ Project deleted event received:", data);
       setProjects((prev) => prev.filter((p) => p.id !== data.projectId));
       // Remove from expanded set
       setExpandedProjects((prev) => {
@@ -142,7 +139,6 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
 
     const handleConversationCreated = (e: Event) => {
       const conversation = (e as CustomEvent).detail as ConversationListItem;
-      console.log("💬 Conversation created event received:", conversation);
 
       // If conversation belongs to a project, update that project's conversations
       if (conversation.project_id) {
@@ -171,7 +167,6 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
         conversationId: string;
         conversation: ConversationListItem;
       };
-      console.log("✏️ Conversation updated event received:", data);
 
       // If conversation belongs to a project, reload fresh data from server
       if (data.conversation.project_id) {
@@ -182,10 +177,6 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
 
         // Reload projects to update conversation count, latest updates, etc.
         loadProjects();
-
-        console.log(
-          `🔄 Reloading conversations for project ${projectId} and refreshing all projects`
-        );
       }
     };
 
@@ -193,7 +184,6 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
       const data = (e as CustomEvent).detail as {
         conversationId: string;
       };
-      console.log("🗑️ Conversation deleted event received:", data);
 
       // Remove conversation from all project conversations
       setProjectConversations((prev) => {
@@ -208,10 +198,6 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
 
       // Reload projects to update conversation count
       loadProjects();
-
-      console.log(
-        `🔄 Removed conversation ${data.conversationId} and refreshing all projects`
-      );
     };
 
     const handleConversationMoved = (e: Event) => {
@@ -220,7 +206,6 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
         oldProjectId: string | null;
         newProjectId: string | null;
       };
-      console.log("🚚 Conversation moved event received:", data);
 
       // Remove from old project
       if (data.oldProjectId && typeof data.oldProjectId === "string") {
@@ -249,10 +234,6 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
 
       // Reload all projects to update conversation counts
       loadProjects();
-
-      console.log(
-        `🔄 Moved conversation ${data.conversationId} from ${data.oldProjectId} to ${data.newProjectId}`
-      );
     };
 
     // Listen to custom window events triggered by websocket service
@@ -264,13 +245,8 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
     window.addEventListener("conversation:deleted", handleConversationDeleted);
     window.addEventListener("conversation:moved", handleConversationMoved);
 
-    console.log(
-      "✅ ProjectSection: Registered project & conversation event listeners"
-    );
-
     // Cleanup
     return () => {
-      console.log("🧹 ProjectSection: Cleaning up event listeners");
       window.removeEventListener("project:created", handleProjectCreated);
       window.removeEventListener("project:updated", handleProjectUpdated);
       window.removeEventListener("project:deleted", handleProjectDeleted);
@@ -344,18 +320,15 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
     try {
       if (modalMode === "create") {
         const newProject = await createProject(data);
-        console.log("✅ Project created via API:", newProject);
         message.success("Project created successfully");
       } else if (editingProject) {
         const updatedProject = await updateProject(editingProject.id, data);
-        console.log("✅ Project updated via API:", updatedProject);
         message.success("Project updated successfully");
       }
       setModalVisible(false);
       // Note: loadProjects() is called here as fallback, but realtime should handle it
       await loadProjects();
     } catch (error: any) {
-      console.error("❌ Failed to save project:", error);
       throw error;
     }
   };

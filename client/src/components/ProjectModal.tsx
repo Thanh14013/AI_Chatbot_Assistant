@@ -160,7 +160,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
         <Form.Item label="Icon (Optional)">
           <div className={styles.iconPicker}>
             <div
-              className={`${styles.iconOption} ${
+              className={`${styles.iconOption} ${styles.noneOption} ${
                 selectedIcon === null ? styles.selected : ""
               }`}
               onClick={() => setSelectedIcon(null)}

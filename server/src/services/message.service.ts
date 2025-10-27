@@ -328,7 +328,13 @@ export const sendMessageAndStreamResponse = async (
     format?: string;
     extracted_text?: string;
     openai_file_id?: string; // OpenAI File API ID
-  }>
+  }>,
+  // optional metadata for resend/edit operations
+  metadata?: {
+    resendMessageId?: string;
+    editMessageId?: string;
+    originalContent?: string;
+  }
 ): Promise<any> => {
   if (!content || content.trim().length === 0) {
     throw new Error("Message content cannot be empty");
@@ -499,6 +505,81 @@ export const sendMessageAndStreamResponse = async (
     );
   }
 
+  // Handle resend/edit metadata - build context prompt
+  if (metadata && (metadata.resendMessageId || metadata.editMessageId)) {
+    try {
+      const targetMessageId = metadata.resendMessageId || metadata.editMessageId;
+
+      // Find the target message to get its timestamp
+      const targetMessage = await Message.findOne({
+        where: { id: targetMessageId, conversation_id: conversationId },
+      });
+
+      if (targetMessage) {
+        const targetTime = new Date(targetMessage.createdAt).getTime();
+
+        // Find all AI messages in this conversation
+        const aiMessages = await Message.findAll({
+          where: {
+            conversation_id: conversationId,
+            role: "assistant",
+          },
+          order: [["createdAt", "ASC"]],
+        });
+
+        // Find AI message before target message
+        const aiBefore = aiMessages
+          .filter((msg) => new Date(msg.createdAt).getTime() < targetTime)
+          .pop();
+
+        // Find AI message after target message
+        const aiAfter = aiMessages.find((msg) => new Date(msg.createdAt).getTime() > targetTime);
+
+        // Build context prompt
+        let contextPrompt = "";
+
+        if (metadata.resendMessageId) {
+          contextPrompt =
+            "[User is resending a previous message because they want a better or different response]\n\n";
+        } else if (metadata.editMessageId) {
+          contextPrompt = "[User edited their previous message and wants a new response]\n\n";
+        }
+
+        if (aiBefore) {
+          contextPrompt += `Previous AI response:\n${aiBefore.content}\n\n`;
+        }
+
+        if (metadata.editMessageId && metadata.originalContent) {
+          contextPrompt += `User's original message:\n${metadata.originalContent}\n\n`;
+          contextPrompt += `User's edited message:\n${content}\n\n`;
+        } else {
+          contextPrompt += `User's message (resent):\n${content}\n\n`;
+        }
+
+        if (aiAfter) {
+          contextPrompt += `Your previous response to this:\n${aiAfter.content}\n\n`;
+        }
+
+        if (metadata.resendMessageId) {
+          contextPrompt += `Please provide an improved or alternative response to the user's message.`;
+        } else {
+          contextPrompt += `Please provide a response to the user's edited message.`;
+        }
+
+        // Replace the last user message with the context prompt
+        if (contextMessages.length > 0) {
+          const lastMessage = contextMessages[contextMessages.length - 1];
+          if (lastMessage.role === "user") {
+            lastMessage.content = contextPrompt;
+          }
+        }
+      }
+    } catch (err: any) {
+      // If context building fails, continue with normal message
+      // logging removed: failed to build resend/edit context
+    }
+  }
+
   // Process attachments if present
   // Determine model to use - if attachments present, always use GPT-4o for multimodal support
   let modelToUse = conversation.model;
@@ -509,20 +590,6 @@ export const sendMessageAndStreamResponse = async (
 
     // Force GPT-4o when attachments present (images, PDFs, CSVs, etc.)
     modelToUse = "gpt-4o";
-
-    // Log attachments with file_id for debugging
-    console.log("📎 [Message Service] Processing attachments for message", {
-      conversationId,
-      userId,
-      messageContent: content.trim().substring(0, 100) + (content.length > 100 ? "..." : ""),
-      attachments: attachments.map((att) => ({
-        public_id: att.public_id,
-        resource_type: att.resource_type,
-        format: att.format,
-        has_openai_file_id: !!att.openai_file_id,
-        openai_file_id: att.openai_file_id,
-      })),
-    });
 
     // Build enhanced content for the last user message with attachments
     const enhancedContent = buildMessageContentWithAttachments(content.trim(), attachments);
@@ -549,32 +616,13 @@ export const sendMessageAndStreamResponse = async (
     payload.temperature = 0.7;
   }
 
-  // Log detailed structure of last message to verify attachments
-  const lastMsg = payload.messages[payload.messages.length - 1];
-
-  console.log("📤 [Message Service] Sending request to OpenAI API", {
-    model: payload.model,
-    messageCount: payload.messages.length,
-    lastMessageType: Array.isArray(lastMsg.content) ? "multimodal" : "text",
-    lastMessageContent: Array.isArray(lastMsg.content)
-      ? JSON.stringify(lastMsg.content, null, 2).substring(0, 500)
-      : lastMsg.content.substring(0, 200),
-  });
-
   // Call OpenAI streaming
   const openai = (await import("./openai.service.js")).default;
 
   let stream;
   try {
     stream = await openai.chat.completions.create(payload);
-    console.log("✅ [Message Service] OpenAI stream created successfully");
   } catch (error: any) {
-    console.error("❌ [Message Service] Failed to create OpenAI stream", {
-      error: error?.message,
-      status: error?.status,
-      code: error?.code,
-      type: error?.type,
-    });
     throw error;
   }
 
@@ -585,7 +633,6 @@ export const sendMessageAndStreamResponse = async (
     const groupSize = 2; // emit every N words (tuneable)
     let buffer = "";
 
-    console.log("🔄 [Message Service] Starting to process stream chunks...");
     let chunkCount = 0;
 
     for await (const chunk of stream) {
@@ -627,12 +674,6 @@ export const sendMessageAndStreamResponse = async (
       }
       buffer = "";
     }
-
-    console.log("✅ [Message Service] Stream completed", {
-      totalChunks: chunkCount,
-      contentLength: fullContent.length,
-      contentPreview: fullContent.substring(0, 200) + (fullContent.length > 200 ? "..." : ""),
-    });
 
     // streaming complete
 

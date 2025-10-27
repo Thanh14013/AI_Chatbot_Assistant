@@ -127,21 +127,20 @@ export const updateUserPreferences = async (userId, updates) => {
 export const buildSystemPromptWithPreferences = async (userId, basePrompt = "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.") => {
     try {
         const preferences = await getUserPreferences(userId);
-        let systemPrompt = basePrompt;
-        // Add language preference
-        if (preferences.language !== "en") {
-            const languageNames = {
-                vi: "Vietnamese",
-                es: "Spanish",
-                fr: "French",
-                de: "German",
-                ja: "Japanese",
-                ko: "Korean",
-                zh: "Chinese",
-            };
-            const languageName = languageNames[preferences.language] || preferences.language;
-            systemPrompt += `\n\nIMPORTANT: Respond in ${languageName} language.`;
-        }
+        // Start with language instruction FIRST (highest priority)
+        const languageNames = {
+            en: "English",
+            vi: "Vietnamese",
+            es: "Spanish",
+            fr: "French",
+            de: "German",
+            ja: "Japanese",
+            ko: "Korean",
+            zh: "Chinese",
+        };
+        const languageName = languageNames[preferences.language] || "English";
+        // CRITICAL: Language instruction at the very beginning with STRONG emphasis
+        let systemPrompt = `CRITICAL INSTRUCTION: You MUST respond ONLY in ${languageName} language. All your responses must be in ${languageName}, regardless of the language used in previous messages or context.\n\n${basePrompt}`;
         // Add response style preference
         const styleInstructions = {
             concise: "Keep your responses brief and to the point. Avoid unnecessary details.",
@@ -157,6 +156,8 @@ export const buildSystemPromptWithPreferences = async (userId, basePrompt = "You
         if (preferences.custom_instructions && preferences.custom_instructions.trim()) {
             systemPrompt += `\n\nAdditional Instructions: ${preferences.custom_instructions.trim()}`;
         }
+        // REINFORCE language instruction at the end
+        systemPrompt += `\n\n🌍 REMINDER: Your response language is ${languageName}. Do not switch to any other language.`;
         return systemPrompt;
     }
     catch (error) {

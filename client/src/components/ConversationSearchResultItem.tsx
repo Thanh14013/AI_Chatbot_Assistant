@@ -47,6 +47,14 @@ export const ConversationSearchResultItem: React.FC<
     onMessageClick(result.conversation_id, message.message_id);
   };
 
+  const handleConversationClick = () => {
+    // For tag search, navigate to conversation directly
+    if (searchType === "tags") {
+      // Navigate to the conversation
+      onMessageClick(result.conversation_id, "");
+    }
+  };
+
   const highlightKeyword = (text: string, keyword: string): React.ReactNode => {
     if (!keyword.trim()) return text;
 
@@ -75,7 +83,10 @@ export const ConversationSearchResultItem: React.FC<
   return (
     <div className={styles.searchResultItem} ref={dropdownRef}>
       {/* Main conversation item */}
-      <div className={styles.conversationItem}>
+      <div
+        className={styles.conversationItem}
+        onClick={searchType === "tags" ? handleConversationClick : undefined}
+      >
         {/* Chat icon */}
         <div className={styles.iconContainer}>
           <MessageOutlined className={styles.icon} />

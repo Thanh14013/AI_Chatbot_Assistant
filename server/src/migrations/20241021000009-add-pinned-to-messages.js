@@ -26,7 +26,6 @@ export default {
         comment: "Index for efficient pinned messages queries",
       });
     } catch (error) {
-      console.error("❌ [MIGRATION] Failed to add pinned column:", error);
       throw error;
     }
   },
@@ -42,7 +41,6 @@ export default {
       // Remove pinned column
       await queryInterface.removeColumn("messages", "pinned");
     } catch (error) {
-      console.error("❌ [MIGRATION] Rollback failed:", error);
       throw error;
     }
   },

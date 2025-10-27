@@ -121,6 +121,30 @@ export const useRealTimeChat = (
       [conversation?.id, onConversationUpdate]
     ),
 
+    // Message state update handler (for sender socket only - no duplicate messages)
+    onMessageStateUpdate: useCallback(
+      (data: {
+        conversationId: string;
+        messageId?: string;
+        status: "complete" | "failed";
+      }) => {
+        if (data.conversationId !== conversation?.id) return;
+
+        // Clear sending and typing states
+        setIsAITyping(false);
+        setIsSending(false);
+        if (data.messageId && pendingMessageIdRef.current === data.messageId) {
+          pendingMessageIdRef.current = null;
+        }
+        // Clear any pending safety timeout
+        if (pendingClearTimeoutRef.current) {
+          window.clearTimeout(pendingClearTimeoutRef.current as number);
+          pendingClearTimeoutRef.current = null;
+        }
+      },
+      [conversation?.id]
+    ),
+
     // AI typing handlers
     onAITypingStart: useCallback(
       (data: { conversationId: string; messageId?: string }) => {

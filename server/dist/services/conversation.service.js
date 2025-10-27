@@ -63,10 +63,12 @@ export const createConversation = async (data) => {
  * @param tagMode - Tag filtering mode: "any" (default) or "all"
  * @returns Array of conversations with pagination info
  */
-export const getUserConversations = async (userId, page = 1, limit = 20, search, tags, tagMode = "any") => {
+export const getUserConversations = async (userId, page = 1, limit = 20, search, tags, tagMode = "any", standalone // New parameter to filter by project_id
+) => {
     // Use cache for conversation lists (include tags in cache key)
     const tagsStr = tags?.join(",") || "";
-    const cacheKey = `${conversationListKey(userId, page, limit, search)}:tags:${tagsStr}:mode:${tagMode}`;
+    const standaloneStr = standalone !== undefined ? `:standalone:${standalone}` : "";
+    const cacheKey = `${conversationListKey(userId, page, limit, search)}:tags:${tagsStr}:mode:${tagMode}${standaloneStr}`;
     const fetchConversations = async () => {
         // Calculate offset
         const offset = (page - 1) * limit;
@@ -75,6 +77,18 @@ export const getUserConversations = async (userId, page = 1, limit = 20, search,
             user_id: userId,
             deleted_at: null,
         };
+        // Filter by project_id if standalone parameter is provided
+        if (standalone === true) {
+            // Only fetch conversations without project_id (standalone conversations)
+            whereClause.project_id = null;
+        }
+        else if (standalone === false) {
+            // Only fetch conversations with project_id
+            whereClause.project_id = {
+                [Op.ne]: null, // Not equal to null
+            };
+        }
+        // If standalone is undefined, fetch all conversations (existing behavior)
         // Add search filter if provided
         if (search && search.trim()) {
             whereClause.title = {

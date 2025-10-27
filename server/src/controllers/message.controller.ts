@@ -133,7 +133,7 @@ export const sendMessageStream = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    const { content, attachments } = req.body;
+    const { content, attachments, metadata } = req.body;
     if (!content || typeof content !== "string" || content.trim().length === 0) {
       res.status(400).json({ success: false, message: "Message content is required" });
       return;
@@ -176,7 +176,6 @@ export const sendMessageStream = async (req: Request, res: Response): Promise<vo
           }
         }
       } catch (err: any) {
-        console.error("❌ [Message Controller] Failed to fetch attachments from DB:", err.message);
         // Fallback to client attachments if DB fetch fails
         enrichedAttachments = attachments;
       }
@@ -193,7 +192,8 @@ export const sendMessageStream = async (req: Request, res: Response): Promise<vo
         res.write(`data: ${JSON.stringify({ type: "chunk", text: chunk })}\n\n`);
       },
       undefined, // onUserMessageCreated callback (not needed in REST API)
-      enrichedAttachments // Pass enriched attachments with openai_file_id
+      enrichedAttachments, // Pass enriched attachments with openai_file_id
+      metadata // Pass metadata for resend/edit handling
     )
       .then((result) => {
         // Send final event with complete result (userMessage, assistantMessage, conversation)

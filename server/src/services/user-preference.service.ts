@@ -158,22 +158,22 @@ export const buildSystemPromptWithPreferences = async (
   try {
     const preferences = await getUserPreferences(userId);
 
-    let systemPrompt = basePrompt;
+    // Start with language instruction FIRST (highest priority)
+    const languageNames: Record<string, string> = {
+      en: "English",
+      vi: "Vietnamese",
+      es: "Spanish",
+      fr: "French",
+      de: "German",
+      ja: "Japanese",
+      ko: "Korean",
+      zh: "Chinese",
+    };
 
-    // Add language preference
-    if (preferences.language !== "en") {
-      const languageNames: Record<string, string> = {
-        vi: "Vietnamese",
-        es: "Spanish",
-        fr: "French",
-        de: "German",
-        ja: "Japanese",
-        ko: "Korean",
-        zh: "Chinese",
-      };
-      const languageName = languageNames[preferences.language] || preferences.language;
-      systemPrompt += `\n\nIMPORTANT: Respond in ${languageName} language.`;
-    }
+    const languageName = languageNames[preferences.language] || "English";
+
+    // CRITICAL: Language instruction at the very beginning with STRONG emphasis
+    let systemPrompt = `CRITICAL INSTRUCTION: You MUST respond ONLY in ${languageName} language. All your responses must be in ${languageName}, regardless of the language used in previous messages or context.\n\n${basePrompt}`;
 
     // Add response style preference
     const styleInstructions: Record<string, string> = {
@@ -196,6 +196,9 @@ export const buildSystemPromptWithPreferences = async (
     if (preferences.custom_instructions && preferences.custom_instructions.trim()) {
       systemPrompt += `\n\nAdditional Instructions: ${preferences.custom_instructions.trim()}`;
     }
+
+    // REINFORCE language instruction at the end
+    systemPrompt += `\n\n🌍 REMINDER: Your response language is ${languageName}. Do not switch to any other language.`;
 
     return systemPrompt;
   } catch (error) {
