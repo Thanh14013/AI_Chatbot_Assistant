@@ -2,8 +2,8 @@
   "openapi": "3.0.0",
   "info": {
     "title": "AI Chatbot Assistant API",
-    "version": "2.0.0",
-    "description": "Comprehensive API documentation for AI Chatbot Assistant including authentication, conversations, real-time messaging (HTTP REST + WebSocket), semantic search, user preferences, and profile management.\n\n## Key Features\n- **Authentication**: JWT-based auth with refresh tokens\n- **Real-time Chat**: WebSocket/Socket.IO for instant messaging and streaming AI responses\n- **Semantic Search**: Vector embeddings for intelligent message search across conversations\n- **User Preferences**: Customizable AI behavior, themes, and settings\n- **Profile Management**: Avatar uploads, bio, password changes\n- **Redis Caching**: High-performance caching for preferences and frequent queries\n- **Multi-tab Sync**: Real-time synchronization across browser tabs\n- **Unread Tracking**: Smart notification system for new messages\n- **Follow-up Suggestions**: AI-generated contextual follow-up questions\n- **Infinite Scroll**: Pagination for conversations and messages\n- **Streaming Responses**: Server-Sent Events (SSE) for real-time AI responses\n\n## Base URLs\n- HTTP API: `http://localhost:3000/api`\n- WebSocket: `ws://localhost:3000`\n\n## Authentication\nMost endpoints require JWT authentication. Include the access token in the Authorization header:\n```\nAuthorization: Bearer <access-token>\n```\n\nFor WebSocket connections, provide the token via:\n- Auth header: `socket.handshake.headers.authorization = 'Bearer <token>'`\n- Query parameter: `ws://localhost:3000?token=<token>`\n- Handshake auth: `socket.auth({ token: '<token>' })`"
+    "version": "3.0.0",
+    "description": "Comprehensive API documentation for AI Chatbot Assistant - a full-featured chat application with intelligent AI responses, advanced file handling, project management, and real-time collaboration.\n\n## Key Features\n\n### 🔐 Authentication & Security\n- **JWT-based Authentication**: Secure access/refresh token system\n- **Password Management**: Change password with validation\n- **Session Management**: Multi-device support with token refresh\n\n### 💬 Real-time Messaging\n- **WebSocket/Socket.IO**: Instant bidirectional communication\n- **Streaming AI Responses**: Server-Sent Events (SSE) for real-time AI text generation\n- **Typing Indicators**: Real-time typing status for users and AI\n- **Message Pinning**: Pin up to 10 important messages per conversation\n- **Multi-tab Sync**: Seamless synchronization across browser tabs and devices\n\n### 🔍 Advanced Search\n- **Semantic Search**: Vector embeddings (pgvector) for intelligent similarity-based search\n- **Global Search**: Search across all conversations with best match highlighting\n- **Contextual Results**: Get surrounding messages for better context\n- **Conversation Search**: Search within specific conversations\n\n### 📁 File Management\n- **Multi-format Upload**: Support for images, videos, PDFs, and documents\n- **Cloudinary Integration**: Secure cloud storage with CDN delivery\n- **OpenAI File API**: Upload files to OpenAI for AI-assisted processing\n- **PDF Text Extraction**: Automatic text extraction from PDF documents\n- **Thumbnail Generation**: Auto-generate previews for media files\n- **Upload Statistics**: Track storage usage and file counts\n\n### 📂 Project Organization\n- **Project Management**: Organize conversations into projects\n- **Drag & Drop**: Reorder conversations within projects\n- **Custom Styling**: Color-coded projects with icons\n- **Batch Operations**: Move multiple conversations efficiently\n\n### 👤 User Preferences & Profile\n- **Customizable Settings**: AI model, context window, response style\n- **Theme Support**: Light, dark, or system-based themes\n- **Avatar Upload**: Profile pictures with image optimization\n- **Bio & Profile**: User information management\n- **Redis Caching**: High-performance preference caching\n\n### 📊 Smart Features\n- **Follow-up Suggestions**: AI-generated contextual follow-up questions\n- **Auto-generated Titles**: Smart conversation naming\n- **Unread Tracking**: Intelligent notification system\n- **Token Usage Tracking**: Monitor AI API usage per conversation\n- **Infinite Scroll**: Efficient pagination for large datasets\n\n### 🔄 Real-time Synchronization\n- **Cross-device Sync**: Updates propagate instantly to all devices\n- **Conversation Management**: Create, update, delete with realtime broadcast\n- **Message Status**: Delivery and read status tracking\n- **Activity Updates**: Live conversation activity monitoring\n\n## Base URLs\n- HTTP API: `http://localhost:3000/api`\n- WebSocket: `ws://localhost:3000`\n\n## Authentication\nMost endpoints require JWT authentication. Include the access token in the Authorization header:\n```\nAuthorization: Bearer <access-token>\n```\n\nFor WebSocket connections, provide the token via:\n- Auth header: `socket.handshake.headers.authorization = 'Bearer <token>'`\n- Query parameter: `ws://localhost:3000?token=<token>`\n- Handshake auth: `socket.auth({ token: '<token>' })`"
   },
   "servers": [
     {
@@ -905,6 +905,496 @@
           "401": { "description": "Unauthorized or incorrect current password" }
         }
       }
+    },
+    "/messages/{messageId}/pin": {
+      "patch": {
+        "summary": "Pin a message",
+        "description": "Pin an important message in a conversation (max 10 pinned messages per conversation)",
+        "tags": ["Messages"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message pinned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "message": { "type": "string" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string" },
+                        "pinned": { "type": "boolean" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Pin limit reached" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Message not found" }
+        }
+      }
+    },
+    "/messages/{messageId}/unpin": {
+      "patch": {
+        "summary": "Unpin a message",
+        "description": "Remove pin from a message",
+        "tags": ["Messages"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Message unpinned successfully" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Message not found" }
+        }
+      }
+    },
+    "/conversations/{id}/messages/pinned": {
+      "get": {
+        "summary": "Get pinned messages",
+        "description": "Get all pinned messages in a conversation",
+        "tags": ["Messages"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pinned messages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "messages": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Message" }
+                    },
+                    "count": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Conversation not found" }
+        }
+      }
+    },
+    "/projects": {
+      "get": {
+        "summary": "Get all projects",
+        "description": "Get all projects for authenticated user",
+        "tags": ["Projects"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Projects retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Project" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create project",
+        "description": "Create a new project",
+        "tags": ["Projects"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "description": { "type": "string" },
+                  "color": { "type": "string" },
+                  "icon": { "type": "string" }
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Project created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "$ref": "#/components/schemas/Project" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/{id}": {
+      "put": {
+        "summary": "Update project",
+        "description": "Update project details",
+        "tags": ["Projects"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "description": { "type": "string" },
+                  "color": { "type": "string" },
+                  "icon": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Project updated" }
+        }
+      },
+      "delete": {
+        "summary": "Delete project",
+        "description": "Delete a project",
+        "tags": ["Projects"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Project deleted" }
+        }
+      }
+    },
+    "/projects/{id}/conversations": {
+      "get": {
+        "summary": "Get project conversations",
+        "description": "Get all conversations in a project",
+        "tags": ["Projects"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Conversation" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conversations/{id}/move": {
+      "put": {
+        "summary": "Move conversation",
+        "description": "Move conversation to project",
+        "tags": ["Projects"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "projectId": { "type": "string", "format": "uuid", "nullable": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Moved" }
+        }
+      }
+    },
+    "/files/upload-signature": {
+      "post": {
+        "summary": "Generate upload signature",
+        "description": "Generate Cloudinary upload signature",
+        "tags": ["Files"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "folder": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signature generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "signature": { "type": "string" },
+                        "timestamp": { "type": "integer" },
+                        "api_key": { "type": "string" },
+                        "cloud_name": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files/metadata": {
+      "post": {
+        "summary": "Save file metadata",
+        "description": "Save uploaded file metadata with PDF extraction and OpenAI upload",
+        "tags": ["Files"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "public_id": { "type": "string" },
+                  "secure_url": { "type": "string" },
+                  "resource_type": { "type": "string" },
+                  "format": { "type": "string" },
+                  "original_filename": { "type": "string" },
+                  "size_bytes": { "type": "integer" },
+                  "conversation_id": { "type": "string", "format": "uuid" }
+                },
+                "required": ["public_id", "secure_url", "resource_type"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Metadata saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "$ref": "#/components/schemas/FileUpload" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files/{id}": {
+      "get": {
+        "summary": "Get file",
+        "description": "Get file metadata",
+        "tags": ["Files"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "$ref": "#/components/schemas/FileUpload" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete file",
+        "description": "Delete file from Cloudinary, OpenAI and database",
+        "tags": ["Files"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Deleted" }
+        }
+      }
+    },
+    "/files/conversation/{conversationId}": {
+      "get": {
+        "summary": "Get conversation files",
+        "description": "Get all files in a conversation",
+        "tags": ["Files"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Files",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/FileUpload" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files/stats": {
+      "get": {
+        "summary": "Get upload stats",
+        "description": "Get user upload statistics",
+        "tags": ["Files"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "total_files": { "type": "integer" },
+                        "total_size_bytes": { "type": "integer" },
+                        "total_size_mb": { "type": "number" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1030,6 +1520,48 @@
           "avatar_url": { "type": "string", "example": "/uploads/avatars/user-123.jpg" },
           "createdAt": { "type": "string", "format": "date-time" },
           "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Project": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "user_id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string", "example": "Work Projects" },
+          "description": { "type": "string", "example": "Work-related conversations" },
+          "color": { "type": "string", "example": "#1890ff" },
+          "icon": { "type": "string", "example": "💼" },
+          "order": { "type": "integer", "example": 1 },
+          "conversation_count": { "type": "integer", "example": 5 },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "FileUpload": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "public_id": { "type": "string", "example": "chat-uploads/file123" },
+          "secure_url": { "type": "string", "example": "https://res.cloudinary.com/..." },
+          "resource_type": { "type": "string", "enum": ["image", "video", "raw"] },
+          "format": { "type": "string", "example": "pdf" },
+          "original_filename": { "type": "string", "example": "document.pdf" },
+          "size_bytes": { "type": "integer", "example": 1024000 },
+          "width": { "type": "integer", "example": 1920 },
+          "height": { "type": "integer", "example": 1080 },
+          "duration": { "type": "number", "example": 30.5 },
+          "pages": { "type": "integer", "example": 5 },
+          "uploaded_by": { "type": "string", "format": "uuid" },
+          "conversation_id": { "type": "string", "format": "uuid" },
+          "extracted_text": {
+            "type": "string",
+            "description": "Extracted text from PDF/documents"
+          },
+          "thumbnail_url": { "type": "string" },
+          "status": { "type": "string", "enum": ["uploaded", "processing", "processed", "failed"] },
+          "openai_file_id": { "type": "string", "description": "OpenAI File API ID" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
         }
       }
     }
