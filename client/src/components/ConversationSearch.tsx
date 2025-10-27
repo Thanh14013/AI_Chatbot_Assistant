@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
+import { SearchOutlined } from "@ant-design/icons";
 import {
   searchConversation,
   SearchMatchWithContext,
@@ -19,6 +20,7 @@ export const ConversationSearch: React.FC<ConversationSearchProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isInputVisible, setIsInputVisible] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
   // Close results when clicking outside
@@ -74,6 +76,20 @@ export const ConversationSearch: React.FC<ConversationSearchProps> = ({
     setIsExpanded(false);
   };
 
+  const handleSearchButtonClick = () => {
+    setIsInputVisible(true);
+  };
+
+  const handleInputBlur = () => {
+    // Hide input if no query and not searching
+    if (!query.trim() && !isSearching) {
+      setIsInputVisible(false);
+      setIsExpanded(false);
+      setResults([]);
+      setError(null);
+    }
+  };
+
   const handleClear = () => {
     setQuery("");
     setResults([]);
@@ -84,31 +100,42 @@ export const ConversationSearch: React.FC<ConversationSearchProps> = ({
   return (
     <div className={styles.conversationSearch} ref={searchRef}>
       <div className={styles.inputContainer}>
-        <input
-          type="text"
-          placeholder="Search in conversation..."
-          value={query}
-          onChange={(e) => {
-            const v = e.target.value;
-            // hide old results immediately while typing
-            setQuery(v);
-            setIsExpanded(false);
-            setResults([]);
-            setError(null);
-          }}
-          onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-          onFocus={() =>
-            query.trim() && results.length > 0 && setIsExpanded(true)
-          }
-          className={styles.input}
-        />
-        {query && (
+        {isInputVisible ? (
+          <>
+            <input
+              type="text"
+              placeholder="Search in conversation..."
+              value={query}
+              onChange={(e) => {
+                const v = e.target.value;
+                // hide old results immediately while typing
+                setQuery(v);
+                setIsExpanded(false);
+                setResults([]);
+                setError(null);
+              }}
+              onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+              onBlur={handleInputBlur}
+              className={styles.input}
+              autoFocus
+            />
+            {query && (
+              <button
+                onClick={handleClear}
+                className={styles.clearButton}
+                title="Clear"
+              >
+                ✕
+              </button>
+            )}
+          </>
+        ) : (
           <button
-            onClick={handleClear}
-            className={styles.clearButton}
-            title="Clear"
+            onClick={handleSearchButtonClick}
+            className={styles.searchButton}
+            title="Search in conversation"
           >
-            ✕
+            <SearchOutlined />
           </button>
         )}
       </div>

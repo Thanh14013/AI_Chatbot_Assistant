@@ -4,7 +4,7 @@
  * Allows user to ask AI to explain the selected text
  */
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { Button, Tooltip } from "antd";
 import { QuestionCircleOutlined } from "@ant-design/icons";
 import styles from "./SelectionAskButton.module.css";
@@ -18,6 +18,8 @@ interface SelectionAskButtonProps {
   isAIMessage: boolean;
   /** Message ID to track changes and re-attach listeners */
   messageId?: string;
+  /** Content hash to detect content changes (for streaming messages) */
+  contentKey?: string | number;
 }
 
 /**
@@ -29,6 +31,7 @@ const SelectionAskButton: React.FC<SelectionAskButtonProps> = ({
   onAskAboutSelection,
   isAIMessage,
   messageId,
+  contentKey,
 }) => {
   const [selectedText, setSelectedText] = useState<string>("");
   const [buttonPosition, setButtonPosition] = useState<{
@@ -36,9 +39,59 @@ const SelectionAskButton: React.FC<SelectionAskButtonProps> = ({
     left: number;
   } | null>(null);
   const buttonRef = useRef<HTMLDivElement>(null);
+  const [isReady, setIsReady] = useState(false);
+
+  // Use useLayoutEffect to check if containerRef is ready after DOM updates
+  // This ensures we don't miss the ref being set
+  // Effect re-runs when messageId OR contentKey changes (new message or content update)
+  useLayoutEffect(() => {
+    console.log("[SelectionAskButton] useLayoutEffect triggered", {
+      messageId,
+      contentKey,
+      isAIMessage,
+      hasContainer: !!containerRef.current,
+    });
+
+    // Use a small timeout to ensure DOM is fully rendered
+    const timer = setTimeout(() => {
+      if (containerRef.current && isAIMessage) {
+        console.log(
+          "[SelectionAskButton] Setting isReady=true for message",
+          messageId
+        );
+        setIsReady(true);
+      } else {
+        console.log(
+          "[SelectionAskButton] Setting isReady=false for message",
+          messageId
+        );
+        setIsReady(false);
+      }
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [isAIMessage, messageId, contentKey]); // Added contentKey to detect content changes
 
   useEffect(() => {
-    if (!isAIMessage || !containerRef.current) return;
+    console.log("[SelectionAskButton] Main effect triggered", {
+      messageId,
+      isAIMessage,
+      isReady,
+      hasContainer: !!containerRef.current,
+    });
+
+    if (!isAIMessage || !isReady || !containerRef.current) {
+      console.log(
+        "[SelectionAskButton] Early return - not attaching listeners"
+      );
+      return;
+    }
+
+    const container = containerRef.current;
+    console.log(
+      "[SelectionAskButton] Attaching event listeners for message",
+      messageId
+    );
 
     const handleSelection = (event: MouseEvent) => {
       const selection = window.getSelection();
@@ -51,7 +104,7 @@ const SelectionAskButton: React.FC<SelectionAskButtonProps> = ({
         // Check if selection is within our container
         if (
           range &&
-          containerRef.current?.contains(range?.commonAncestorContainer as Node)
+          container?.contains(range?.commonAncestorContainer as Node)
         ) {
           // Position button at mouse cursor position (where user released)
           setButtonPosition({
@@ -83,15 +136,16 @@ const SelectionAskButton: React.FC<SelectionAskButtonProps> = ({
       }
     };
 
-    // Only listen for mouseup - show button when user releases mouse after selection
-    document.addEventListener("mouseup", handleSelection);
+    // Listen for mouseup on the message container (not document)
+    // This prevents conflicts between multiple SelectionAskButton instances
+    container.addEventListener("mouseup", handleSelection);
     document.addEventListener("mousedown", handleClickOutside);
 
     return () => {
-      document.removeEventListener("mouseup", handleSelection);
+      container.removeEventListener("mouseup", handleSelection);
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isAIMessage, containerRef, messageId]);
+  }, [isAIMessage, isReady, messageId, contentKey]); // Added contentKey
 
   const handleAskClick = () => {
     if (selectedText) {

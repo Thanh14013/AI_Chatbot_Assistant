@@ -1,25 +1,25 @@
 /* PinnedMessagesDropdown Component Styles - Modern Design */
 
 .pinnedMessagesButton {
-  color: #f59e0b;
+  color: #6b7280;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   background: linear-gradient(
     135deg,
-    rgba(251, 191, 36, 0.1),
-    rgba(245, 158, 11, 0.1)
+    rgba(107, 114, 128, 0.1),
+    rgba(75, 85, 99, 0.1)
   );
   border-radius: 8px;
 }
 
 .pinnedMessagesButton:hover {
-  color: #fbbf24;
+  color: #374151;
   background: linear-gradient(
     135deg,
-    rgba(251, 191, 36, 0.2),
-    rgba(245, 158, 11, 0.15)
+    rgba(107, 114, 128, 0.2),
+    rgba(75, 85, 99, 0.15)
   );
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
+  box-shadow: 0 2px 8px rgba(107, 114, 128, 0.2);
 }
 
 .pinnedMessagesDropdown {

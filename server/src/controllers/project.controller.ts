@@ -306,12 +306,36 @@ export const moveConversation = async (req: Request, res: Response): Promise<voi
 
     // Broadcast conversation:moved event via WebSocket for multi-tab sync
     if (global.socketIO) {
-      global.socketIO.emit("conversation:moved", {
-        conversationId: id,
-        oldProjectId,
-        newProjectId: projectId,
-        userId,
-      });
+      const senderSocketId = req.headers["x-socket-id"] as string | undefined;
+
+      // Broadcast to all sockets except sender (to avoid duplication)
+      if (senderSocketId) {
+        const senderSocket = global.socketIO.sockets.sockets.get(senderSocketId);
+        if (senderSocket) {
+          senderSocket.broadcast.emit("conversation:moved", {
+            conversationId: id,
+            oldProjectId,
+            newProjectId: projectId,
+            userId,
+          });
+        } else {
+          // Socket not found, broadcast to all
+          global.socketIO.emit("conversation:moved", {
+            conversationId: id,
+            oldProjectId,
+            newProjectId: projectId,
+            userId,
+          });
+        }
+      } else {
+        // No socket ID provided, broadcast to all
+        global.socketIO.emit("conversation:moved", {
+          conversationId: id,
+          oldProjectId,
+          newProjectId: projectId,
+          userId,
+        });
+      }
     }
 
     res.status(200).json({

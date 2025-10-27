@@ -690,15 +690,20 @@ export const initializeSocketIO = (
 
       // conversation update received
 
-      // Broadcast update to ALL sockets of the same user (including sender) via user room for complete sync
-      broadcastToUser(socket.userId!, "conversation:updated", {
-        conversationId,
-        update,
-      });
+      // Broadcast update to other sockets of the same user (excluding sender) via user room for multi-tab sync
+      broadcastToUser(
+        socket.userId!,
+        "conversation:updated",
+        {
+          conversationId,
+          update,
+        },
+        socket.id
+      );
 
-      // ALSO broadcast update to all participants in the conversation room
+      // ALSO broadcast update to all other participants in the conversation room (excluding sender)
       try {
-        io.to(`conversation:${conversationId}`).emit("conversation:updated", {
+        socket.broadcast.to(`conversation:${conversationId}`).emit("conversation:updated", {
           conversationId,
           update,
         });
@@ -716,13 +721,15 @@ export const initializeSocketIO = (
 
       // conversation creation received
 
-      // Broadcast creation to ALL sockets of the same user (including sender) via user room for complete sync
-      broadcastToUser(socket.userId!, "conversation:created", conversation);
+      // Broadcast creation to other sockets of the same user (excluding sender) via user room for multi-tab sync
+      broadcastToUser(socket.userId!, "conversation:created", conversation, socket.id);
 
-      // ALSO broadcast creation to the conversation room (if any sockets already joined)
+      // ALSO broadcast creation to the conversation room (if any other sockets already joined, excluding sender)
       try {
         if (conversation?.id) {
-          io.to(`conversation:${conversation.id}`).emit("conversation:created", conversation);
+          socket.broadcast
+            .to(`conversation:${conversation.id}`)
+            .emit("conversation:created", conversation);
         }
       } catch {}
     });
@@ -736,12 +743,14 @@ export const initializeSocketIO = (
 
       // conversation deletion requested
 
-      // Broadcast deletion to ALL sockets of the same user (including sender) via user room for complete sync
-      broadcastToUser(socket.userId!, "conversation:deleted", { conversationId });
+      // Broadcast deletion to other sockets of the same user (excluding sender) via user room for multi-tab sync
+      broadcastToUser(socket.userId!, "conversation:deleted", { conversationId }, socket.id);
 
-      // ALSO broadcast deletion to the conversation room (all participants)
+      // ALSO broadcast deletion to the conversation room (all other participants, excluding sender)
       try {
-        io.to(`conversation:${conversationId}`).emit("conversation:deleted", { conversationId });
+        socket.broadcast
+          .to(`conversation:${conversationId}`)
+          .emit("conversation:deleted", { conversationId });
       } catch {}
 
       // Remove all sockets from the conversation room

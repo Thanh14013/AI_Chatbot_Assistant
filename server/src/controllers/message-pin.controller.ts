@@ -120,21 +120,60 @@ export const pinMessage = async (req: Request, res: Response): Promise<void> => 
         console.warn(`⚠️ [PIN_MESSAGE] Socket.io instance not available`);
       } else {
         const roomName = `conversation:${message.conversation_id}`;
+        const senderSocketId = req.headers["x-socket-id"] as string | undefined;
 
-        io.to(roomName).emit("message:pinned", {
-          conversationId: message.conversation_id,
-          messageId: updatedMessage.id,
-          message: {
-            id: updatedMessage.id,
-            conversation_id: updatedMessage.conversation_id,
-            role: updatedMessage.role,
-            content: updatedMessage.content,
-            tokens_used: updatedMessage.tokens_used,
-            model: updatedMessage.model,
-            pinned: updatedMessage.pinned,
-            createdAt: updatedMessage.createdAt,
-          },
-        });
+        // Broadcast to all sockets in room except sender (to avoid duplication)
+        if (senderSocketId) {
+          const senderSocket = io.sockets.sockets.get(senderSocketId);
+          if (senderSocket) {
+            senderSocket.broadcast.to(roomName).emit("message:pinned", {
+              conversationId: message.conversation_id,
+              messageId: updatedMessage.id,
+              message: {
+                id: updatedMessage.id,
+                conversation_id: updatedMessage.conversation_id,
+                role: updatedMessage.role,
+                content: updatedMessage.content,
+                tokens_used: updatedMessage.tokens_used,
+                model: updatedMessage.model,
+                pinned: updatedMessage.pinned,
+                createdAt: updatedMessage.createdAt,
+              },
+            });
+          } else {
+            // Socket not found, broadcast to all
+            io.to(roomName).emit("message:pinned", {
+              conversationId: message.conversation_id,
+              messageId: updatedMessage.id,
+              message: {
+                id: updatedMessage.id,
+                conversation_id: updatedMessage.conversation_id,
+                role: updatedMessage.role,
+                content: updatedMessage.content,
+                tokens_used: updatedMessage.tokens_used,
+                model: updatedMessage.model,
+                pinned: updatedMessage.pinned,
+                createdAt: updatedMessage.createdAt,
+              },
+            });
+          }
+        } else {
+          // No socket ID provided, broadcast to all
+          io.to(roomName).emit("message:pinned", {
+            conversationId: message.conversation_id,
+            messageId: updatedMessage.id,
+            message: {
+              id: updatedMessage.id,
+              conversation_id: updatedMessage.conversation_id,
+              role: updatedMessage.role,
+              content: updatedMessage.content,
+              tokens_used: updatedMessage.tokens_used,
+              model: updatedMessage.model,
+              pinned: updatedMessage.pinned,
+              createdAt: updatedMessage.createdAt,
+            },
+          });
+        }
       }
     } catch (socketError) {
       // Don't fail the request if socket emit fails
@@ -250,11 +289,30 @@ export const unpinMessage = async (req: Request, res: Response): Promise<void> =
         console.warn(`⚠️ [UNPIN_MESSAGE] Socket.io instance not available`);
       } else {
         const roomName = `conversation:${message.conversation_id}`;
+        const senderSocketId = req.headers["x-socket-id"] as string | undefined;
 
-        io.to(roomName).emit("message:unpinned", {
-          conversationId: message.conversation_id,
-          messageId: updatedMessage.id,
-        });
+        // Broadcast to all sockets in room except sender (to avoid duplication)
+        if (senderSocketId) {
+          const senderSocket = io.sockets.sockets.get(senderSocketId);
+          if (senderSocket) {
+            senderSocket.broadcast.to(roomName).emit("message:unpinned", {
+              conversationId: message.conversation_id,
+              messageId: updatedMessage.id,
+            });
+          } else {
+            // Socket not found, broadcast to all
+            io.to(roomName).emit("message:unpinned", {
+              conversationId: message.conversation_id,
+              messageId: updatedMessage.id,
+            });
+          }
+        } else {
+          // No socket ID provided, broadcast to all
+          io.to(roomName).emit("message:unpinned", {
+            conversationId: message.conversation_id,
+            messageId: updatedMessage.id,
+          });
+        }
       }
     } catch (socketError) {
       // Don't fail the request if socket emit fails

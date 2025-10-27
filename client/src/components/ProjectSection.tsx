@@ -369,16 +369,12 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
       // Reload project conversations
       await loadProjectConversations(selectedProjectId);
 
+      // Reload projects to update conversation count (don't dispatch conversation:created
+      // because loadProjectConversations already added it to the list, dispatching would cause duplication)
+      await loadProjects();
+
       // Refresh main conversation list
       window.dispatchEvent(new Event("conversations:refresh"));
-
-      // Dispatch conversation:created event for THIS tab (sender is excluded from backend broadcast)
-      // This ensures ProjectSection reloads projects to show updated conversation count
-      window.dispatchEvent(
-        new CustomEvent("conversation:created", {
-          detail: newConversation,
-        })
-      );
 
       // Note: Backend broadcasts conversation:created to OTHER tabs (excludes sender socket)
     } catch (error: any) {

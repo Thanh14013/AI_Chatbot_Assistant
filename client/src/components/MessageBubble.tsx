@@ -695,6 +695,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           onAskAboutSelection={onAskAboutSelection}
           isAIMessage={!isUser}
           messageId={message.id}
+          contentKey={message.content?.length || 0}
         />
       )}
     </div>
