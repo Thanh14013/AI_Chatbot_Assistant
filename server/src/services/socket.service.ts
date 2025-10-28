@@ -26,6 +26,21 @@ const socketUsers = new Map<string, string>(); // socketId -> userId
 const socketViewingConversation = new Map<string, string | null>(); // socketId -> conversationId | null
 const socketUnreadConversations = new Map<string, Set<string>>(); // socketId -> Set<conversationId>
 
+// Message debouncer with auto-cleanup
+const messageCompleteDebouncer = new Map<string, number>();
+
+// Auto-cleanup timer for debouncer (prevent memory leak)
+setInterval(() => {
+  const now = Date.now();
+  const threshold = 5 * 60 * 1000; // 5 minutes
+
+  for (const [key, timestamp] of messageCompleteDebouncer.entries()) {
+    if (now - timestamp > threshold) {
+      messageCompleteDebouncer.delete(key);
+    }
+  }
+}, 60000); // Cleanup every minute
+
 /**
  * Socket.io Authentication Middleware
  * Verifies JWT token and attaches user info to socket
@@ -111,6 +126,15 @@ const handleUserDisconnection = (socket: AuthenticatedSocket) => {
     // Cleanup unread tracking
     socketViewingConversation.delete(socket.id);
     socketUnreadConversations.delete(socket.id);
+
+    // Force leave all rooms to prevent memory leaks
+    const rooms = Array.from(socket.rooms);
+    rooms.forEach((room) => {
+      if (room !== socket.id) {
+        // Don't leave default room
+        socket.leave(room);
+      }
+    });
 
     // user disconnection handled
   }

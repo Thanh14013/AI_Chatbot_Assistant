@@ -1,4 +1,4 @@
-import { DataTypes, Model, Optional } from "sequelize";
+import { DataTypes, Model, Optional, Op } from "sequelize";
 import sequelize from "../db/database.config.js";
 import type { IConversation } from "../types/conversation.type.js";
 
@@ -211,6 +211,26 @@ Conversation.init(
     modelName: "Conversation",
     timestamps: true, // Enable createdAt and updatedAt
     paranoid: false, // We handle soft deletes manually with deleted_at
+    defaultScope: {
+      // Default scope automatically filters out deleted records
+      where: {
+        deleted_at: null,
+      },
+    },
+    scopes: {
+      // Scope to include deleted records
+      withDeleted: {
+        where: {},
+      },
+      // Scope to get only deleted records
+      onlyDeleted: {
+        where: {
+          deleted_at: {
+            [Op.ne]: null,
+          },
+        },
+      },
+    },
     indexes: [
       // Indexes for performance optimization
       { fields: ["user_id"] }, // Index for finding user's conversations

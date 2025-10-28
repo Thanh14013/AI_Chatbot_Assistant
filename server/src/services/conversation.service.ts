@@ -12,6 +12,7 @@ import {
   conversationListPattern,
   conversationMetaKey,
   popularTagsKey,
+  projectListPattern,
 } from "../utils/cache-key.util.js";
 import { sanitizeTags } from "../utils/tag.util.js";
 import sequelize from "../db/database.config.js";
@@ -30,21 +31,50 @@ export const createConversation = async (
     throw new Error("User ID and title are required");
   }
 
-  // Sanitize tags
-  const tags = sanitizeTags(data.tags || []);
+  // Use transaction to prevent race conditions
+  const conversation = await sequelize.transaction(async (t) => {
+    // Check for duplicate title in active conversations (prevent spam clicking)
+    const existing = await Conversation.findOne({
+      where: {
+        user_id: data.user_id,
+        title: data.title,
+        deleted_at: null,
+      },
+      transaction: t,
+      lock: true, // Use row-level locking
+    });
 
-  // Create conversation with default values
-  const conversation = await Conversation.create({
-    user_id: data.user_id,
-    title: data.title,
-    model: data.model || "gpt-5-nano",
-    context_window: data.context_window || 10,
-    total_tokens_used: 0,
-    message_count: 0,
-    tags,
-    project_id: data.project_id || null, // Assign to project if provided
-    order_in_project: 0, // Default order
-    deleted_at: null,
+    if (existing) {
+      // If conversation with same title exists and was created within last 5 seconds,
+      // it's likely a duplicate request (spam click)
+      const timeDiff = Date.now() - new Date(existing.createdAt).getTime();
+      if (timeDiff < 5000) {
+        // Return existing conversation instead of creating duplicate
+        return existing;
+      }
+    }
+
+    // Sanitize tags
+    const tags = sanitizeTags(data.tags || []);
+
+    // Create conversation with default values
+    const newConversation = await Conversation.create(
+      {
+        user_id: data.user_id,
+        title: data.title,
+        model: data.model || "gpt-5-nano",
+        context_window: data.context_window || 10,
+        total_tokens_used: 0,
+        message_count: 0,
+        tags,
+        project_id: data.project_id || null, // Assign to project if provided
+        order_in_project: 0, // Default order
+        deleted_at: null,
+      },
+      { transaction: t }
+    );
+
+    return newConversation;
   });
 
   // Invalidate conversation list cache for this user
@@ -277,6 +307,10 @@ export const updateConversation = async (
     throw new Error("Unauthorized access to conversation");
   }
 
+  // Track if project_id changed (for cache invalidation)
+  const projectIdChanged =
+    data.project_id !== undefined && data.project_id !== conversation.project_id;
+
   // Update fields if provided
   if (data.title !== undefined) {
     conversation.title = data.title;
@@ -299,6 +333,11 @@ export const updateConversation = async (
   await invalidateCachePattern(conversationListPattern(userId));
   await deleteCache(conversationMetaKey(conversationId));
   await deleteCache(popularTagsKey(userId));
+
+  // If project_id changed, invalidate project list cache (conversation counts changed)
+  if (projectIdChanged) {
+    await invalidateCachePattern(projectListPattern(userId));
+  }
 
   // Return updated conversation
   return {
@@ -348,6 +387,9 @@ export const deleteConversation = async (
     throw new Error("Unauthorized access to conversation");
   }
 
+  // Track if conversation belongs to a project (for cache invalidation)
+  const belongsToProject = conversation.project_id !== null;
+
   // Soft delete (set deleted_at timestamp) immediately so the conversation
   // disappears from user lists. Message deletion will be performed
   // asynchronously (fire-and-forget) to avoid blocking the request when
@@ -358,6 +400,11 @@ export const deleteConversation = async (
   // Invalidate all caches related to this conversation
   await invalidateCachePattern(conversationListPattern(userId));
   await deleteCache(conversationMetaKey(conversationId));
+
+  // If conversation was in a project, invalidate project list cache (conversation count changed)
+  if (belongsToProject) {
+    await invalidateCachePattern(projectListPattern(userId));
+  }
 
   // Fire-and-forget: delete messages in background and log any failures.
   // We intentionally do NOT await this Promise so the HTTP response can

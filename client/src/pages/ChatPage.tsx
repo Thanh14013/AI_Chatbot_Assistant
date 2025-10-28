@@ -272,10 +272,63 @@ const ChatPage: React.FC = () => {
   // Track newly created conversations to avoid race condition with message loading
   const justCreatedConversationIdRef = useRef<string | null>(null);
 
+  // Track if we're currently creating and sending for a new conversation
+  // This prevents useEffect from interfering during the critical send phase
+  const isCreatingAndSendingRef = useRef<boolean>(false);
+
+  // Debounce map for message:complete events to prevent duplicate processing
+  const messageCompleteDebouncer = useRef(new Map<string, number>());
+
+  // Message queue system to handle concurrent sends
+  interface QueuedMessage {
+    content: string;
+    attachments?: FileAttachment[];
+    metadata?: {
+      resendMessageId?: string;
+      editMessageId?: string;
+      originalContent?: string;
+    };
+    timestamp: number;
+  }
+
+  const messageQueueRef = useRef<QueuedMessage[]>([]);
+  const isProcessingQueueRef = useRef<boolean>(false);
+
   // Fetch user preferences on mount (auto-creates if doesn't exist)
   useEffect(() => {
     fetchPreferences().catch((err) => {});
   }, [fetchPreferences]);
+
+  // Cleanup effect to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      // Clear message refs map to prevent memory leak
+      messageRefs.current.clear();
+
+      // Clear debouncer
+      messageCompleteDebouncer.current.clear();
+
+      // Clear message queue
+      messageQueueRef.current = [];
+
+      // Reset processing flags
+      isCreatingAndSendingRef.current = false;
+      isProcessingQueueRef.current = false;
+    };
+  }, []);
+
+  // Limit messageRefs size to prevent unbounded growth
+  useEffect(() => {
+    if (messageRefs.current.size > 200) {
+      // Keep only last 200 message refs
+      const entries = Array.from(messageRefs.current.entries());
+      const lastEntries = entries.slice(-200);
+      messageRefs.current.clear();
+      lastEntries.forEach(([key, value]) => {
+        messageRefs.current.set(key, value);
+      });
+    }
+  }, [messages.length]);
 
   // Network connectivity monitoring
   useEffect(() => {
@@ -336,6 +389,12 @@ const ChatPage: React.FC = () => {
     }
 
     const loadConversation = async (convId: string) => {
+      // IMPORTANT: Don't load if we're in the middle of creating and sending
+      // This prevents race condition where useEffect clears optimistic messages
+      if (isCreatingAndSendingRef.current) {
+        return;
+      }
+
       setIsLoadingMessages(true);
       try {
         const svc = await import("../services/chat.service");
@@ -433,9 +492,6 @@ const ChatPage: React.FC = () => {
       // so subsequent chunks continue to update the same typing placeholder.
       setMessages((prev) => {
         const lastMessage = prev[prev.length - 1];
-        try {
-          // debug logging removed
-        } catch {}
 
         if (
           lastMessage &&
@@ -445,9 +501,6 @@ const ChatPage: React.FC = () => {
           const next = prev.map((msg, index) =>
             index === prev.length - 1 ? { ...msg, content } : msg
           );
-          try {
-            // debug logging removed
-          } catch {}
           // Update the typing message with new content, preserve isTyping
           return next;
         }
@@ -466,60 +519,90 @@ const ChatPage: React.FC = () => {
         return;
       }
 
+      // DEBOUNCE: Prevent duplicate processing if same assistant message comes quickly
+      const key = assistantMessage?.id;
+      if (key) {
+        const lastProcessed = messageCompleteDebouncer.current.get(key);
+        const now = Date.now();
+        if (lastProcessed && now - lastProcessed < 500) {
+          console.warn(
+            "[DEBOUNCE] Skipping duplicate message:complete for",
+            key
+          );
+          return;
+        }
+        messageCompleteDebouncer.current.set(key, now);
+
+        // Cleanup old entries (keep only last 50)
+        if (messageCompleteDebouncer.current.size > 50) {
+          const entries = Array.from(
+            messageCompleteDebouncer.current.entries()
+          );
+          entries.sort((a, b) => b[1] - a[1]); // Sort by timestamp desc
+          messageCompleteDebouncer.current = new Map(entries.slice(0, 50));
+        }
+      }
+
       // Replace streaming message with final messages
       setMessages((prev) => {
         // Build a set of existing message IDs to avoid duplicates
         const existingIds = new Set<string>();
 
         // First pass: collect IDs and handle replacements
-        let replaced = false;
-        const processedMessages = prev.map((m) => {
-          // If this is a typing assistant message with content, replace with final assistant message
-          if (m.isTyping && m.role === "assistant" && assistantMessage) {
-            existingIds.add(assistantMessage.id);
-            return { ...assistantMessage, isTyping: false };
+        let replacedTyping = false;
+        let replacedUser = false;
+
+        const processedMessages: Message[] = [];
+
+        for (const m of prev) {
+          // IMPROVED: Replace ALL typing assistant messages, not just first
+          if (m.isTyping && m.role === "assistant") {
+            if (!replacedTyping && assistantMessage) {
+              // Replace first typing message with final assistant message
+              processedMessages.push({ ...assistantMessage, isTyping: false });
+              existingIds.add(assistantMessage.id);
+              replacedTyping = true;
+            }
+            // Skip all other typing messages (cleanup stale typing indicators)
+            continue;
           }
 
           // Replace optimistic pending user message with server version
           if (
-            !replaced &&
+            !replacedUser &&
             m.localStatus === "pending" &&
             m.role === "user" &&
             m.conversation_id === userMessage.conversation_id
           ) {
-            replaced = true;
+            processedMessages.push(userMessage);
             existingIds.add(userMessage.id);
-            return userMessage;
+            replacedUser = true;
+            continue;
           }
 
           // Keep existing message
           if (m.id) {
             existingIds.add(m.id);
           }
-          return m;
-        });
-
-        // Filter out empty typing placeholders only
-        const withoutEmptyTyping = processedMessages.filter(
-          (m) => !(m.isTyping && !m.content)
-        );
+          processedMessages.push(m);
+        }
 
         // If no optimistic user message found to replace, append the server userMessage
-        if (!replaced && userMessage && !existingIds.has(userMessage.id)) {
-          withoutEmptyTyping.push(userMessage);
+        if (!replacedUser && userMessage && !existingIds.has(userMessage.id)) {
+          processedMessages.push(userMessage);
           existingIds.add(userMessage.id);
         }
 
-        // Append assistant message if not already added and not duplicate
+        // Append assistant message if no typing message was replaced
         if (
+          !replacedTyping &&
           assistantMessage &&
-          !existingIds.has(assistantMessage.id) &&
-          !processedMessages.some((m) => m.isTyping && m.role === "assistant")
+          !existingIds.has(assistantMessage.id)
         ) {
-          withoutEmptyTyping.push(assistantMessage);
+          processedMessages.push(assistantMessage);
         }
 
-        return withoutEmptyTyping;
+        return processedMessages;
       });
 
       // Update conversation metadata
@@ -582,18 +665,30 @@ const ChatPage: React.FC = () => {
           return prev;
         }
 
-        // If there's an optimistic pending user message with the same content,
-        // don't append the server user message here. It will be reconciled
-        // by the `message:complete` handler. This prevents the sender tab from
-        // showing the user message twice.
-        const hasMatchingPending = prev.some(
-          (m) =>
-            m.localStatus === "pending" &&
-            m.role === "user" &&
-            m.conversation_id === message.conversation_id &&
+        // IMPROVED: If there's an optimistic pending user message with the same content,
+        // check timestamp window to avoid filtering legitimate duplicate content
+        const hasMatchingPending = prev.some((m) => {
+          if (m.localStatus !== "pending" || m.role !== "user") return false;
+          if (m.conversation_id !== message.conversation_id) return false;
+
+          const contentMatch =
             String(m.content || "").trim() ===
-              String(message.content || "").trim()
-        );
+            String(message.content || "").trim();
+          if (!contentMatch) return false;
+
+          // Check if sent within last 2 seconds (timestamp window)
+          // This allows users to send the same content twice if enough time has passed
+          try {
+            const msgTime = new Date(message.createdAt).getTime();
+            const optimisticTime = new Date(m.createdAt).getTime();
+            const timeDiff = Math.abs(msgTime - optimisticTime);
+            return timeDiff < 2000; // 2 second window
+          } catch {
+            // If timestamp parsing fails, assume it's a match to be safe
+            return true;
+          }
+        });
+
         if (hasMatchingPending) {
           return prev;
         }
@@ -799,9 +894,99 @@ const ChatPage: React.FC = () => {
   }, [location.search, currentConversation, messages.length, messagesHasMore]);
 
   /**
-   * Handle sending a message
+   * Process message queue sequentially to prevent race conditions
+   */
+  const processMessageQueue = async () => {
+    // Already processing, skip
+    if (isProcessingQueueRef.current) {
+      console.debug("[MessageQueue] Already processing, skipping");
+      return;
+    }
+
+    // Queue empty, nothing to do
+    if (messageQueueRef.current.length === 0) {
+      console.debug("[MessageQueue] Queue empty");
+      return;
+    }
+
+    console.log(
+      "[MessageQueue] Starting processing, queue length:",
+      messageQueueRef.current.length
+    );
+    isProcessingQueueRef.current = true;
+
+    while (messageQueueRef.current.length > 0) {
+      const queuedMsg = messageQueueRef.current.shift();
+      if (!queuedMsg) break;
+
+      try {
+        console.log(
+          "[MessageQueue] Processing message:",
+          queuedMsg.content.substring(0, 50) + "..."
+        );
+        await handleSendMessageInternal(
+          queuedMsg.content,
+          queuedMsg.attachments,
+          queuedMsg.metadata
+        );
+
+        // Small delay between messages to avoid overwhelming server
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      } catch (err) {
+        console.error("[MessageQueue] Failed to send queued message:", err);
+        antdMessage.error("Failed to send queued message. Please try again.");
+        // Continue processing other messages
+      }
+    }
+
+    console.log("[MessageQueue] Processing complete");
+    isProcessingQueueRef.current = false;
+  };
+
+  /**
+   * Handle sending a message (with queueing)
    */
   const handleSendMessage = async (
+    content: string,
+    attachments?: FileAttachment[],
+    metadata?: {
+      resendMessageId?: string;
+      editMessageId?: string;
+      originalContent?: string;
+    }
+  ) => {
+    // Check if offline first
+    if (!isOnline) {
+      antdMessage.warning(
+        "You are offline. Please check your connection and try again."
+      );
+      return;
+    }
+
+    // For new conversation or if not currently processing, send immediately
+    // Otherwise queue it to prevent concurrent sends
+    if (!currentConversation || !isProcessingQueueRef.current) {
+      console.log("[Send] Sending immediately (not queued)");
+      return handleSendMessageInternal(content, attachments, metadata);
+    }
+
+    // Queue the message for sequential processing
+    console.log("[Send] Queueing message for sequential processing");
+    messageQueueRef.current.push({
+      content,
+      attachments,
+      metadata,
+      timestamp: Date.now(),
+    });
+
+    // Trigger queue processing
+    processMessageQueue();
+  };
+
+  /**
+   * Internal message sending logic (actual implementation)
+   */
+  const handleSendMessageInternal = async (
     content: string,
     attachments?: FileAttachment[],
     metadata?: {
@@ -813,20 +998,16 @@ const ChatPage: React.FC = () => {
     // Prevent sending if already sending
     if (isSendingMessage || isSendingRealtimeMessage) return;
 
-    // Check if offline
-    if (!isOnline) {
-      antdMessage.warning(
-        "You are offline. Please check your connection and try again."
-      );
-      return;
-    }
-
     // Clear conversation suggestions when sending a message
     setConversationSuggestions([]);
     setIsLoadingConversationSuggestions(false);
 
     // ============ NEW CONVERSATION FLOW ============
     if (!currentConversation) {
+      console.log("[NewConv] Starting new conversation flow");
+
+      // CRITICAL: Set flag to prevent useEffect from interfering
+      isCreatingAndSendingRef.current = true;
       setIsSendingMessage(true);
 
       try {
@@ -848,38 +1029,18 @@ const ChatPage: React.FC = () => {
         }
 
         // Step 2: Create conversation
+        console.log("[NewConv] Creating conversation with title:", title);
         const newConversation = await apiCreateConversation({
           title,
           model: "gpt-5-nano",
           context_window: 10,
         });
+        console.log("[NewConv] Conversation created:", newConversation.id);
 
         // Mark this conversation as just created to skip message reload
         justCreatedConversationIdRef.current = newConversation.id;
 
-        // Step 3: Set current conversation (without navigation yet)
-        setCurrentConversation(newConversation as any);
-
-        // IMPORTANT: Join WebSocket room immediately before sending message
-        // (useEffect auto-join may not run in time)
-        if (isConnected) {
-          joinConversation(newConversation.id);
-        }
-
-        // Step 4: Notify WebSocket about conversation creation
-        if (isConnected) {
-          try {
-            websocketService.notifyConversationCreated(newConversation as any);
-          } catch {}
-        }
-
-        // Refresh conversations list
-        refreshConversations().catch(() => {});
-        try {
-          window.dispatchEvent(new Event("conversations:refresh"));
-        } catch {}
-
-        // Step 5: Add optimistic user message
+        // Step 3: Add optimistic user message FIRST (before navigation)
         const tempId = `temp_${Date.now()}`;
         const userMsg: Message = {
           id: tempId,
@@ -904,30 +1065,51 @@ const ChatPage: React.FC = () => {
             extracted_text: att.extracted_text,
           })),
         };
+
+        // Step 4: Batch state updates together
+        console.log("[NewConv] Setting state and messages");
+        setCurrentConversation(newConversation as any);
         setMessages([userMsg]);
+
+        // Step 5: Join WebSocket room SYNCHRONOUSLY before navigation
+        if (isConnected) {
+          console.log("[NewConv] Joining WebSocket room");
+          joinConversation(newConversation.id);
+        } else {
+          console.warn("[NewConv] WebSocket not connected, skipping room join");
+        }
+
+        // Step 6: Notify WebSocket about conversation creation
+        if (isConnected) {
+          try {
+            websocketService.notifyConversationCreated(newConversation as any);
+          } catch (err) {
+            console.error(
+              "[NewConv] Failed to notify conversation creation:",
+              err
+            );
+          }
+        }
+
+        // Step 7: Navigate FIRST (before sending)
+        console.log("[NewConv] Navigating to conversation");
+        navigate(`/conversations/${newConversation.id}`, { replace: true });
 
         // Scroll to show user message
         try {
-          setTimeout(
-            () => window.dispatchEvent(new Event("messages:scrollToBottom")),
-            40
-          );
+          window.dispatchEvent(new Event("messages:scrollToBottom"));
         } catch {}
 
-        // Navigate to conversation URL after a short delay
-        // This allows message sending to start before useEffect triggers
-        setTimeout(() => {
-          navigate(`/conversations/${newConversation.id}`, { replace: true });
-        }, 50);
+        // Refresh conversations list
+        refreshConversations().catch(() => {});
+        try {
+          window.dispatchEvent(new Event("conversations:refresh"));
+        } catch {}
 
-        // Wait a tiny bit for state updates to propagate before sending
-        await new Promise((resolve) => setTimeout(resolve, 100));
-
-        // Step 6: Try sending via WebSocket first
+        // Step 8: Send message IMMEDIATELY after navigation (no artificial delay)
         if (isConnected) {
           try {
-            // logging removed: attempting WebSocket send
-
+            console.log("[NewConv] Sending message via WebSocket");
             // Send directly via websocketService instead of hook
             // (hook may not have updated conversation prop yet)
             websocketService.sendMessage(
@@ -942,7 +1124,7 @@ const ChatPage: React.FC = () => {
               }))
             );
 
-            // logging removed: WebSocket send initiated
+            console.log("[NewConv] Message sent successfully");
 
             // Update conversation metadata optimistically
             try {
@@ -953,27 +1135,34 @@ const ChatPage: React.FC = () => {
               });
               refreshConversations().catch(() => {});
               window.dispatchEvent(new Event("message:sent"));
-            } catch {}
+            } catch (err) {
+              console.error(
+                "[NewConv] Failed to update conversation metadata:",
+                err
+              );
+            }
 
             setIsSendingMessage(false);
 
-            // WebSocket is fire-and-forget, response will come via event listeners
-            // Don't return here - let HTTP fallback handle if WebSocket fails
-            // Actually, we should wait a bit to see if WebSocket succeeds
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            // CRITICAL: Clear the flag to allow useEffect to run normally
+            isCreatingAndSendingRef.current = false;
 
-            // If we're still here and no error, assume success
-            // logging removed: WebSocket send assumed successful
+            // WebSocket is fire-and-forget, response will come via event listeners
             return;
           } catch (err) {
-            // logging removed: WebSocket send failed, falling back to HTTP
+            console.error(
+              "[NewConv] WebSocket send failed, falling back to HTTP:",
+              err
+            );
             // Continue to HTTP fallback
           }
         } else {
-          // logging removed: WebSocket not connected, using HTTP directly
+          console.warn(
+            "[NewConv] WebSocket not connected, using HTTP directly"
+          );
         }
 
-        // Step 7: Fallback to HTTP streaming
+        // Step 9: Fallback to HTTP streaming
         // logging removed: starting HTTP fallback
 
         // Add typing indicator
@@ -1074,6 +1263,7 @@ const ChatPage: React.FC = () => {
             },
             // onError
             (err) => {
+              console.error("[NewConv] HTTP streaming error:", err);
               antdMessage.error("Failed to send message");
               // Mark optimistic message as failed
               setMessages((prev) =>
@@ -1096,6 +1286,7 @@ const ChatPage: React.FC = () => {
             metadata
           );
         } catch (err) {
+          console.error("[NewConv] HTTP fallback failed:", err);
           antdMessage.error("Failed to send message");
           setMessages((prev) =>
             prev.map((m) =>
@@ -1105,16 +1296,21 @@ const ChatPage: React.FC = () => {
           setMessages((prev) => prev.filter((m) => m.id !== typingId));
         } finally {
           setIsSendingMessage(false);
+          // CRITICAL: Clear flag even on error
+          isCreatingAndSendingRef.current = false;
         }
 
         return; // End of new conversation flow
       } catch (err: any) {
+        console.error("[NewConv] Conversation creation failed:", err);
         antdMessage.error(
           err?.response?.data?.message || "Failed to create conversation"
         );
         setCurrentConversation(null);
         setMessages([]);
         setIsSendingMessage(false);
+        // CRITICAL: Clear flag on conversation creation error
+        isCreatingAndSendingRef.current = false;
         return;
       }
     }
