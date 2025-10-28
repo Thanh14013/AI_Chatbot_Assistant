@@ -9,7 +9,7 @@ import User from "../models/user.model.js";
 import type { RegisterInput, LoginInput } from "../types/user.type.js";
 
 /**
- * Register a new user
+ * Register a new user....
  * POST /api/auth/register
  */
 export const register = async (req: Request, res: Response): Promise<void> => {
