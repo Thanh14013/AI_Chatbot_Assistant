@@ -58,6 +58,50 @@ const ConversationList: React.FC<ConversationListProps> = ({
   onConversationDragStart,
   onConversationDragEnd,
 }) => {
+  // Define drag handlers first (before early returns)
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Call parent callback - parent (Sidebar) has the drag state
+    // Cannot read dataTransfer.getData() during dragover due to browser security
+    if (onDragOver) {
+      onDragOver();
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const conversationId = e.dataTransfer.getData("conversationId");
+    const sourceProjectId = e.dataTransfer.getData("projectId");
+
+    // Convert "null" string to actual null
+    const actualSourceProjectId =
+      !sourceProjectId || sourceProjectId === "null" ? null : sourceProjectId;
+
+    // Only process drop if conversation is from a project
+    if (onDrop && conversationId && actualSourceProjectId) {
+      onDrop(conversationId, actualSourceProjectId);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (
+      e.currentTarget === e.target ||
+      !e.currentTarget.contains(e.relatedTarget as Node)
+    ) {
+      if (onDragLeave) {
+        onDragLeave();
+      }
+    }
+  };
+
+  // Early returns with drag support
   if (error) {
     return (
       <div className={styles.errorState}>
@@ -86,66 +130,48 @@ const ConversationList: React.FC<ConversationListProps> = ({
   }
 
   if (conversations.length === 0) {
+    // Show empty state with drop zone support
     return (
-      <div className={styles.emptyState}>
-        <Empty
-          image={<MessageOutlined className={styles.emptyIcon} />}
-          description={
-            <div>
-              <span className={styles.emptyText}>
-                {searchQuery
-                  ? "No conversations found"
-                  : "No conversations yet"}
-              </span>
-              <br />
-              <span className={styles.emptySubtext}>
-                {searchQuery
-                  ? "Try a different search term"
-                  : "Start a new conversation to get started"}
-              </span>
+      <div
+        className={`${styles.emptyState} ${
+          isDropTarget ? styles.dropZoneActive : ""
+        }`}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        onDragLeave={handleDragLeave}
+      >
+        {isDropTarget ? (
+          <div className={styles.emptyDropZone}>
+            <MessageOutlined className={styles.dropZoneIcon} />
+            <div className={styles.dropZoneText}>
+              Drop here to move to All Conversations
             </div>
-          }
-        />
+          </div>
+        ) : (
+          <Empty
+            image={<MessageOutlined className={styles.emptyIcon} />}
+            description={
+              <div>
+                <span className={styles.emptyText}>
+                  {searchQuery
+                    ? "No conversations found"
+                    : "No conversations yet"}
+                </span>
+                <br />
+                <span className={styles.emptySubtext}>
+                  {searchQuery
+                    ? "Try a different search term"
+                    : "Start a new conversation to get started"}
+                </span>
+              </div>
+            }
+          />
+        )}
       </div>
     );
   }
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (onDragOver) {
-      onDragOver();
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const conversationId = e.dataTransfer.getData("conversationId");
-    const sourceProjectId = e.dataTransfer.getData("projectId");
-    const actualSourceProjectId =
-      sourceProjectId === "null" ? null : sourceProjectId;
-
-    if (onDrop && conversationId) {
-      onDrop(conversationId, actualSourceProjectId);
-    }
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (
-      e.currentTarget === e.target ||
-      !e.currentTarget.contains(e.relatedTarget as Node)
-    ) {
-      if (onDragLeave) {
-        onDragLeave();
-      }
-    }
-  };
-
+  // Main return with conversations list
   return (
     <div
       className={`${styles.conversationsList} ${
@@ -157,6 +183,8 @@ const ConversationList: React.FC<ConversationListProps> = ({
     >
       <div
         className={styles.conversationsScrollContainer}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
         onScroll={(e) => {
           try {
             const el = e.currentTarget as HTMLDivElement;
@@ -183,6 +211,13 @@ const ConversationList: React.FC<ConversationListProps> = ({
             onDragEnd={onConversationDragEnd}
           />
         ))}
+
+        {/* Show drop zone hint when dragging and list is small */}
+        {isDropTarget && conversations.length < 3 && (
+          <div className={styles.dropZoneHint}>
+            Drop here to move to All Conversations
+          </div>
+        )}
 
         {/* Infinite scroll loader */}
         {isLoadingMore && (
