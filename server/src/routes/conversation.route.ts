@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authenticateAccessToken } from "../middlewares/authJwt.js";
+import { verifyConversationAccess } from "../middlewares/authorization.middleware.js";
 import {
   create,
   getAll,
@@ -45,15 +46,15 @@ router.get("/", getAll);
 
 // Get a specific conversation by ID
 // GET /api/conversations/:id
-router.get("/:id", getOne);
+router.get("/:id", verifyConversationAccess, getOne);
 
 // Update a conversation (rename, change model, etc.)
 // PATCH /api/conversations/:id
-router.patch("/:id", update);
+router.patch("/:id", verifyConversationAccess, update);
 
 // Delete a conversation (soft delete)
 // DELETE /api/conversations/:id
-router.delete("/:id", remove);
+router.delete("/:id", verifyConversationAccess, remove);
 
 // Move a conversation to a project (or remove from project)
 // PUT /api/conversations/:id/move
@@ -74,15 +75,15 @@ router.put("/:id/move", async (req, res) => {
 
 // Get all messages for a conversation (with pagination)
 // GET /api/conversations/:id/messages?page=1&limit=30
-router.get("/:id/messages", getMessages);
+router.get("/:id/messages", verifyConversationAccess, getMessages);
 
 // Get all pinned messages for a conversation
 // GET /api/conversations/:id/messages/pinned
-router.get("/:id/messages/pinned", getPinnedMessages);
+router.get("/:id/messages/pinned", verifyConversationAccess, getPinnedMessages);
 
 // Send a user message and stream AI response via Server-Sent Events (SSE)
 // POST /api/conversations/:id/messages/stream
-router.post("/:id/messages/stream", sendMessageStream);
+router.post("/:id/messages/stream", verifyConversationAccess, sendMessageStream);
 
 /**
  * Message Pin/Unpin Routes
@@ -103,6 +104,6 @@ router.patch("/messages/:messageId/unpin", unpinMessage);
 // Semantic search within a conversation
 // POST /api/conversations/:id/search
 // Body: { query: string, limit?: number, similarity_threshold?: number }
-router.post("/:id/search", semanticSearch);
+router.post("/:id/search", verifyConversationAccess, semanticSearch);
 
 export default router;

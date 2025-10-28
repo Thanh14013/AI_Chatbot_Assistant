@@ -11,7 +11,7 @@ import type {
   ProjectResponse,
 } from "../types/project.type.js";
 import { invalidateCachePattern } from "./cache.service.js";
-import { conversationListPattern } from "../utils/cache-key.util.js";
+import { conversationListPattern, projectListPattern } from "../utils/cache-key.util.js";
 
 /**
  * Get all projects for a user
@@ -226,6 +226,9 @@ export const moveConversationToProject = async (
 
   // Invalidate conversation list cache for this user to ensure fresh data
   await invalidateCachePattern(conversationListPattern(userId));
+
+  // Invalidate project list cache (conversation counts changed)
+  await invalidateCachePattern(projectListPattern(userId));
 
   return {
     message: projectId
