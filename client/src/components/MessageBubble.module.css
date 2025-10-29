@@ -816,26 +816,126 @@
 @media (max-width: 768px) {
   .messageBubble {
     max-width: 85%;
-    padding-top: 28px;
+    padding-top: 32px; /* Increased for better button spacing */
   }
 
   .messageContent {
-    font-size: 13px;
+    font-size: 14px; /* Increased for better readability */
   }
 
   .copyButton {
     opacity: 1;
+    /* Better touch target */
+    min-height: 32px;
+    min-width: 32px;
+  }
+
+  .followupButtonCorner,
+  .pinButtonCorner {
+    opacity: 0.8; /* More visible on mobile */
+    top: 6px;
+    height: 28px; /* Larger touch target */
+    width: 28px;
   }
 
   .followupButtonCorner {
-    opacity: 0.7;
-    top: 4px;
-    right: 4px;
+    right: 40px; /* More space from pin button */
+  }
+
+  .pinButtonCorner {
+    right: 6px;
   }
 
   .suggestionChip {
+    font-size: 13px;
+    padding: 10px 14px; /* Larger touch target */
+    min-height: 44px; /* Apple HIG minimum */
+  }
+}
+
+/* iPhone 16 specific optimizations (393px width) */
+@media (max-width: 430px) {
+  .messageBubble {
+    max-width: 88%;
+  }
+
+  .assistantMessage .messageBubble {
+    max-width: 85%;
+  }
+
+  /* Larger touch targets for all interactive elements */
+  .copyButton,
+  .resendButton,
+  .retryButton {
+    min-height: 36px;
+    min-width: 36px;
+    font-size: 14px;
+  }
+
+  .followupButtonCorner,
+  .pinButtonCorner {
+    height: 32px;
+    width: 32px;
+    font-size: 16px;
+  }
+
+  /* Better code block handling */
+  .codeBlock {
     font-size: 12px;
-    padding: 6px 12px;
+    margin: 8px 0;
+  }
+
+  .codeBlock pre {
+    padding: 12px;
+  }
+}
+
+/* Landscape orientation for mobile */
+@media (max-width: 932px) and (orientation: landscape) {
+  .messageContainer {
+    margin-bottom: 12px; /* Reduce vertical spacing */
+  }
+
+  .messageBubble {
+    max-width: 75%; /* Wider in landscape */
+    padding-top: 28px;
+  }
+
+  .assistantMessage .messageBubble {
+    max-width: 70%;
+  }
+
+  .messageContent {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* Simplify in landscape */
+  .followupSuggestionsCard {
+    margin-top: 8px;
+  }
+
+  .suggestionChips {
+    padding: 6px;
+    gap: 6px;
+  }
+
+  .suggestionChip {
+    padding: 6px 10px;
+    font-size: 12px;
+    min-height: 36px;
+  }
+
+  /* Hide some elements to save space */
+  .timestamp {
+    font-size: 10px;
+  }
+
+  .avatar,
+  .avatar .ant-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
   }
 }
 

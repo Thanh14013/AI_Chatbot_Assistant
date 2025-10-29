@@ -125,6 +125,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const handlePinToggle = async () => {
     if (isPendingMessage(message) || isPinning) return;
 
+    // Don't allow pinning temporary/typing messages
+    if (message.id.startsWith("temp_") || message.isTyping) {
+      return;
+    }
+
     // IMPORTANT: Read current pinned status directly from message prop
     // to avoid using stale cached const value
     const currentPinned =
@@ -134,9 +139,32 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     try {
       if (currentPinned) {
         await unpinMessage(message.id);
+
+        // Dispatch custom event to update other components
+        window.dispatchEvent(
+          new CustomEvent("message:unpinned", {
+            detail: {
+              conversationId: message.conversation_id,
+              messageId: message.id,
+            },
+          })
+        );
+
         antMessage.success("Message unpinned");
       } else {
         await pinMessage(message.id);
+
+        // Dispatch custom event to update other components
+        window.dispatchEvent(
+          new CustomEvent("message:pinned", {
+            detail: {
+              conversationId: message.conversation_id,
+              messageId: message.id,
+              message: message,
+            },
+          })
+        );
+
         antMessage.success("Message pinned");
       }
 
@@ -447,19 +475,22 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             }`}
           >
             {/* Pin button positioned in top-right corner */}
-            {!isPendingMessage(message) && message.content && (
-              <Button
-                type="text"
-                size="small"
-                icon={isPinned ? <PushpinFilled /> : <PushpinOutlined />}
-                onClick={handlePinToggle}
-                loading={isPinning}
-                className={`${styles.pinButtonCorner} ${
-                  isPinned ? styles.pinned : ""
-                }`}
-                title={isPinned ? "Unpin message" : "Pin message"}
-              />
-            )}
+            {!isPendingMessage(message) &&
+              message.content &&
+              !message.id.startsWith("temp_") &&
+              !message.isTyping && (
+                <Button
+                  type="text"
+                  size="small"
+                  icon={isPinned ? <PushpinFilled /> : <PushpinOutlined />}
+                  onClick={handlePinToggle}
+                  loading={isPinning}
+                  className={`${styles.pinButtonCorner} ${
+                    isPinned ? styles.pinned : ""
+                  }`}
+                  title={isPinned ? "Unpin message" : "Pin message"}
+                />
+              )}
 
             {/* Message content - clickable for user messages to edit */}
             {isEditing ? (

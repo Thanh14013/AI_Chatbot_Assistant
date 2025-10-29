@@ -109,14 +109,15 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     e.preventDefault();
     e.stopPropagation();
 
-    const conversationId = e.dataTransfer.getData("conversationId");
-    const sourceProjectId = e.dataTransfer.getData("projectId");
+    // Cannot read getData() during dragover due to browser security
+    // We rely on parent component (Sidebar) passing draggedConversationId
+    // to determine if this is a valid drop target
 
-    // Check if valid drop (not dropping on same project)
-    const isValid = !!conversationId && sourceProjectId !== project.id;
-
+    // For now, always call onDragOver and let parent decide validity
+    // Parent has access to dragDropState which knows sourceProjectId
     if (onDragOver) {
-      onDragOver(project.id, isValid);
+      // Parent will validate: sourceProjectId !== project.id
+      onDragOver(project.id, true); // Signal drag over, parent validates
     }
   };
 
@@ -126,8 +127,10 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
 
     const conversationId = e.dataTransfer.getData("conversationId");
     const sourceProjectId = e.dataTransfer.getData("projectId");
+
+    // Convert "null" string to actual null
     const actualSourceProjectId =
-      sourceProjectId === "null" ? null : sourceProjectId;
+      !sourceProjectId || sourceProjectId === "null" ? null : sourceProjectId;
 
     if (onDrop && conversationId) {
       onDrop(project.id, conversationId, actualSourceProjectId);
