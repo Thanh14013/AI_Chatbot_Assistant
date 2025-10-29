@@ -2,7 +2,7 @@
 
 .chatInputContainer {
   padding: 6px 16px 8px 16px;
-  background-color: #ffffff;
+  background-color: #f8f9fa;
   border-top: none;
   box-shadow: none;
   position: sticky;
@@ -12,7 +12,7 @@
 
 .inputWrapper {
   max-width: 900px;
-  heigh: 12px;
+  min-height: 42px;
   margin: 0 auto;
   display: flex;
   flex-wrap: nowrap;
@@ -21,7 +21,7 @@
   background: #ffffff;
   border: 1.5px solid #e5e7eb;
   border-radius: 20px;
-  padding: 2px 5px 2px 7px;
+  padding: 6px 8px 6px 10px;
   transition: all 0.2s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
@@ -35,15 +35,15 @@
 
 /* Attach button styling - Modern icon button */
 .attachButton {
-  height: 24px;
-  min-height: 24px;
-  width: 24px;
+  height: 28px;
+  min-height: 28px;
+  width: 28px;
   flex-shrink: 0;
-  padding: 2px;
-  border-radius: 6px !important;
+  padding: 4px;
+  border-radius: 7px !important;
   transition: all 0.2s ease;
   color: #6b7280;
-  font-size: 13px;
+  font-size: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -60,15 +60,15 @@
 
 /* Suggest button (lightbulb) styling */
 .suggestButton {
-  height: 24px;
-  min-height: 24px;
-  width: 24px;
+  height: 28px;
+  min-height: 28px;
+  width: 28px;
   flex-shrink: 0;
-  padding: 2px;
-  border-radius: 6px !important;
+  padding: 4px;
+  border-radius: 7px !important;
   transition: all 0.2s ease;
   color: #6b7280;
-  font-size: 13px;
+  font-size: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -180,13 +180,13 @@
   border: none !important;
   background: transparent !important;
   overflow-y: auto;
-  line-height: 1.3;
+  line-height: 1.4;
   color: #1f2937;
-  padding: 1px 0;
+  padding: 4px 0;
   -ms-overflow-style: none;
   scrollbar-width: none;
-  min-height: 26px;
-  max-height: 52px;
+  min-height: 28px;
+  max-height: 56px;
 }
 
 .textarea::-webkit-scrollbar {
@@ -211,12 +211,12 @@
 
 /* Send button styling - Dynamic states */
 .sendButton {
-  height: 26px;
-  min-height: 26px;
-  width: 48px;
+  height: 30px;
+  min-height: 30px;
+  width: 52px;
   flex-shrink: 0;
-  padding: 2px 8px;
-  border-radius: 7px !important;
+  padding: 4px 10px;
+  border-radius: 8px !important;
   font-weight: 500;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   font-size: 13px;

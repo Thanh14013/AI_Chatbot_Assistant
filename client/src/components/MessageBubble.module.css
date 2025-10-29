@@ -425,19 +425,19 @@
 /* Pin button positioned in top-right corner */
 .pinButtonCorner {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 6px;
+  right: 6px;
   opacity: 0;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  padding: 2px;
-  height: 12px;
-  width: 12px;
+  padding: 4px;
+  height: 20px;
+  width: 20px;
   min-width: auto;
-  font-size: 12px;
+  font-size: 13px;
   color: #f59e0b;
   background: rgba(255, 255, 255, 0.95);
-  border-radius: 4px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
   z-index: 2;
   display: flex;
   align-items: center;
@@ -458,8 +458,8 @@
   opacity: 1 !important;
   color: #fbbf24;
   background: rgba(255, 255, 255, 1);
-  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3);
-  transform: scale(1.05);
+  box-shadow: 0 3px 8px rgba(245, 158, 11, 0.4);
+  transform: scale(1.1);
 }
 
 /* Pinned state - always visible */
@@ -829,7 +829,6 @@
 
   .copyButton {
     opacity: 1;
-<<<<<<< HEAD
     /* Better touch target */
     min-height: 32px;
     min-width: 32px;
@@ -841,8 +840,6 @@
     top: 6px;
     height: 24px; /* Larger touch target */
     width: 24px;
-=======
->>>>>>> parent of 2b82ea3 (feat: responsive design)
   }
 
   .followupButtonCorner {
@@ -852,7 +849,6 @@
   }
 
   .suggestionChip {
-<<<<<<< HEAD
     font-size: 13px;
     padding: 10px 14px; /* Larger touch target */
     min-height: 44px; /* Apple HIG minimum */
@@ -887,8 +883,6 @@
 
   /* Better code block handling */
   .codeBlock {
-=======
->>>>>>> parent of 2b82ea3 (feat: responsive design)
     font-size: 12px;
     padding: 6px 12px;
   }
