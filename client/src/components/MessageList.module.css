@@ -6,7 +6,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: linear-gradient(to bottom, #f9fafb 0%, #ffffff 100%);
+  background: linear-gradient(to top, #f9fafb 0%, #ffffff 100%);
 }
 
 /* load earlier button removed: message list auto-loads when scrolled near top */

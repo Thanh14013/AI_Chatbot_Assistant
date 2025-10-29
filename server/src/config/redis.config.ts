@@ -15,6 +15,12 @@ const redisConfig = {
   password: process.env.REDIS_PASSWORD || undefined,
   db: parseInt(process.env.REDIS_DB || "0"),
   retryStrategy: (times: number) => {
+    // Stop retrying after 10 attempts to prevent infinite loop
+    if (times > 10) {
+      console.error("Redis: Max retry attempts (10) reached. Stopping retry.");
+      return null; // Return null to stop retrying
+    }
+    // Exponential backoff with max 2 seconds delay
     const delay = Math.min(times * 50, 2000);
     return delay;
   },

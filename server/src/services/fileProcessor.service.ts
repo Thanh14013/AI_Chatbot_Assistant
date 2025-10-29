@@ -3,6 +3,9 @@
  * Handles extraction of text content from various file types (PDF, DOCX, CSV)
  */
 
+import * as pdfParse from "pdf-parse";
+import mammoth from "mammoth";
+
 // Type definitions
 export interface FileProcessingResult {
   extracted_text?: string;
@@ -49,8 +52,7 @@ export const processFile = async (
 
 /**
  * Extract text from PDF
- * Note: For production, you'd use pdf-parse or similar library
- * For now, we'll use a placeholder that returns a message
+ * Uses pdf-parse library for actual text extraction
  */
 const extractTextFromPDF = async (url: string): Promise<FileProcessingResult> => {
   try {
@@ -58,27 +60,25 @@ const extractTextFromPDF = async (url: string): Promise<FileProcessingResult> =>
     const response = await fetch(url);
     const buffer = Buffer.from(await response.arrayBuffer());
 
-    // TODO: Implement actual PDF text extraction using pdf-parse
-    // const pdfParse = require('pdf-parse');
-    // const data = await pdfParse(buffer);
-    // return {
-    //   extracted_text: data.text,
-    //   pages: data.numpages,
-    // };
+    // Extract text using pdf-parse
+    const data = await (pdfParse as any)(buffer);
 
-    // Placeholder for now
     return {
-      extracted_text: "[PDF content - text extraction will be implemented with pdf-parse library]",
-      pages: 1,
+      extracted_text: data.text || "[PDF contains no extractable text]",
+      pages: data.numpages || 1,
     };
   } catch (error: any) {
-    return { error: `Failed to extract text from PDF: ${error.message}` };
+    console.error("PDF extraction error:", error);
+    return {
+      error: `Failed to extract text from PDF: ${error.message}`,
+      extracted_text: "[PDF text extraction failed]",
+    };
   }
 };
 
 /**
  * Extract text from DOCX
- * Note: For production, use mammoth library
+ * Uses mammoth library for actual text extraction
  */
 const extractTextFromDOCX = async (url: string): Promise<FileProcessingResult> => {
   try {
@@ -86,19 +86,18 @@ const extractTextFromDOCX = async (url: string): Promise<FileProcessingResult> =
     const response = await fetch(url);
     const buffer = Buffer.from(await response.arrayBuffer());
 
-    // TODO: Implement actual DOCX text extraction using mammoth
-    // const mammoth = require('mammoth');
-    // const result = await mammoth.extractRawText({ buffer });
-    // return {
-    //   extracted_text: result.value,
-    // };
+    // Extract text using mammoth
+    const result = await mammoth.extractRawText({ buffer });
 
-    // Placeholder for now
     return {
-      extracted_text: "[DOCX content - text extraction will be implemented with mammoth library]",
+      extracted_text: result.value || "[DOCX contains no extractable text]",
     };
   } catch (error: any) {
-    return { error: `Failed to extract text from DOCX: ${error.message}` };
+    console.error("DOCX extraction error:", error);
+    return {
+      error: `Failed to extract text from DOCX: ${error.message}`,
+      extracted_text: "[DOCX text extraction failed]",
+    };
   }
 };
 

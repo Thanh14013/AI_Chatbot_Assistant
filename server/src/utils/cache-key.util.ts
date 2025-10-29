@@ -140,6 +140,20 @@ export function popularTagsKey(userId: string): string {
   return `tags:popular:user:${userId}`;
 }
 
+/**
+ * Generate cache key for project list for a user
+ */
+export function projectListKey(userId: string): string {
+  return `projects:user:${userId}`;
+}
+
+/**
+ * Generate pattern to invalidate all project lists for a user
+ */
+export function projectListPattern(userId: string): string {
+  return `projects:user:${userId}:*`;
+}
+
 export default {
   userByEmailKey,
   userByIdKey,
@@ -157,4 +171,6 @@ export default {
   globalSearchKey,
   globalSearchPattern,
   popularTagsKey,
+  projectListKey,
+  projectListPattern,
 };

@@ -603,23 +603,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                     title="Resend this message"
                   />
                 )}
-
-                {/* Retry button shown for failed messages, placed next to copy */}
-                {isFailed && (
-                  <Button
-                    type="link"
-                    size="small"
-                    icon={<ReloadOutlined />}
-                    onClick={() => onRetry && onRetry(message)}
-                    className={styles.retryButton}
-                    disabled={isSending || retryCount >= maxRetries}
-                    title={
-                      retryCount >= maxRetries
-                        ? `Maximum retry attempts (${maxRetries}) reached`
-                        : `Retry (${retryCount}/${maxRetries} attempts)`
-                    }
-                  />
-                )}
               </div>
             </div>
 
@@ -627,10 +610,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             {isFailed && errorMessage && (
               <div className={styles.errorMessageContainer}>
                 <WarningOutlined className={styles.errorIcon} />
-                <Text className={styles.errorText}>
-                  {errorMessage}
-                  {retryCount > 0 && ` (Attempt ${retryCount}/${maxRetries})`}
-                </Text>
+                <Text className={styles.errorText}>{errorMessage}</Text>
               </div>
             )}
 
@@ -638,11 +618,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             {isSending && (
               <div className={styles.sendingStatusContainer}>
                 <SyncOutlined spin className={styles.sendingIcon} />
-                <Text className={styles.sendingText}>
-                  {retryCount > 0
-                    ? `Retrying (${retryCount}/${maxRetries})...`
-                    : "Sending..."}
-                </Text>
+                <Text className={styles.sendingText}>Sending...</Text>
               </div>
             )}
 
