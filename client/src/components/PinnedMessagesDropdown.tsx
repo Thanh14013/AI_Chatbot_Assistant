@@ -65,6 +65,16 @@ const PinnedMessagesDropdown: React.FC<PinnedMessagesDropdownProps> = ({
       // Update local state
       setPinnedMessages((prev) => prev.filter((msg) => msg.id !== messageId));
 
+      // Dispatch custom event to update message list
+      window.dispatchEvent(
+        new CustomEvent("message:unpinned", {
+          detail: {
+            conversationId,
+            messageId,
+          },
+        })
+      );
+
       // Notify parent
       if (onMessageUnpinned) {
         onMessageUnpinned(messageId);

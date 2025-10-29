@@ -32,7 +32,7 @@
 .middleSection {
   flex: 1;
   min-height: 0;
-  height: 600px;
+  height: 610px;
   overflow-y: auto;
   overflow-x: hidden;
   background: #fff;
