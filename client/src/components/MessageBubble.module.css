@@ -820,15 +820,16 @@
 @media (max-width: 768px) {
   .messageBubble {
     max-width: 85%;
-    padding-top: 32px; /* Increased for better button spacing */
+    padding-top: 28px;
   }
 
   .messageContent {
-    font-size: 14px; /* Increased for better readability */
+    font-size: 13px;
   }
 
   .copyButton {
     opacity: 1;
+<<<<<<< HEAD
     /* Better touch target */
     min-height: 32px;
     min-width: 32px;
@@ -840,17 +841,18 @@
     top: 6px;
     height: 24px; /* Larger touch target */
     width: 24px;
+=======
+>>>>>>> parent of 2b82ea3 (feat: responsive design)
   }
 
   .followupButtonCorner {
-    right: 40px; /* More space from pin button */
-  }
-
-  .pinButtonCorner {
-    right: 6px;
+    opacity: 0.7;
+    top: 4px;
+    right: 4px;
   }
 
   .suggestionChip {
+<<<<<<< HEAD
     font-size: 13px;
     padding: 10px 14px; /* Larger touch target */
     min-height: 44px; /* Apple HIG minimum */
@@ -885,61 +887,10 @@
 
   /* Better code block handling */
   .codeBlock {
+=======
+>>>>>>> parent of 2b82ea3 (feat: responsive design)
     font-size: 12px;
-    margin: 8px 0;
-  }
-
-  .codeBlock pre {
-    padding: 12px;
-  }
-}
-
-/* Landscape orientation for mobile */
-@media (max-width: 932px) and (orientation: landscape) {
-  .messageContainer {
-    margin-bottom: 12px; /* Reduce vertical spacing */
-  }
-
-  .messageBubble {
-    max-width: 75%; /* Wider in landscape */
-    padding-top: 28px;
-  }
-
-  .assistantMessage .messageBubble {
-    max-width: 70%;
-  }
-
-  .messageContent {
-    font-size: 13px;
-    line-height: 1.5;
-  }
-
-  /* Simplify in landscape */
-  .followupSuggestionsCard {
-    margin-top: 8px;
-  }
-
-  .suggestionChips {
-    padding: 6px;
-    gap: 6px;
-  }
-
-  .suggestionChip {
-    padding: 6px 10px;
-    font-size: 12px;
-    min-height: 36px;
-  }
-
-  /* Hide some elements to save space */
-  .timestamp {
-    font-size: 10px;
-  }
-
-  .avatar,
-  .avatar .ant-avatar {
-    width: 28px;
-    height: 28px;
-    font-size: 14px;
+    padding: 6px 12px;
   }
 }
 

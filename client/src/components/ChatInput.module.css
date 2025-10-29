@@ -292,8 +292,6 @@
 @media (max-width: 768px) {
   .chatInputContainer {
     padding: 12px 16px;
-    /* Safe area support for iPhone bottom (home indicator) */
-    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   }
 
   .inputWrapper {
@@ -303,15 +301,15 @@
 
   .attachButton,
   .suggestButton {
-    height: 36px; /* Increased for better touch target */
-    width: 36px;
+    height: 32px;
+    width: 32px;
     font-size: 16px;
   }
 
   .sendButton {
     width: 60px;
     padding: 4px 8px;
-    height: 40px; /* Increased for better touch target */
+    height: 36px;
     font-size: 16px;
   }
 
@@ -320,57 +318,10 @@
   }
 
   .textarea {
-    font-size: 16px; /* Prevent iOS zoom on focus */
-    min-height: 40px;
+    font-size: 14px;
   }
 
   .hintText {
     display: none; /* Hide helper text on mobile */
-  }
-}
-
-/* iPhone 16 specific optimizations (393px width) */
-@media (max-width: 430px) {
-  .chatInputContainer {
-    padding: 10px 12px;
-    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-  }
-
-  .inputWrapper {
-    padding: 6px;
-    gap: 6px;
-  }
-
-  .attachButton,
-  .suggestButton {
-    height: 40px; /* Apple HIG minimum: 44px, but 40px acceptable with spacing */
-    width: 40px;
-  }
-
-  .sendButton {
-    height: 40px;
-    width: 56px;
-  }
-}
-
-/* Landscape mode for mobile */
-@media (max-width: 932px) and (orientation: landscape) {
-  .chatInputContainer {
-    padding: 6px 12px;
-    padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
-    padding-left: calc(12px + env(safe-area-inset-left, 0px));
-    padding-right: calc(12px + env(safe-area-inset-right, 0px));
-  }
-
-  .inputWrapper {
-    padding: 4px 6px;
-  }
-
-  .textarea {
-    max-height: 60px; /* Limit height in landscape */
-  }
-
-  .charCounter {
-    display: none; /* Save space in landscape */
   }
 }
