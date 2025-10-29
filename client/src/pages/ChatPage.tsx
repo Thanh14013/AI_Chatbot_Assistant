@@ -392,6 +392,22 @@ const ChatPage: React.FC = () => {
       // IMPORTANT: Don't load if we're in the middle of creating and sending
       // This prevents race condition where useEffect clears optimistic messages
       if (isCreatingAndSendingRef.current) {
+        console.log(
+          "[LoadConv] Skipping load - creating and sending in progress"
+        );
+        return;
+      }
+
+      // IMPORTANT: Don't reload if we already have this conversation loaded with messages
+      // This prevents unnecessary reloads after streaming completes
+      if (
+        currentConversation?.id === convId &&
+        messages.length > 0 &&
+        !isLoadingMessages
+      ) {
+        console.log(
+          "[LoadConv] Skipping load - conversation already loaded with messages"
+        );
         return;
       }
 
@@ -485,53 +501,75 @@ const ChatPage: React.FC = () => {
     if (!currentConversation) return;
 
     const handleMessageChunk = (event: CustomEvent) => {
-      const { conversationId, chunk, content } = event.detail;
+      const { conversationId, chunk, content, messageId } = event.detail;
       if (conversationId !== currentConversation.id) return;
 
       // Update messages with streaming content. IMPORTANT: keep isTyping=true
       // so subsequent chunks continue to update the same typing placeholder.
       setMessages((prev) => {
-        const lastMessage = prev[prev.length - 1];
+        // Find the last typing assistant message to update
+        // (There should only be one due to hasTyping check, but be defensive)
+        let foundTyping = false;
 
-        if (
-          lastMessage &&
-          lastMessage.role === "assistant" &&
-          lastMessage.isTyping
-        ) {
-          const next = prev.map((msg, index) =>
-            index === prev.length - 1 ? { ...msg, content } : msg
-          );
-          // Update the typing message with new content, preserve isTyping
-          return next;
-        }
-        return prev;
+        const updated = prev.map((msg) => {
+          // Update the last (most recent) typing message
+          if (!foundTyping && msg.role === "assistant" && msg.isTyping) {
+            foundTyping = true;
+            return { ...msg, content };
+          }
+          return msg;
+        });
+
+        // If no typing message found, don't update
+        // (This can happen if ai:typing:start event hasn't arrived yet)
+        return foundTyping ? updated : prev;
       });
     };
 
     const handleMessageComplete = (event: CustomEvent) => {
       const { userMessage, assistantMessage, conversation } = event.detail;
 
-      // Skip if userMessage is null or doesn't belong to current conversation
+      // IMPORTANT: For sender socket, userMessage may be null (to avoid duplicate)
+      // We still need to process assistantMessage and reset isSendingMessage
+
+      // If userMessage exists, verify it belongs to current conversation
       if (
-        !userMessage ||
+        userMessage &&
         userMessage.conversation_id !== currentConversation.id
       ) {
         return;
       }
 
-      // DEBOUNCE: Prevent duplicate processing if same assistant message comes quickly
-      const key = assistantMessage?.id;
-      if (key) {
-        const lastProcessed = messageCompleteDebouncer.current.get(key);
+      // If assistantMessage exists, verify it belongs to current conversation
+      if (
+        assistantMessage &&
+        assistantMessage.conversation_id !== currentConversation.id
+      ) {
+        return;
+      }
+
+      // If neither message exists or belongs to current conversation, skip
+      if (!userMessage && !assistantMessage) {
+        return;
+      }
+
+      // DEBOUNCE: Prevent duplicate processing if same message comes quickly
+      // Use both assistantMessage.id and userMessage.id as debounce keys
+      const debounceKey = [assistantMessage?.id, userMessage?.id]
+        .filter(Boolean)
+        .join("_");
+
+      if (debounceKey) {
+        const lastProcessed = messageCompleteDebouncer.current.get(debounceKey);
         const now = Date.now();
         if (lastProcessed && now - lastProcessed < 500) {
           console.warn(
             "[DEBOUNCE] Skipping duplicate message:complete for",
-            key
+            debounceKey
           );
           return;
         }
-        messageCompleteDebouncer.current.set(key, now);
+        messageCompleteDebouncer.current.set(debounceKey, now);
 
         // Cleanup old entries (keep only last 50)
         if (messageCompleteDebouncer.current.size > 50) {
@@ -567,17 +605,34 @@ const ChatPage: React.FC = () => {
             continue;
           }
 
-          // Replace optimistic pending user message with server version
-          if (
-            !replacedUser &&
-            m.localStatus === "pending" &&
-            m.role === "user" &&
-            m.conversation_id === userMessage.conversation_id
-          ) {
-            processedMessages.push(userMessage);
-            existingIds.add(userMessage.id);
-            replacedUser = true;
-            continue;
+          // CRITICAL FIX: Replace optimistic pending user message with server version
+          // Match by either:
+          // 1. Standard conditions (localStatus, role, conversation_id)
+          // 2. Fallback: Match by content if no pending message found yet
+          if (!replacedUser && userMessage && m.role === "user") {
+            const standardMatch =
+              m.localStatus === "pending" &&
+              m.conversation_id === userMessage.conversation_id;
+
+            const contentMatch =
+              !replacedUser &&
+              String(m.content || "")
+                .trim()
+                .toLowerCase() ===
+                String(userMessage.content || "")
+                  .trim()
+                  .toLowerCase() &&
+              m.id.startsWith("temp_"); // Only match temp IDs
+
+            if (standardMatch || contentMatch) {
+              console.log(
+                `[MessageComplete] Replacing ${m.id} with ${userMessage.id}`
+              );
+              processedMessages.push(userMessage);
+              existingIds.add(userMessage.id);
+              replacedUser = true;
+              continue;
+            }
           }
 
           // Keep existing message
@@ -587,10 +642,35 @@ const ChatPage: React.FC = () => {
           processedMessages.push(m);
         }
 
-        // If no optimistic user message found to replace, append the server userMessage
-        if (!replacedUser && userMessage && !existingIds.has(userMessage.id)) {
-          processedMessages.push(userMessage);
-          existingIds.add(userMessage.id);
+        // CRITICAL FIX: Before appending userMessage, check for content duplicates
+        // This prevents duplicate if optimistic message was somehow not matched
+        if (!replacedUser && userMessage) {
+          const hasDuplicateContent = processedMessages.some(
+            (m) =>
+              m.role === "user" &&
+              String(m.content || "")
+                .trim()
+                .toLowerCase() ===
+                String(userMessage.content || "")
+                  .trim()
+                  .toLowerCase() &&
+              Math.abs(
+                new Date(m.createdAt).getTime() -
+                  new Date(userMessage.createdAt).getTime()
+              ) < 10000 // Within 10 seconds
+          );
+
+          if (!hasDuplicateContent && !existingIds.has(userMessage.id)) {
+            console.log(
+              `[MessageComplete] Appending userMessage ${userMessage.id} (no pending found)`
+            );
+            processedMessages.push(userMessage);
+            existingIds.add(userMessage.id);
+          } else if (hasDuplicateContent) {
+            console.warn(
+              `[MessageComplete] Skipping userMessage ${userMessage.id} - duplicate content found`
+            );
+          }
         }
 
         // Append assistant message if no typing message was replaced
@@ -641,6 +721,19 @@ const ChatPage: React.FC = () => {
           }
         } catch {}
       }
+
+      // CRITICAL: Reset isSendingMessage to re-enable input after message is complete
+      setIsSendingMessage(false);
+
+      // CRITICAL: Clear the flag to allow useEffect to run normally for NEW conversations
+      // Only clear if this is the conversation we're currently creating
+      if (
+        isCreatingAndSendingRef.current &&
+        (userMessage?.conversation_id === currentConversation.id ||
+          assistantMessage?.conversation_id === currentConversation.id)
+      ) {
+        isCreatingAndSendingRef.current = false;
+      }
     };
 
     // Add event listeners
@@ -652,6 +745,32 @@ const ChatPage: React.FC = () => {
       "message:complete",
       handleMessageComplete as EventListener
     );
+
+    // Handle socket errors (streaming failures)
+    const handleSocketError = (event: CustomEvent) => {
+      const { message: errorMessage, conversationId, messageId } = event.detail;
+
+      if (conversationId !== currentConversation?.id) {
+        return;
+      }
+
+      console.error("[ChatPage] Socket error:", errorMessage);
+
+      // Clear sending flags to allow retry
+      setIsSendingMessage(false);
+      isCreatingAndSendingRef.current = false;
+
+      // Remove typing message if present
+      setMessages((prev) => prev.filter((m) => !m.isTyping));
+
+      // Show error notification
+      antdMessage.error(
+        errorMessage || "Message sending failed. Please try again."
+      );
+    };
+
+    window.addEventListener("socket:error", handleSocketError as EventListener);
+
     const handleMessageNew = (event: CustomEvent) => {
       const { conversationId, message } = event.detail;
 
@@ -665,9 +784,8 @@ const ChatPage: React.FC = () => {
           return prev;
         }
 
-        // IMPROVED: If there's an optimistic pending user message with the same content,
-        // check timestamp window to avoid filtering legitimate duplicate content
-        const hasMatchingPending = prev.some((m) => {
+        // CRITICAL FIX: Find and REPLACE optimistic pending message instead of just filtering
+        const matchingPendingIndex = prev.findIndex((m) => {
           if (m.localStatus !== "pending" || m.role !== "user") return false;
           if (m.conversation_id !== message.conversation_id) return false;
 
@@ -676,21 +794,23 @@ const ChatPage: React.FC = () => {
             String(message.content || "").trim();
           if (!contentMatch) return false;
 
-          // Check if sent within last 2 seconds (timestamp window)
-          // This allows users to send the same content twice if enough time has passed
+          // Check if sent within last 5 seconds (timestamp window)
           try {
             const msgTime = new Date(message.createdAt).getTime();
             const optimisticTime = new Date(m.createdAt).getTime();
             const timeDiff = Math.abs(msgTime - optimisticTime);
-            return timeDiff < 2000; // 2 second window
+            return timeDiff < 5000; // 5 second window
           } catch {
             // If timestamp parsing fails, assume it's a match to be safe
             return true;
           }
         });
 
-        if (hasMatchingPending) {
-          return prev;
+        // If found matching optimistic message, REPLACE it with real message
+        if (matchingPendingIndex !== -1) {
+          const newMessages = [...prev];
+          newMessages[matchingPendingIndex] = message;
+          return newMessages;
         }
 
         // Otherwise append normally
@@ -777,6 +897,10 @@ const ChatPage: React.FC = () => {
       window.removeEventListener(
         "message:complete",
         handleMessageComplete as EventListener
+      );
+      window.removeEventListener(
+        "socket:error",
+        handleSocketError as EventListener
       );
       window.removeEventListener(
         "message:new",
@@ -1144,8 +1268,9 @@ const ChatPage: React.FC = () => {
 
             setIsSendingMessage(false);
 
-            // CRITICAL: Clear the flag to allow useEffect to run normally
-            isCreatingAndSendingRef.current = false;
+            // NOTE: Don't clear isCreatingAndSendingRef here!
+            // It will be cleared in handleMessageComplete after receiving the complete message
+            // This prevents useEffect from reloading messages while streaming is in progress
 
             // WebSocket is fire-and-forget, response will come via event listeners
             return;

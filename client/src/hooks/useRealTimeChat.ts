@@ -83,8 +83,13 @@ export const useRealTimeChat = (
         };
         messageId?: string;
       }) => {
+        // Determine the conversation ID from either message
+        const dataConversationId =
+          data.userMessage?.conversation_id ||
+          data.assistantMessage?.conversation_id;
+
         // Only process conversation updates if it's the current conversation
-        if (data.userMessage.conversation_id !== conversation?.id) {
+        if (dataConversationId !== conversation?.id) {
           // Still dispatch event for other components to handle
           window.dispatchEvent(
             new CustomEvent("message:complete", { detail: data })
