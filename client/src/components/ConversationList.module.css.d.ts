@@ -3,6 +3,10 @@ declare const styles: {
   readonly dropZoneActive: string;
   readonly collapsed: string;
   readonly conversationsScrollContainer: string;
+  readonly dropZoneHint: string;
+  readonly emptyDropZone: string;
+  readonly dropZoneIcon: string;
+  readonly dropZoneText: string;
   readonly listItem: string;
   readonly conversationItem: string;
   readonly active: string;

@@ -194,9 +194,20 @@ const Sidebar: React.FC<SidebarProps> = ({
     const onMessageSent = () => loadConversations();
 
     // Listen for conversation:moved events (from WebSocket or local)
-    const onConversationMoved = () => {
-      // Reload conversations to ensure consistency across tabs
-      loadConversations({ reset: true });
+    const onConversationMoved = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      const { conversationId, oldProjectId, newProjectId } = detail;
+
+      // If moved TO "All Conversations" (newProjectId = null), reload to show it
+      if (newProjectId === null) {
+        loadConversations({ reset: true });
+      } else {
+        // If moved FROM "All Conversations" to a project, just remove from list
+        setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+        setFilteredConversations((prev) =>
+          prev.filter((c) => c.id !== conversationId)
+        );
+      }
     };
 
     window.addEventListener("conversations:refresh", onRefresh);
@@ -245,14 +256,20 @@ const Sidebar: React.FC<SidebarProps> = ({
    * Handle drag over project
    */
   const handleProjectDragOver = (projectId: string, isValid: boolean) => {
-    setDragDropState((prev) => ({
-      ...prev,
-      dropTarget: {
-        projectId,
-        isValid,
-        type: "project",
-      },
-    }));
+    setDragDropState((prev) => {
+      // Validate: cannot drop on same project
+      const sourceProjectId = prev.draggedItem?.sourceProjectId;
+      const actualIsValid = sourceProjectId !== projectId;
+
+      return {
+        ...prev,
+        dropTarget: {
+          projectId,
+          isValid: actualIsValid,
+          type: "project",
+        },
+      };
+    });
   };
 
   /**
@@ -304,14 +321,18 @@ const Sidebar: React.FC<SidebarProps> = ({
    * Handle drag over "All Conversations" section
    */
   const handleAllConversationsDragOver = () => {
-    setDragDropState((prev) => ({
-      ...prev,
-      dropTarget: {
-        projectId: null,
-        isValid: !!prev.draggedItem?.sourceProjectId, // Only valid if coming from a project
-        type: "all-conversations",
-      },
-    }));
+    setDragDropState((prev) => {
+      const isValid = !!prev.draggedItem?.sourceProjectId;
+      return {
+        ...prev,
+        dropTarget: {
+          projectId: null,
+          // Only valid if coming from a project (has sourceProjectId and not null)
+          isValid,
+          type: "all-conversations",
+        },
+      };
+    });
   };
 
   /**
@@ -329,6 +350,46 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
 
     try {
+      // Check if conversation already in list (optimistic update)
+      const existingConv = conversations.find((c) => c.id === conversationId);
+
+      if (existingConv) {
+        // Already in memory, just update and move to top
+        const updatedConv = { ...existingConv, project_id: null };
+        setConversations((prev) => [
+          updatedConv,
+          ...prev.filter((c) => c.id !== conversationId),
+        ]);
+        setFilteredConversations((prev) => [
+          updatedConv,
+          ...prev.filter((c) => c.id !== conversationId),
+        ]);
+      } else {
+        // Not in current list - fetch the conversation to add it
+        try {
+          const { getConversation } = await import("../services/chat.service");
+          const fetchedConv = await getConversation(conversationId);
+          const convListItem: ConversationListItem = {
+            id: fetchedConv.id,
+            title: fetchedConv.title,
+            model: fetchedConv.model,
+            context_window: fetchedConv.context_window,
+            message_count: 0, // Will be updated on next load
+            updatedAt: fetchedConv.updatedAt,
+            tags: fetchedConv.tags || [],
+            project_id: null, // Remove from project
+            order_in_project: 0,
+          };
+
+          // Add to top of list
+          setConversations((prev) => [convListItem, ...prev]);
+          setFilteredConversations((prev) => [convListItem, ...prev]);
+        } catch (fetchError) {
+          console.error("Failed to fetch conversation:", fetchError);
+          // Continue with API call anyway
+        }
+      }
+
       // Remove from project (set project_id to null)
       await moveConversationToProject(conversationId, null);
 
@@ -346,7 +407,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       );
     } catch (err: any) {
       antdMessage.error(err?.message || "Failed to move conversation");
-      // Reload to ensure consistency
+      // Rollback optimistic update by reloading from server
       await loadConversations({ reset: true });
     } finally {
       handleConversationDragEnd();

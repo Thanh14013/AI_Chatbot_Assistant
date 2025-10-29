@@ -357,6 +357,15 @@ class WebSocketService {
       this.socket.on("error", (error) => {
         // logging removed
         this.handlers.onError?.(error);
+
+        // Dispatch window event for error handling in ChatPage
+        try {
+          window.dispatchEvent(
+            new CustomEvent("socket:error", { detail: error })
+          );
+        } catch {
+          // ignore dispatch errors
+        }
       });
 
       // Message events

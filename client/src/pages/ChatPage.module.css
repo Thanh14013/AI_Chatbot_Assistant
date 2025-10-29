@@ -267,11 +267,17 @@
 
   .mobileMenuBtn {
     display: flex;
+    /* Safe area support for left side */
+    left: calc(12px + env(safe-area-inset-left, 0px));
   }
 
   /* Adjust conversation header padding for mobile menu button */
   .conversationHeader {
     padding: 12px 20px 12px 56px;
+    /* Safe area support for top (Dynamic Island/Notch) */
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    padding-left: calc(56px + env(safe-area-inset-left, 0px));
+    padding-right: calc(20px + env(safe-area-inset-right, 0px));
   }
 
   .conversationTitle {
@@ -287,10 +293,64 @@
 @media (max-width: 480px) {
   .conversationHeader {
     padding: 8px 14px 8px 52px;
+    padding-top: calc(8px + env(safe-area-inset-top, 0px));
+    padding-left: calc(52px + env(safe-area-inset-left, 0px));
+    padding-right: calc(14px + env(safe-area-inset-right, 0px));
   }
 
   .conversationTitle {
     font-size: 15px !important;
+  }
+}
+
+/* iPhone 16 specific (393px width) */
+@media (max-width: 430px) {
+  .conversationHeader {
+    min-height: 52px;
+  }
+
+  .mobileMenuBtn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .headerTagsContainer {
+    display: none; /* Hide tags on very small screens */
+  }
+}
+
+/* Landscape orientation for mobile */
+@media (max-width: 932px) and (orientation: landscape) {
+  .chatPageLayout {
+    height: 100vh;
+    height: -webkit-fill-available;
+  }
+
+  .mainLayout {
+    height: calc(100vh - 48px);
+    height: calc(-webkit-fill-available - 48px);
+  }
+
+  .conversationHeader {
+    padding: 6px 16px 6px 48px;
+    padding-left: calc(48px + env(safe-area-inset-left, 0px));
+    padding-right: calc(16px + env(safe-area-inset-right, 0px));
+    min-height: 44px;
+  }
+
+  .conversationTitle {
+    font-size: 14px !important;
+  }
+
+  .mobileMenuBtn {
+    width: 36px;
+    height: 36px;
+    top: 6px;
+  }
+
+  /* Hide search in landscape to save space */
+  .conversationSearchContainer {
+    display: none;
   }
 }
 

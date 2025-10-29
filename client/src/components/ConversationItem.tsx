@@ -107,7 +107,13 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     if (draggable && onDragStart) {
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("conversationId", conversation.id);
-      e.dataTransfer.setData("projectId", conversation.project_id || "null");
+      // Ensure projectId is properly set - use "null" string for null values
+      const projectIdValue = conversation.project_id
+        ? conversation.project_id
+        : "null";
+      e.dataTransfer.setData("projectId", projectIdValue);
+
+      // Pass actual null value to callback
       onDragStart(conversation.id, conversation.project_id || null);
     }
   };
