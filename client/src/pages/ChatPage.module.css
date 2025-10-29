@@ -123,7 +123,7 @@
 .contentArea {
   display: flex;
   flex-direction: column;
-  background-color: white;
+  background-color: #ffffff;
   position: relative;
   overflow: hidden;
   flex: 1 1 auto;

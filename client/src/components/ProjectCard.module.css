@@ -1,7 +1,6 @@
 .projectCard {
   margin-bottom: 8px;
   border-radius: 8px;
-  transition: all 0.2s;
   background: transparent;
 }
 
@@ -30,7 +29,6 @@
   color: rgba(0, 0, 0, 0.45);
   font-size: 12px;
   flex-shrink: 0;
-  transition: transform 0.2s;
 }
 
 .projectIcon {
@@ -53,29 +51,29 @@
 }
 
 .menuButton {
-  opacity: 0.7;
-  transition: opacity 0.2s;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.projectCard:hover .menuButton {
+  opacity: 1;
 }
 
 .menuButton:hover {
-  opacity: 1;
   background: rgba(0, 0, 0, 0.04);
 }
 
 .conversationsList {
   padding-left: 24px;
   margin-top: 4px;
-  animation: slideDown 0.2s ease-out;
 }
 
 @keyframes slideDown {
   from {
     opacity: 0;
-    transform: translateY(-4px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -95,24 +93,9 @@
   background: rgba(0, 122, 255, 0.05);
   border: 2px solid #007aff;
   box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.2);
-  transition: all 250ms ease;
 }
 
 .projectCard.dragOverInvalid {
   background: rgba(255, 59, 48, 0.05);
   border: 2px solid #ff3b30;
-  animation: shake 400ms ease;
-}
-
-@keyframes shake {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  25% {
-    transform: translateX(-4px);
-  }
-  75% {
-    transform: translateX(4px);
-  }
 }
