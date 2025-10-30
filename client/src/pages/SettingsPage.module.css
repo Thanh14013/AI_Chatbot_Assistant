@@ -69,33 +69,3 @@
   margin-top: 16px;
   margin-bottom: 0;
 }
-
-/* Mobile responsiveness */
-@media (max-width: 768px) {
-  .container {
-    padding: 24px 12px;
-  }
-
-  .card {
-    width: 100%;
-    min-width: unset;
-    max-width: 100%;
-    padding: 24px;
-  }
-
-  .icon {
-    font-size: 28px;
-  }
-
-  .title {
-    font-size: 20px;
-  }
-}
-
-/* Tablet */
-@media (min-width: 769px) and (max-width: 1024px) {
-  .card {
-    width: 70%;
-    min-width: 450px;
-  }
-}

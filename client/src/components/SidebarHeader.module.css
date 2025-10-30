@@ -259,19 +259,3 @@
   color: #999;
   font-size: 13px;
 }
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .header {
-    padding: 8px 10px;
-  }
-
-  .newButton {
-    padding: 0 10px;
-    font-size: 13px;
-  }
-
-  .searchBar {
-    min-height: 30px;
-  }
-}

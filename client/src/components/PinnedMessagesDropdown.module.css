@@ -145,25 +145,6 @@
   }
 }
 
-/* Responsive design for mobile */
-@media (max-width: 768px) {
-  .pinnedMessagesDropdown {
-    max-width: 90vw;
-  }
-
-  .pinnedMessagesDropdown :global(.ant-dropdown-menu) {
-    min-width: 300px;
-  }
-
-  .pinnedMessageItem {
-    padding: 10px 32px 10px 10px;
-  }
-
-  .unpinButton {
-    opacity: 0.8;
-  }
-}
-
 /* Modern scrollbar for dropdown */
 .pinnedMessagesDropdown :global(.ant-dropdown-menu)::-webkit-scrollbar {
   width: 8px;

@@ -294,23 +294,3 @@
   background-color: #f9f9f9;
   cursor: not-allowed;
 }
-
-/* Responsive */
-@media (max-width: 768px) {
-  .settingsModal :global(.ant-modal) {
-    max-width: calc(100vw - 32px);
-    margin: 16px;
-  }
-
-  .section {
-    padding: 16px;
-  }
-
-  .sectionIcon {
-    font-size: 20px;
-  }
-
-  .sectionTitle {
-    font-size: 16px;
-  }
-}

@@ -133,21 +133,6 @@
   outline-offset: -2px;
 }
 
-/* Responsive design for mobile */
-@media (max-width: 768px) {
-  .conversationItem {
-    padding: 10px 12px;
-  }
-
-  .title {
-    font-size: 13px;
-  }
-
-  .tags {
-    font-size: 9px;
-  }
-}
-
 /* Remove unused styles - keeping only what's needed for minimal design */
 .tagsContainer,
 .metadata,

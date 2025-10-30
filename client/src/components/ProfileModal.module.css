@@ -359,37 +359,3 @@
 .profileModal :global(.ant-modal-body)::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(135deg, #5568d3 0%, #653a8a 100%);
 }
-
-/* Responsive */
-@media (max-width: 768px) {
-  .profileModal :global(.ant-modal) {
-    max-width: calc(100vw - 32px);
-    margin: 16px;
-  }
-
-  .section {
-    padding: 16px;
-  }
-
-  .sectionIcon {
-    font-size: 20px;
-  }
-
-  .sectionTitle {
-    font-size: 16px;
-  }
-
-  .passwordRow {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-
-  .passwordRow button {
-    width: 100%;
-  }
-
-  .avatarSection {
-    padding: 16px 0;
-  }
-}

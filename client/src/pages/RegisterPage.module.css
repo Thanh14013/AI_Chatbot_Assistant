@@ -47,15 +47,3 @@
 .link {
   font-weight: 500;
 }
-
-@media (max-width: 768px) {
-  .card {
-    width: 100%;
-    max-width: 420px;
-    padding: 20px;
-  }
-  .container {
-    padding: 24px 12px;
-    position: fixed;
-  }
-}

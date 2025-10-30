@@ -1,7 +1,6 @@
 /* UserSection Styles */
 .userSection {
   padding: 6px 8px;
-  border-top: 1px solid #f0f0f0;
   background: #fff;
   width: 100%;
   transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -94,31 +93,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .userSection {
-    padding: 12px;
-  }
-
-  .userInfo {
-    padding: 6px;
-  }
-
-  .avatar {
-    width: 36px !important;
-    height: 36px !important;
-    font-size: 14px;
-  }
-
-  .userName {
-    font-size: 13px;
-  }
-
-  .userEmail {
-    font-size: 11px;
-  }
 }
 
 /* Tooltip content styles */

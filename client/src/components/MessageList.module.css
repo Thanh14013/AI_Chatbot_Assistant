@@ -6,7 +6,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: linear-gradient(to top, #f9fafb 0%, #ffffff 100%);
+  background: #ffffff;
 }
 
 /* load earlier button removed: message list auto-loads when scrolled near top */
@@ -24,7 +24,7 @@
 }
 
 .messageList::-webkit-scrollbar-track {
-  background: #f9fafb;
+  background: #ffffff;
   border-radius: 4px;
 }
 
@@ -152,99 +152,6 @@
   }
 }
 
-/* Responsive design for mobile */
-@media (max-width: 768px) {
-  .messageList {
-    padding: 16px 12px;
-    /* Add safe area padding for edges */
-    padding-left: calc(12px + env(safe-area-inset-left, 0px));
-    padding-right: calc(12px + env(safe-area-inset-right, 0px));
-  }
-
-  .scrollButton {
-    bottom: 80px; /* Adjusted for input area */
-    right: 16px;
-    /* Safe area support */
-    bottom: calc(80px + env(safe-area-inset-bottom, 0px));
-    right: calc(16px + env(safe-area-inset-right, 0px));
-    /* Better touch target */
-    width: 44px;
-    height: 44px;
-  }
-
-  .loadingIndicator {
-    bottom: 20px;
-    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-  }
-
-  .emptyPlaceholder {
-    font-size: 36px;
-  }
-}
-
-/* iPhone 16 specific (393px width) */
-@media (max-width: 430px) {
-  .messageList {
-    padding: 12px 10px;
-    padding-left: calc(10px + env(safe-area-inset-left, 0px));
-    padding-right: calc(10px + env(safe-area-inset-right, 0px));
-  }
-
-  .scrollButton {
-    width: 48px; /* Larger for better touch */
-    height: 48px;
-    bottom: calc(90px + env(safe-area-inset-bottom, 0px));
-  }
-
-  .emptyPlaceholder {
-    font-size: 32px;
-  }
-}
-
-/* Landscape orientation for mobile */
-@media (max-width: 932px) and (orientation: landscape) {
-  .messageListContainer {
-    /* Optimize for shorter height */
-    background: linear-gradient(to top, #fafafa 0%, #ffffff 100%);
-  }
-
-  .messageList {
-    padding: 10px 12px;
-    padding-left: calc(12px + env(safe-area-inset-left, 0px));
-    padding-right: calc(12px + env(safe-area-inset-right, 0px));
-  }
-
-  .scrollButton {
-    bottom: calc(60px + env(safe-area-inset-bottom, 0px));
-    right: calc(12px + env(safe-area-inset-right, 0px));
-    width: 40px;
-    height: 40px;
-  }
-
-  .loadingIndicator {
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-    padding: 6px 12px;
-  }
-
-  .loadingText {
-    font-size: 12px;
-  }
-
-  .emptyPlaceholder {
-    font-size: 28px;
-  }
-
-  /* Optimize skeleton loading */
-  .loadingContainer {
-    padding: 12px;
-  }
-
-  .skeletonItem {
-    margin-bottom: 12px;
-    padding: 8px;
-  }
-}
-
 /* Empty state placeholder */
 .emptyPlaceholder {
   position: absolute;
@@ -257,10 +164,4 @@
   user-select: none;
   pointer-events: none;
   white-space: nowrap;
-}
-
-@media (max-width: 768px) {
-  .emptyPlaceholder {
-    font-size: 36px;
-  }
 }

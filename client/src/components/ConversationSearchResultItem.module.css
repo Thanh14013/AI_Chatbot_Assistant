@@ -165,28 +165,3 @@
   border-radius: 2px;
   font-weight: 600;
 }
-
-/* Responsive design */
-@media (max-width: 768px) {
-  .conversationItem {
-    padding: 10px 12px;
-  }
-
-  .title {
-    font-size: 13px;
-  }
-
-  .badge {
-    font-size: 11px;
-    padding: 0 5px;
-  }
-
-  .dropdown {
-    left: -8px;
-    right: -8px;
-  }
-
-  .messagePreview {
-    padding: 10px 12px;
-  }
-}

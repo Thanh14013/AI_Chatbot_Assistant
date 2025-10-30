@@ -81,31 +81,6 @@
   }
 }
 
-/* Responsive design */
-@media (max-width: 768px) {
-  .conversationModal {
-    width: 95% !important;
-    margin: 10px auto;
-  }
-
-  .conversationForm {
-    .ant-form-item {
-      margin-bottom: 16px;
-    }
-  }
-
-  .modelOption {
-    .modelDescription {
-      display: none; /* Hide descriptions on mobile to save space */
-    }
-  }
-
-  .contextDescription {
-    padding: 8px;
-    font-size: 12px;
-  }
-}
-
 /* Form validation styles */
 .conversationForm {
   .ant-form-item-has-error {

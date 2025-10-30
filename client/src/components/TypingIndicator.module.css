@@ -105,23 +105,6 @@
   border-color: var(--ant-color-border);
 }
 
-/* Responsive design - Compact */
-@media (max-width: 768px) {
-  .typingIndicator {
-    padding: 6px 10px;
-    gap: 4px;
-  }
-
-  .message {
-    font-size: 12px;
-  }
-
-  .dot {
-    width: 4px;
-    height: 4px;
-  }
-}
-
 /* High contrast mode */
 @media (prefers-contrast: high) {
   .dot {

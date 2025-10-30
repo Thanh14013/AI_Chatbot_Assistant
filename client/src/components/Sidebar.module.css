@@ -84,7 +84,6 @@
   background: #fff;
   z-index: 10;
   padding: 12px 16px;
-  border-top: 1px solid #f0f0f0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -144,73 +143,6 @@
 
 .collapseToggle:active {
   transform: scale(0.95);
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-  .sidebar {
-    width: 280px !important; /* Optimized for mobile drawer */
-  }
-
-  .headerSection {
-    /* Safe area support for top */
-    padding-top: env(safe-area-inset-top, 0px);
-  }
-
-  .bottomSection {
-    /* Safe area support for bottom */
-    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  }
-}
-
-@media (max-width: 480px) {
-  .sidebar {
-    width: 260px !important; /* Slightly narrower for small phones */
-  }
-}
-
-/* iPhone 16 specific (393px width) */
-@media (max-width: 430px) {
-  .sidebar {
-    width: 300px !important; /* Use more screen space */
-    max-width: 80vw; /* But don't exceed 80% of viewport */
-  }
-
-  .middleSection {
-    height: auto; /* Flexible height */
-    max-height: calc(100vh - 200px);
-  }
-}
-
-/* Landscape orientation */
-@media (max-width: 932px) and (orientation: landscape) {
-  .sidebar {
-    width: 240px !important; /* Narrower in landscape to save space */
-    max-width: 50vw;
-  }
-
-  .headerSection {
-    height: 52px; /* Shorter header */
-    padding-top: calc(4px + env(safe-area-inset-top, 0px));
-  }
-
-  .middleSection {
-    height: auto;
-    max-height: calc(100vh - 120px);
-    padding-left: calc(2px + env(safe-area-inset-left, 0px));
-  }
-
-  .bottomSection {
-    height: 40px;
-    padding: 8px 12px;
-    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
-  }
-
-  .collapseToggle {
-    width: 24px;
-    height: 24px;
-    font-size: 12px;
-  }
 }
 
 /* Smooth animations for content visibility */
