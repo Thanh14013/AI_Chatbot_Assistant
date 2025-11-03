@@ -19,6 +19,7 @@ import { websocketService } from "./websocket.service";
 /**
  * Register a new user
  */
+
 export const register = async (
   data: RegisterRequest
 ): Promise<AuthResponse> => {

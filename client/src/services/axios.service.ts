@@ -2,7 +2,7 @@
  * Axios instance configuration with interceptors
  * Handles automatic token attachment and refresh logic
  */
-
+import dotenv from "dotenv";
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 import {
   getAccessToken,
@@ -11,10 +11,10 @@ import {
 } from "../utils/token.util";
 import { websocketService } from "./websocket.service";
 import type { ApiErrorResponse, RefreshTokenResponse } from "../types";
-
+dotenv.config();
 // Create axios instance with base configuration
 const axiosInstance = axios.create({
-  baseURL: "/api",
+  baseURL: `${process.env.VITE_BACKEND_URL}${process.env.VITE_API_BASE_URL}`,
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",

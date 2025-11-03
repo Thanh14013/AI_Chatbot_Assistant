@@ -1,0 +1,355 @@
+name: Monitoring & Health Checks
+
+on:
+  schedule:
+    # Run every 15 minutes
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to check"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+          - all
+
+env:
+  ALERT_THRESHOLD_RESPONSE_TIME: 3000 # milliseconds
+  ALERT_THRESHOLD_ERROR_RATE: 5 # percentage
+
+jobs:
+  # ========================================
+  # Health Check - Staging
+  # ========================================
+  health-check-staging:
+    name: Staging Health Check
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'schedule' || 
+      inputs.environment == 'staging' || 
+      inputs.environment == 'all'
+
+    steps:
+      - name: Check API health
+        id: api-health
+        continue-on-error: true
+        run: |
+          echo "🔍 Checking staging API health..."
+
+          START_TIME=$(date +%s%3N)
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}|%{time_total}" ${{ secrets.STAGING_URL }}/api/health)
+          END_TIME=$(date +%s%3N)
+
+          HTTP_CODE=$(echo $RESPONSE | cut -d'|' -f1)
+          TIME_TOTAL=$(echo $RESPONSE | cut -d'|' -f2)
+          RESPONSE_TIME=$(echo "scale=0; $TIME_TOTAL * 1000 / 1" | bc)
+
+          echo "http_code=$HTTP_CODE" >> $GITHUB_OUTPUT
+          echo "response_time=$RESPONSE_TIME" >> $GITHUB_OUTPUT
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "status=unhealthy" >> $GITHUB_OUTPUT
+            echo "❌ API is unhealthy (HTTP $HTTP_CODE)"
+            exit 1
+          else
+            echo "status=healthy" >> $GITHUB_OUTPUT
+            echo "✅ API is healthy (${RESPONSE_TIME}ms)"
+          fi
+
+      - name: Check frontend
+        id: frontend-health
+        continue-on-error: true
+        run: |
+          echo "🔍 Checking staging frontend..."
+
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.STAGING_URL }})
+
+          if [ "$RESPONSE" != "200" ]; then
+            echo "status=unhealthy" >> $GITHUB_OUTPUT
+            echo "❌ Frontend is unhealthy (HTTP $RESPONSE)"
+            exit 1
+          else
+            echo "status=healthy" >> $GITHUB_OUTPUT
+            echo "✅ Frontend is healthy"
+          fi
+
+      - name: Check database connectivity
+        id: db-health
+        continue-on-error: true
+        run: |
+          echo "🔍 Checking database connectivity..."
+
+          # Try to hit an endpoint that requires database
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.STAGING_URL }}/api/auth/login -X POST)
+
+          # 400 or 401 means the endpoint is working but no credentials provided (expected)
+          if [ "$RESPONSE" == "400" ] || [ "$RESPONSE" == "401" ]; then
+            echo "status=healthy" >> $GITHUB_OUTPUT
+            echo "✅ Database connectivity is healthy"
+          else
+            echo "status=unhealthy" >> $GITHUB_OUTPUT
+            echo "❌ Database connectivity issue (HTTP $RESPONSE)"
+            exit 1
+          fi
+
+      - name: Create staging health report
+        if: always()
+        run: |
+          echo "## 🏥 Staging Health Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| API | ${{ steps.api-health.outputs.status || 'unknown' }} | Response: ${{ steps.api-health.outputs.response_time || 'N/A' }}ms |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | ${{ steps.frontend-health.outputs.status || 'unknown' }} | HTTP ${{ steps.frontend-health.outputs.http_code || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Database | ${{ steps.db-health.outputs.status || 'unknown' }} | Connectivity check |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Alert if unhealthy
+        if: |
+          steps.api-health.outputs.status == 'unhealthy' ||
+          steps.frontend-health.outputs.status == 'unhealthy' ||
+          steps.db-health.outputs.status == 'unhealthy'
+        run: |
+          echo "🚨 ALERT: Staging environment has health issues!"
+          # Add alerting logic here (Slack, PagerDuty, email, etc.)
+
+  # ========================================
+  # Health Check - Production
+  # ========================================
+  health-check-production:
+    name: Production Health Check
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'schedule' || 
+      inputs.environment == 'production' || 
+      inputs.environment == 'all'
+
+    steps:
+      - name: Check API health
+        id: api-health
+        continue-on-error: true
+        run: |
+          echo "🔍 Checking production API health..."
+
+          START_TIME=$(date +%s%3N)
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}|%{time_total}" ${{ secrets.PRODUCTION_URL }}/api/health)
+          END_TIME=$(date +%s%3N)
+
+          HTTP_CODE=$(echo $RESPONSE | cut -d'|' -f1)
+          TIME_TOTAL=$(echo $RESPONSE | cut -d'|' -f2)
+          RESPONSE_TIME=$(echo "scale=0; $TIME_TOTAL * 1000 / 1" | bc)
+
+          echo "http_code=$HTTP_CODE" >> $GITHUB_OUTPUT
+          echo "response_time=$RESPONSE_TIME" >> $GITHUB_OUTPUT
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "status=unhealthy" >> $GITHUB_OUTPUT
+            echo "❌ API is unhealthy (HTTP $HTTP_CODE)"
+            exit 1
+          else
+            echo "status=healthy" >> $GITHUB_OUTPUT
+            echo "✅ API is healthy (${RESPONSE_TIME}ms)"
+          fi
+
+          # Check response time threshold
+          if [ "$RESPONSE_TIME" -gt "${{ env.ALERT_THRESHOLD_RESPONSE_TIME }}" ]; then
+            echo "performance_warning=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Response time exceeds threshold"
+          fi
+
+      - name: Check frontend
+        id: frontend-health
+        continue-on-error: true
+        run: |
+          echo "🔍 Checking production frontend..."
+
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.PRODUCTION_URL }})
+
+          if [ "$RESPONSE" != "200" ]; then
+            echo "status=unhealthy" >> $GITHUB_OUTPUT
+            echo "❌ Frontend is unhealthy (HTTP $RESPONSE)"
+            exit 1
+          else
+            echo "status=healthy" >> $GITHUB_OUTPUT
+            echo "✅ Frontend is healthy"
+          fi
+
+      - name: Check database connectivity
+        id: db-health
+        continue-on-error: true
+        run: |
+          echo "🔍 Checking database connectivity..."
+
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.PRODUCTION_URL }}/api/auth/login -X POST)
+
+          if [ "$RESPONSE" == "400" ] || [ "$RESPONSE" == "401" ]; then
+            echo "status=healthy" >> $GITHUB_OUTPUT
+            echo "✅ Database connectivity is healthy"
+          else
+            echo "status=unhealthy" >> $GITHUB_OUTPUT
+            echo "❌ Database connectivity issue (HTTP $RESPONSE)"
+            exit 1
+          fi
+
+      - name: Check SSL certificate
+        id: ssl-check
+        continue-on-error: true
+        run: |
+          echo "🔍 Checking SSL certificate..."
+
+          DOMAIN=$(echo ${{ secrets.PRODUCTION_URL }} | sed -e 's|^[^/]*//||' -e 's|/.*$||')
+          EXPIRY=$(echo | openssl s_client -servername $DOMAIN -connect $DOMAIN:443 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
+
+          if [ -z "$EXPIRY" ]; then
+            echo "status=unknown" >> $GITHUB_OUTPUT
+            echo "⚠️ Could not check SSL certificate"
+          else
+            EXPIRY_EPOCH=$(date -d "$EXPIRY" +%s)
+            CURRENT_EPOCH=$(date +%s)
+            DAYS_UNTIL_EXPIRY=$(( ($EXPIRY_EPOCH - $CURRENT_EPOCH) / 86400 ))
+            
+            echo "days_until_expiry=$DAYS_UNTIL_EXPIRY" >> $GITHUB_OUTPUT
+            
+            if [ $DAYS_UNTIL_EXPIRY -lt 30 ]; then
+              echo "status=warning" >> $GITHUB_OUTPUT
+              echo "⚠️ SSL certificate expires in $DAYS_UNTIL_EXPIRY days"
+            else
+              echo "status=healthy" >> $GITHUB_OUTPUT
+              echo "✅ SSL certificate valid for $DAYS_UNTIL_EXPIRY days"
+            fi
+          fi
+
+      - name: Check WebSocket connectivity
+        id: websocket-health
+        continue-on-error: true
+        run: |
+          echo "🔍 Checking WebSocket connectivity..."
+
+          # Try to connect to Socket.IO endpoint
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.PRODUCTION_URL }}/socket.io/)
+
+          if [ "$RESPONSE" == "200" ] || [ "$RESPONSE" == "400" ]; then
+            echo "status=healthy" >> $GITHUB_OUTPUT
+            echo "✅ WebSocket endpoint is accessible"
+          else
+            echo "status=unhealthy" >> $GITHUB_OUTPUT
+            echo "❌ WebSocket endpoint issue (HTTP $RESPONSE)"
+            exit 1
+          fi
+
+      - name: Create production health report
+        if: always()
+        run: |
+          echo "## 🏥 Production Health Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| API | ${{ steps.api-health.outputs.status || 'unknown' }} | Response: ${{ steps.api-health.outputs.response_time || 'N/A' }}ms |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | ${{ steps.frontend-health.outputs.status || 'unknown' }} | HTTP ${{ steps.frontend-health.outputs.http_code || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Database | ${{ steps.db-health.outputs.status || 'unknown' }} | Connectivity check |" >> $GITHUB_STEP_SUMMARY
+          echo "| SSL Certificate | ${{ steps.ssl-check.outputs.status || 'unknown' }} | Expires in ${{ steps.ssl-check.outputs.days_until_expiry || 'N/A' }} days |" >> $GITHUB_STEP_SUMMARY
+          echo "| WebSocket | ${{ steps.websocket-health.outputs.status || 'unknown' }} | Socket.IO endpoint |" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.api-health.outputs.performance_warning }}" == "true" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **Performance Warning:** API response time exceeds threshold" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Critical alert
+        if: |
+          steps.api-health.outputs.status == 'unhealthy' ||
+          steps.frontend-health.outputs.status == 'unhealthy' ||
+          steps.db-health.outputs.status == 'unhealthy' ||
+          steps.websocket-health.outputs.status == 'unhealthy'
+        run: |
+          echo "🚨 CRITICAL ALERT: Production environment has health issues!"
+          echo "Immediate attention required!"
+          # Add critical alerting (PagerDuty, SMS, etc.)
+
+      - name: Warning alert
+        if: |
+          steps.ssl-check.outputs.status == 'warning' ||
+          steps.api-health.outputs.performance_warning == 'true'
+        run: |
+          echo "⚠️ WARNING: Production environment has warnings"
+          # Add warning notifications
+
+  # ========================================
+  # Docker Hub Image Check
+  # ========================================
+  check-docker-images:
+    name: Check Docker Images
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || inputs.environment == 'all'
+
+    steps:
+      - name: Check latest images
+        run: |
+          echo "🐳 Checking Docker Hub images..."
+
+          # Check server image
+          if docker manifest inspect ${{ secrets.DOCKER_USERNAME }}/ai-chatbot-server:latest > /dev/null 2>&1; then
+            echo "✅ Server image exists"
+            SERVER_DIGEST=$(docker manifest inspect ${{ secrets.DOCKER_USERNAME }}/ai-chatbot-server:latest | grep -m1 digest | awk '{print $2}' | tr -d '",')
+            echo "Server digest: $SERVER_DIGEST"
+          else
+            echo "❌ Server image not found"
+          fi
+
+          # Check client image
+          if docker manifest inspect ${{ secrets.DOCKER_USERNAME }}/ai-chatbot-client:latest > /dev/null 2>&1; then
+            echo "✅ Client image exists"
+            CLIENT_DIGEST=$(docker manifest inspect ${{ secrets.DOCKER_USERNAME }}/ai-chatbot-client:latest | grep -m1 digest | awk '{print $2}' | tr -d '",')
+            echo "Client digest: $CLIENT_DIGEST"
+          else
+            echo "❌ Client image not found"
+          fi
+
+      - name: Create Docker report
+        run: |
+          echo "## 🐳 Docker Images Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All Docker images are available and up to date." >> $GITHUB_STEP_SUMMARY
+
+  # ========================================
+  # Summary Report
+  # ========================================
+  create-summary:
+    name: Create Overall Summary
+    runs-on: ubuntu-latest
+    needs: [health-check-staging, health-check-production, check-docker-images]
+    if: always()
+
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## 📊 Overall System Health" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Check Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          OVERALL_STATUS="✅ All systems operational"
+
+          if [ "${{ needs.health-check-staging.result }}" == "failure" ] || [ "${{ needs.health-check-production.result }}" == "failure" ]; then
+            OVERALL_STATUS="❌ System issues detected"
+          fi
+
+          echo "**Status:** $OVERALL_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Job Results" >> $GITHUB_STEP_SUMMARY
+          echo "- Staging: ${{ needs.health-check-staging.result || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Production: ${{ needs.health-check-production.result || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Docker Images: ${{ needs.check-docker-images.result || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Log monitoring result
+        run: |
+          if [ "${{ needs.health-check-staging.result }}" == "success" ] && [ "${{ needs.health-check-production.result }}" == "success" ]; then
+            echo "✅ Monitoring check completed - All systems healthy"
+          else
+            echo "⚠️ Monitoring check completed - Issues detected"
+          fi

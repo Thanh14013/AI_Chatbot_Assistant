@@ -1,0 +1,294 @@
+name: Rollback Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to rollback"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: "Version to rollback to (Docker image tag)"
+        required: true
+        type: string
+      reason:
+        description: "Reason for rollback"
+        required: true
+        type: string
+      skip_backup:
+        description: "Skip backup before rollback"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  # ========================================
+  # Rollback Validation
+  # ========================================
+  validate-rollback:
+    name: Validate Rollback Request
+    runs-on: ubuntu-latest
+    outputs:
+      proceed: ${{ steps.validation.outputs.proceed }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate inputs
+        id: validation
+        run: |
+          echo "🔍 Validating rollback request..."
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Target version: ${{ inputs.version }}"
+          echo "Reason: ${{ inputs.reason }}"
+
+          # Verify target version exists
+          if ! docker manifest inspect ${{ secrets.DOCKER_USERNAME }}/ai-chatbot-server:${{ inputs.version }} > /dev/null 2>&1; then
+            echo "❌ Server image not found: ${{ inputs.version }}"
+            exit 1
+          fi
+
+          if ! docker manifest inspect ${{ secrets.DOCKER_USERNAME }}/ai-chatbot-client:${{ inputs.version }} > /dev/null 2>&1; then
+            echo "❌ Client image not found: ${{ inputs.version }}"
+            exit 1
+          fi
+
+          echo "✅ Target version validated"
+          echo "proceed=true" >> $GITHUB_OUTPUT
+
+      - name: Create rollback summary
+        run: |
+          echo "## ⚠️ Rollback Request" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Target Version:** ${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Reason:** ${{ inputs.reason }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Initiated by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+
+  # ========================================
+  # Staging Rollback
+  # ========================================
+  rollback-staging:
+    name: Rollback Staging
+    runs-on: ubuntu-latest
+    needs: validate-rollback
+    if: inputs.environment == 'staging' && needs.validate-rollback.outputs.proceed == 'true'
+    environment:
+      name: staging
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.STAGING_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.STAGING_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Create pre-rollback backup
+        if: inputs.skip_backup == false
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'ENDSSH'
+            BACKUP_DIR="/backups/pre-rollback-$(date +%Y%m%d_%H%M%S)"
+            mkdir -p $BACKUP_DIR
+            
+            # Backup current state
+            docker exec ai-chatbot-postgres pg_dump -U postgres ai_chatbot > $BACKUP_DIR/database.sql
+            cp -r ${{ secrets.STAGING_DEPLOY_PATH }}/server/uploads $BACKUP_DIR/
+            
+            echo "✅ Pre-rollback backup created: $BACKUP_DIR"
+          ENDSSH
+
+      - name: Execute rollback
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'ENDSSH'
+            set -e
+            cd ${{ secrets.STAGING_DEPLOY_PATH }}
+            
+            echo "🔄 Starting rollback to version: ${{ inputs.version }}"
+            
+            # Pull target version images
+            docker pull ${{ secrets.DOCKER_USERNAME }}/ai-chatbot-server:${{ inputs.version }}
+            docker pull ${{ secrets.DOCKER_USERNAME }}/ai-chatbot-client:${{ inputs.version }}
+            
+            # Update docker-compose to use specific version
+            export SERVER_IMAGE_TAG=${{ inputs.version }}
+            export CLIENT_IMAGE_TAG=${{ inputs.version }}
+            
+            # Stop current containers
+            docker compose down
+            
+            # Start with target version
+            docker compose up -d
+            
+            # Wait for services
+            sleep 10
+            
+            echo "✅ Rollback completed"
+          ENDSSH
+
+      - name: Verify rollback
+        run: |
+          echo "Verifying rollback..."
+
+          response=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.STAGING_URL }}/api/health || echo "000")
+          if [ "$response" != "200" ]; then
+            echo "❌ Health check failed after rollback"
+            exit 1
+          fi
+
+          echo "✅ Rollback verification passed"
+
+      - name: Create rollback report
+        run: |
+          echo "## ✅ Staging Rollback Completed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** Success" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Verification:** Passed" >> $GITHUB_STEP_SUMMARY
+
+  # ========================================
+  # Production Rollback
+  # ========================================
+  rollback-production:
+    name: Rollback Production
+    runs-on: ubuntu-latest
+    needs: validate-rollback
+    if: inputs.environment == 'production' && needs.validate-rollback.outputs.proceed == 'true'
+    environment:
+      name: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PRODUCTION_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.PRODUCTION_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Create pre-rollback backup
+        if: inputs.skip_backup == false
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} << 'ENDSSH'
+            BACKUP_DIR="/backups/pre-rollback-$(date +%Y%m%d_%H%M%S)"
+            mkdir -p $BACKUP_DIR
+            
+            # Comprehensive backup
+            docker exec ai-chatbot-postgres pg_dump -U postgres ai_chatbot > $BACKUP_DIR/database.sql
+            cp -r ${{ secrets.PRODUCTION_DEPLOY_PATH }}/server/uploads $BACKUP_DIR/
+            docker compose config > $BACKUP_DIR/docker-compose.yml
+            
+            echo "✅ Pre-rollback backup created: $BACKUP_DIR"
+          ENDSSH
+
+      - name: Execute production rollback
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} << 'ENDSSH'
+            set -e
+            cd ${{ secrets.PRODUCTION_DEPLOY_PATH }}
+            
+            echo "🔄 Starting PRODUCTION rollback to version: ${{ inputs.version }}"
+            
+            # Pull target version images
+            docker pull ${{ secrets.DOCKER_USERNAME }}/ai-chatbot-server:${{ inputs.version }}
+            docker pull ${{ secrets.DOCKER_USERNAME }}/ai-chatbot-client:${{ inputs.version }}
+            
+            # Zero-downtime rollback
+            export SERVER_IMAGE_TAG=${{ inputs.version }}
+            export CLIENT_IMAGE_TAG=${{ inputs.version }}
+            
+            # Rolling restart with old version
+            docker compose up -d --no-deps server
+            sleep 10
+            
+            docker compose up -d --no-deps client
+            sleep 5
+            
+            # Verify each service
+            curl -f http://localhost:3000/api/health || exit 1
+            curl -f http://localhost:80 || exit 1
+            
+            echo "✅ Production rollback completed"
+          ENDSSH
+
+      - name: Run post-rollback tests
+        run: |
+          echo "Running post-rollback tests..."
+
+          # Health check
+          response=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.PRODUCTION_URL }}/api/health || echo "000")
+          if [ "$response" != "200" ]; then
+            echo "❌ Health check failed"
+            exit 1
+          fi
+
+          # Test critical endpoints
+          response=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.PRODUCTION_URL }}/api/auth/login -X POST || echo "000")
+          if [ "$response" != "400" ] && [ "$response" != "401" ]; then
+            echo "❌ Auth endpoint check failed"
+            exit 1
+          fi
+
+          echo "✅ All post-rollback tests passed"
+
+      - name: Create production rollback report
+        run: |
+          echo "## ✅ Production Rollback Completed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** Success" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Reason:** ${{ inputs.reason }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Verification:** All tests passed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ⚠️ Important" >> $GITHUB_STEP_SUMMARY
+          echo "- Monitor application metrics closely" >> $GITHUB_STEP_SUMMARY
+          echo "- Investigate root cause of issues" >> $GITHUB_STEP_SUMMARY
+          echo "- Update incident report" >> $GITHUB_STEP_SUMMARY
+
+  # ========================================
+  # Notification
+  # ========================================
+  notify-rollback:
+    name: Notify Team
+    runs-on: ubuntu-latest
+    needs: [rollback-staging, rollback-production]
+    if: always()
+
+    steps:
+      - name: Send notification
+        run: |
+          echo "📢 Sending rollback notification to team..."
+
+          if [[ "${{ needs.rollback-staging.result }}" == "success" ]] || [[ "${{ needs.rollback-production.result }}" == "success" ]]; then
+            echo "✅ Rollback completed successfully"
+          else
+            echo "❌ Rollback encountered issues"
+          fi
+
+          # Add Slack, Discord, email, or PagerDuty notification here
+
+      - name: Create incident report
+        run: |
+          echo "## 📋 Rollback Incident Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Rolled back to:** ${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Reason:** ${{ inputs.reason }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Initiated by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Follow-up Actions" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] Root cause analysis" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] Fix identified issues" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] Update tests to prevent recurrence" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] Document lessons learned" >> $GITHUB_STEP_SUMMARY
