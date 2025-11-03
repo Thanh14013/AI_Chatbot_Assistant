@@ -1,4 +1,5 @@
 import redisClient, { isRedisConnected } from "../config/redis.config.js";
+import { handleError } from "../utils/error-handler.js";
 
 /**
  * Base Cache Service
@@ -75,7 +76,9 @@ export async function deleteCache(key: string): Promise<void> {
     const result = await redisClient.del(key);
     if (result > 0) {
     }
-  } catch (error) {}
+  } catch (error) {
+    handleError(error, { operation: "deleteCache", key });
+  }
 }
 
 /**
@@ -199,7 +202,9 @@ export async function flushAllCache(): Promise<void> {
     }
 
     await redisClient.flushdb();
-  } catch (error) {}
+  } catch (error) {
+    handleError(error, { operation: "flushAllCache" });
+  }
 }
 
 export default {

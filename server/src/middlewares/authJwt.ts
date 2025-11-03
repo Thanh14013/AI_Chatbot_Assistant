@@ -35,7 +35,10 @@ export const authenticateAccessToken = (req: Req, res: Response, next: NextFunct
     // Development-only logging to help trace auth issues
     if (process.env.NODE_ENV === "development") {
       try {
-      } catch {}
+        // Log token validation for debugging
+      } catch (error) {
+        console.error("Error in development logging:", error);
+      }
     }
 
     if (!accessToken) {
@@ -62,7 +65,10 @@ export const authenticateAccessToken = (req: Req, res: Response, next: NextFunct
 
     if (process.env.NODE_ENV === "development") {
       try {
-      } catch {}
+        // Log successful authentication
+      } catch (error) {
+        console.error("Error in development logging:", error);
+      }
     }
 
     next();

@@ -3,14 +3,33 @@
  * Configures routing and authentication
  */
 
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
-import { ConfigProvider, App as AntApp } from "antd";
+import { ConfigProvider, App as AntApp, Spin } from "antd";
 import { AuthProvider } from "./hooks";
 import { PreferencesProvider } from "./stores/preferences.store";
 import { ProtectedRoute } from "./components";
 import ErrorBoundary from "./components/ErrorBoundary";
-import { ChatPage, LoginPage, RegisterPage, NotFoundPage } from "./pages";
+
+// Lazy load pages for code splitting
+const ChatPage = lazy(() => import("./pages/ChatPage"));
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const RegisterPage = lazy(() => import("./pages/RegisterPage"));
+const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
+
+// Loading fallback component
+const PageLoader = () => (
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      height: "100vh",
+    }}
+  >
+    <Spin size="large" tip="Loading..." />
+  </div>
+);
 
 const App: React.FC = () => {
   return (
@@ -31,33 +50,35 @@ const App: React.FC = () => {
             {/* Provide preferences context */}
             <PreferencesProvider>
               {/* Configure application routes */}
-              <Routes>
-                {/* Public routes */}
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
+                  {/* Public routes */}
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="/register" element={<RegisterPage />} />
 
-                {/* Protected routes - require authentication */}
-                <Route
-                  path="/"
-                  element={
-                    <ProtectedRoute>
-                      <ChatPage />
-                    </ProtectedRoute>
-                  }
-                />
-                {/* Conversation-specific route */}
-                <Route
-                  path="/conversations/:id"
-                  element={
-                    <ProtectedRoute>
-                      <ChatPage />
-                    </ProtectedRoute>
-                  }
-                />
+                  {/* Protected routes - require authentication */}
+                  <Route
+                    path="/"
+                    element={
+                      <ProtectedRoute>
+                        <ChatPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  {/* Conversation-specific route */}
+                  <Route
+                    path="/conversations/:id"
+                    element={
+                      <ProtectedRoute>
+                        <ChatPage />
+                      </ProtectedRoute>
+                    }
+                  />
 
-                {/* 404 Not Found route */}
-                <Route path="*" element={<NotFoundPage />} />
-              </Routes>
+                  {/* 404 Not Found route */}
+                  <Route path="*" element={<NotFoundPage />} />
+                </Routes>
+              </Suspense>
             </PreferencesProvider>
           </AuthProvider>
         </ErrorBoundary>

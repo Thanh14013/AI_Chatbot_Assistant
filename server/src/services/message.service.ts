@@ -246,13 +246,23 @@ export const getConversationMessages = async (
       createdAt: msg.createdAt,
     }));
 
-    // Fetch attachments for all messages
-    const { default: fileUploadModel } = await import("../models/fileUpload.model.js");
-    for (const msgResponse of messageResponses) {
+    // Fetch attachments for all messages (batch query to avoid N+1)
+    const messageIds = messageResponses.map((m) => m.id);
+    if (messageIds.length > 0) {
       try {
-        const attachments = await fileUploadModel.findByMessageId(msgResponse.id);
-        if (attachments && attachments.length > 0) {
-          msgResponse.attachments = attachments.map((att: any) => ({
+        const { default: pool } = await import("../db/pool.js");
+        const attachmentsResult = await pool.query(
+          `SELECT * FROM files_upload WHERE message_id = ANY($1) ORDER BY created_at ASC`,
+          [messageIds]
+        );
+
+        // Group attachments by message_id
+        const attachmentsByMessage = new Map<string, any[]>();
+        for (const att of attachmentsResult.rows) {
+          if (!attachmentsByMessage.has(att.message_id)) {
+            attachmentsByMessage.set(att.message_id, []);
+          }
+          attachmentsByMessage.get(att.message_id)!.push({
             id: att.id,
             public_id: att.public_id,
             secure_url: att.secure_url,
@@ -264,10 +274,16 @@ export const getConversationMessages = async (
             height: att.height,
             thumbnail_url: att.thumbnail_url,
             extracted_text: att.extracted_text,
-          }));
+          });
+        }
+
+        // Attach to messages
+        for (const msgResponse of messageResponses) {
+          msgResponse.attachments = attachmentsByMessage.get(msgResponse.id) || [];
         }
       } catch (err) {
         // Don't fail if attachments fetch fails
+        console.error("Error fetching attachments:", err);
       }
     }
 
@@ -397,7 +413,9 @@ export const sendMessageAndStreamResponse = async (
               openai_file_id: att.openai_file_id, // Include OpenAI file_id
             }));
           }
-        } catch (err: any) {}
+        } catch (err: any) {
+          console.error("Error fetching attachments for broadcast:", err);
+        }
       }
 
       await onUserMessageCreated({
@@ -697,7 +715,9 @@ export const sendMessageAndStreamResponse = async (
     await invalidateCachePattern(conversationListPattern(conversation.user_id));
 
     // Generate and store embedding for assistant message (async, non-blocking)
-    generateAndStoreEmbedding(assistantMessage.id, assistantMessage.content).catch((error) => {});
+    generateAndStoreEmbedding(assistantMessage.id, assistantMessage.content).catch((error) => {
+      console.error("Error generating embedding for assistant message:", error);
+    });
 
     // Return userMessage, assistantMessage, and updated conversation for client sync
     return {

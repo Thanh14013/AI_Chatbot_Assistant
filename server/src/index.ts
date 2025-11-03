@@ -13,6 +13,24 @@ import path from "path";
 import { initializeSocketIO } from "./services/socket.service.js";
 import models from "./models/index.js";
 import redisClient, { isRedisConnected } from "./config/redis.config.js";
+import * as Sentry from "@sentry/node";
+import { nodeProfilingIntegration } from "@sentry/profiling-node";
+import { PORT as PORT_CONFIG, TIMEOUTS, RATE_LIMITING } from "./config/constants.js";
+
+// Load environment variables first
+dotenv.config();
+
+// Initialize Sentry (must be before any other imports/code)
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    integrations: [nodeProfilingIntegration()],
+    tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
+    profilesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
+    environment: process.env.NODE_ENV || "development",
+  });
+  console.log("✅ Sentry initialized");
+}
 
 // Load swagger JSON at runtime to avoid import-assertion issues in some Node setups
 const swaggerPath = path.resolve(process.cwd(), "src", "swagger.json");
@@ -21,8 +39,12 @@ const swaggerDocument = JSON.parse(fs.readFileSync(swaggerPath, "utf8"));
 // Initialize Express app
 const app = express();
 
-// Load environment variables from .env file
-dotenv.config();
+// Sentry request handler (must be first middleware after app creation)
+// This needs to be before all other middleware
+if (process.env.SENTRY_DSN) {
+  // No need for manual setup - Sentry automatically instruments Express
+  console.log("✅ Sentry Express integration active");
+}
 
 // Enable CORS for cross-origin requests and allow credentials for cookies
 app.use(
@@ -44,7 +66,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // Server Configuration
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || PORT_CONFIG.START_PORT;
 
 // Initialize Database Connection
 connectToDatabase();
@@ -53,8 +75,8 @@ connectToDatabase();
 // This ensures we check the connection status AFTER Redis has attempted to connect
 (async () => {
   try {
-    // Wait up to 4 seconds for Redis to become ready
-    const timeout = 4000;
+    // Wait up to TIMEOUTS.REDIS_READY_CHECK for Redis to become ready
+    const timeout = TIMEOUTS.REDIS_READY_CHECK;
     const startTime = Date.now();
 
     while (!isRedisConnected() && Date.now() - startTime < timeout) {
@@ -92,10 +114,10 @@ if (process.env.DB_SYNC === "true") {
 // Apply rate limiting, body size limits, and request timeouts
 app.use(
   securityStack({
-    maxRequests: 1000, // 1000 requests
-    windowMs: 60 * 60 * 1000, // 1 hour
-    maxBodySize: 2 * 1024 * 1024, // 2MB
-    timeout: 30000, // 30 seconds
+    maxRequests: RATE_LIMITING.MAX_REQUESTS,
+    windowMs: RATE_LIMITING.WINDOW_MS,
+    maxBodySize: RATE_LIMITING.MAX_BODY_SIZE,
+    timeout: TIMEOUTS.REQUEST_TIMEOUT,
   })
 );
 
@@ -110,6 +132,27 @@ app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 // All routes are prefixed with /api
 app.use("/api", routes);
 
+// Sentry error handler middleware (must be after all routes, before other error handlers)
+// Note: Sentry v8+ automatically instruments Express, just add manual error capture
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // Capture error in Sentry
+  if (process.env.SENTRY_DSN) {
+    Sentry.captureException(err);
+  }
+
+  // Log error
+  console.error("Unhandled error:", err);
+
+  // Send response
+  res.status(err.statusCode || 500).json({
+    success: false,
+    message:
+      process.env.NODE_ENV === "production"
+        ? "An unexpected error occurred"
+        : err.message || "Internal server error",
+  });
+});
+
 // Create HTTP server and initialize Socket.io
 const httpServer = createServer(app);
 const io = initializeSocketIO(httpServer);
@@ -122,8 +165,8 @@ global.socketIO = io;
 
 // Start Server with graceful EADDRINUSE handling
 // Try to bind to the configured port; if it's in use, try the next ports up to a limit.
-const START_PORT = Number(process.env.PORT || PORT) || 3000;
-const MAX_PORT_ATTEMPTS = 10;
+const START_PORT = Number(process.env.PORT || PORT) || PORT_CONFIG.START_PORT;
+const MAX_PORT_ATTEMPTS = PORT_CONFIG.MAX_PORT_ATTEMPTS;
 
 function tryListen(port: number, attemptsLeft: number) {
   httpServer.once("error", (err: any) => {

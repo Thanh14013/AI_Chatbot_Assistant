@@ -3,7 +3,7 @@
  * Displays individual chat messages with different styles for user and assistant
  */
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, memo } from "react";
 import { Avatar, Typography, Button, App, Input } from "antd";
 import {
   UserOutlined,
@@ -611,4 +611,20 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   );
 };
 
-export default MessageBubble;
+// Memoize component to prevent unnecessary re-renders
+export default memo(MessageBubble, (prevProps, nextProps) => {
+  // Only re-render if these key properties change
+  const prevMsg = prevProps.message;
+  const nextMsg = nextProps.message;
+
+  return (
+    prevMsg.id === nextMsg.id &&
+    prevMsg.content === nextMsg.content &&
+    ("pinned" in prevMsg ? prevMsg.pinned : false) ===
+      ("pinned" in nextMsg ? nextMsg.pinned : false) &&
+    ("isTyping" in prevMsg ? prevMsg.isTyping : false) ===
+      ("isTyping" in nextMsg ? nextMsg.isTyping : false) &&
+    ("status" in prevMsg ? prevMsg.status : "sent") ===
+      ("status" in nextMsg ? nextMsg.status : "sent")
+  );
+});

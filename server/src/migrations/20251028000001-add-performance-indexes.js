@@ -23,13 +23,36 @@ export async function up(queryInterface, Sequelize) {
 
   try {
     // 2. Index for file uploads by message (for join queries)
-    await queryInterface.addIndex("file_uploads", ["message_id"], {
+    await queryInterface.addIndex("files_upload", ["message_id"], {
       name: "idx_file_uploads_message",
       using: "BTREE",
     });
     console.log("✅ Added idx_file_uploads_message");
   } catch (error) {
     console.log("⚠️  Skipped idx_file_uploads_message:", error.message);
+  }
+
+  try {
+    // 2b. Index for file uploads by public_id (for fast lookup)
+    await queryInterface.addIndex("files_upload", ["public_id"], {
+      name: "idx_file_uploads_public_id",
+      unique: true,
+      using: "BTREE",
+    });
+    console.log("✅ Added idx_file_uploads_public_id");
+  } catch (error) {
+    console.log("⚠️  Skipped idx_file_uploads_public_id:", error.message);
+  }
+
+  try {
+    // 2c. Index for messages by conversation and created date (most important!)
+    await queryInterface.sequelize.query(`
+        CREATE INDEX IF NOT EXISTS idx_messages_conversation_created 
+        ON messages(conversation_id, "createdAt" DESC);
+      `);
+    console.log("✅ Added idx_messages_conversation_created");
+  } catch (error) {
+    console.log("⚠️  Skipped idx_messages_conversation_created:", error.message);
   }
 
   try {
@@ -78,6 +101,17 @@ export async function up(queryInterface, Sequelize) {
     console.log("⚠️  Skipped idx_conversations_project_order:", error.message);
   }
 
+  try {
+    // 7. GIN Index for conversations tags (for array search performance)
+    await queryInterface.sequelize.query(`
+        CREATE INDEX IF NOT EXISTS idx_conversations_tags 
+        ON conversations USING GIN(tags);
+      `);
+    console.log("✅ Added idx_conversations_tags (GIN)");
+  } catch (error) {
+    console.log("⚠️  Skipped idx_conversations_tags:", error.message);
+  }
+
   // Try to add message_embeddings index only if table exists
   try {
     const tables = await queryInterface.sequelize.query(
@@ -106,6 +140,10 @@ export async function down(queryInterface, Sequelize) {
 
   // Remove all added indexes (ignore errors if they don't exist)
   try {
+    await queryInterface.sequelize.query("DROP INDEX IF EXISTS idx_conversations_tags;");
+  } catch (e) {}
+
+  try {
     await queryInterface.sequelize.query("DROP INDEX IF EXISTS idx_conversations_project_order;");
   } catch (e) {}
 
@@ -119,6 +157,14 @@ export async function down(queryInterface, Sequelize) {
 
   try {
     await queryInterface.sequelize.query("DROP INDEX IF EXISTS idx_messages_pinned;");
+  } catch (e) {}
+
+  try {
+    await queryInterface.sequelize.query("DROP INDEX IF EXISTS idx_messages_conversation_created;");
+  } catch (e) {}
+
+  try {
+    await queryInterface.removeIndex("file_uploads", "idx_file_uploads_public_id");
   } catch (e) {}
 
   try {

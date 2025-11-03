@@ -314,7 +314,9 @@ export const initializeSocketIO = (
     SocketData
   >(httpServer, {
     cors: {
-      origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+      origin: process.env.CORS_ORIGINS
+        ? process.env.CORS_ORIGINS.split(",").map((o) => o.trim())
+        : ["http://localhost:5173"],
       credentials: true,
       methods: ["GET", "POST"],
     },
@@ -611,7 +613,9 @@ export const initializeSocketIO = (
             messageId,
           });
         }
-      } catch {}
+      } catch (error) {
+        console.error("Error in typing:start handler:", error);
+      }
     });
 
     socket.on("typing:stop", (conversationId: string) => {
@@ -785,7 +789,9 @@ export const initializeSocketIO = (
             .to(`conversation:${conversation.id}`)
             .emit("conversation:created", conversation);
         }
-      } catch {}
+      } catch (error) {
+        console.error("Error broadcasting conversation:created:", error);
+      }
     });
 
     // Handle conversation deletion (for real-time sync across tabs)
@@ -805,7 +811,9 @@ export const initializeSocketIO = (
         socket.broadcast
           .to(`conversation:${conversationId}`)
           .emit("conversation:deleted", { conversationId });
-      } catch {}
+      } catch (error) {
+        console.error("Error broadcasting conversation:deleted:", error);
+      }
 
       // Remove all sockets from the conversation room
       // removing sockets from conversation room

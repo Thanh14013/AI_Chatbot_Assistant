@@ -60,7 +60,9 @@ export const isRedisConnected = (): boolean => {
 export const disconnectRedis = async (): Promise<void> => {
   try {
     await redisClient.quit();
-  } catch (error) {}
+  } catch (error) {
+    console.error("Error disconnecting Redis:", error);
+  }
 };
 
 // Export Redis client instance

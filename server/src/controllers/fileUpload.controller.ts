@@ -322,7 +322,23 @@ export const getConversationFiles = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // TODO: Verify user has access to this conversation
+    // Verify user has access to this conversation
+    const { default: Conversation } = await import("../models/conversation.model.js");
+    const conversation = await Conversation.findByPk(conversationId);
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        error: "Conversation not found",
+      });
+    }
+
+    if (conversation.user_id !== userId) {
+      return res.status(403).json({
+        success: false,
+        error: "Access denied to this conversation",
+      });
+    }
 
     const files = await FileUploadModel.findByConversationId(conversationId);
 
