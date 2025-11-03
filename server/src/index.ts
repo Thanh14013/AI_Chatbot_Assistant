@@ -27,7 +27,9 @@ dotenv.config();
 // Enable CORS for cross-origin requests and allow credentials for cookies
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || true,
+    origin: process.env.CORS_ORIGINS
+      ? process.env.CORS_ORIGINS.split(",").map((o) => o.trim())
+      : true,
     credentials: true,
   })
 );

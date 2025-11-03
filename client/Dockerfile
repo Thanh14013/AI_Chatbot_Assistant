@@ -14,6 +14,14 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Accept build arguments for environment variables
+ARG VITE_API_BASE_URL=/api
+ARG VITE_BACKEND_URL=http://server:3000
+
+# Set environment variables for build
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}
+
 # Build the application
 RUN npm run build
 

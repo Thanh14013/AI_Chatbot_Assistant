@@ -74,10 +74,21 @@ const RegisterPage: React.FC = () => {
         "Registration successful! Please login.";
       message.success(successMessage);
     } catch (err) {
-      const axiosError = err as AxiosError<{ message: string }>;
-      const errorMessage =
-        axiosError.response?.data?.message ||
-        "Registration failed. Please try again.";
+      const axiosError = err as AxiosError<{
+        message: string;
+        success: boolean;
+      }>;
+
+      // Extract specific error message from server response
+      let errorMessage = "Registration failed. Please try again.";
+
+      if (axiosError.response?.data?.message) {
+        // Use the exact error message from server
+        errorMessage = axiosError.response.data.message;
+      } else if (axiosError.message) {
+        // Fallback to axios error message
+        errorMessage = axiosError.message;
+      }
 
       setError(errorMessage);
       message.error(errorMessage);

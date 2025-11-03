@@ -69,13 +69,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const bubbleRef = useRef<HTMLDivElement>(null);
   const [bubbleWidth, setBubbleWidth] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  // Client-side streaming display (progressive reveal)
-  const [displayedContent, setDisplayedContent] = useState<string>(
-    message.content || ""
-  );
-  // Render-time debug logging removed
+  // NO displayedContent state - render message.content directly for no animation
   const lastStreamedMessageId = useRef<string | null>(null);
-  const displayedContentRef = useRef<string>(displayedContent);
   // Reference to message content container for selection detection
   const messageContentRef = useRef<HTMLDivElement>(null);
   // MessageRole is a string union ('user' | 'assistant' | 'system')
@@ -333,99 +328,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     });
   };
 
-  // Client-side streaming: reveal assistant message token-by-token
-  useEffect(() => {
-    // If message isTyping (stream in progress), just reflect the accumulated
-    // content immediately on each chunk so the UI shows per-chunk updates.
-    const full = message.content || "";
-
-    if (isTyping) {
-      try {
-        // streaming chunk debug removed
-      } catch {
-        // Ignore debug logging errors
-      }
-      setDisplayedContent(full);
-      lastStreamedMessageId.current = message.id;
-      // No token timer while streaming via chunks
-      return;
-    }
-
-    // Otherwise (message is finalized/not typing) run tokenized reveal
-    // If there's no content, nothing to stream
-    if (!full) {
-      setDisplayedContent("");
-      return;
-    }
-
-    // If this message was just streamed (lastStreamedMessageId matches and isTyping just turned false),
-    // skip the tokenized reveal and just show full content immediately
-    if (
-      lastStreamedMessageId.current === message.id &&
-      displayedContentRef.current === full
-    ) {
-      // Already fully displayed during streaming, no need to re-animate
-      setDisplayedContent(full);
-      return;
-    }
-
-    // Split into tokens while preserving whitespace so spacing stays correct
-    const tokens = full.match(/\s+|\S+/g) || [full];
-
-    // Determine starting index: if we're already streaming the same message id,
-    // resume from the number of tokens already displayed. Otherwise start from 0.
-    let startIndex = 0;
-    if (lastStreamedMessageId.current === message.id) {
-      const displayedTokens =
-        (displayedContentRef.current || "").match(/\s+|\S+/g) || [];
-      startIndex = displayedTokens.length;
-      if (startIndex >= tokens.length) {
-        // Nothing new to stream
-        setDisplayedContent(full);
-        return;
-      }
-    } else {
-      lastStreamedMessageId.current = message.id;
-      setDisplayedContent("");
-      startIndex = 0;
-    }
-
-    let idx = startIndex;
-    const DELAY_MS = 40;
-
-    // Debug logging to help trace streaming behavior in browser console
-    try {
-      // streaming start debug removed
-    } catch {
-      // Ignore debug logging errors
-    }
-
-    const timer = setInterval(() => {
-      idx += 1;
-      const token = tokens[idx - 1] || "";
-      setDisplayedContent((prev) => prev + token);
-      try {
-        // append token debug removed
-      } catch {
-        // Ignore debug logging errors
-      }
-      if (idx >= tokens.length) {
-        clearInterval(timer);
-      }
-    }, DELAY_MS);
-
-    return () => {
-      clearInterval(timer);
-    };
-  }, [message.id, message.content, message.role, isTyping]);
-
-  // Keep a ref in sync with displayedContent so the streaming effect can
-  // compute how many tokens were already shown without adding displayedContent
-  // as a dependency (which would cause extra effect runs).
-  useEffect(() => {
-    displayedContentRef.current = displayedContent;
-  }, [displayedContent]);
-
   // Handle clicking outside to exit edit mode
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -455,7 +357,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     >
       {/* Render content even while isTyping if content exists (shows streaming).
           Only show typing dots when content is empty. */}
-      {!(isTyping && displayedContent.trim() === "") ? (
+      {!(isTyping && (!message.content || message.content.trim() === "")) ? (
         <>
           {/* Avatar - show on left for assistant, right for user */}
           {!isUser && (
@@ -513,12 +415,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 onClick={handleMessageClick}
               >
                 {message.role === "assistant" &&
-                (!displayedContent || displayedContent.trim() === "") ? (
+                (!message.content || message.content.trim() === "") ? (
                   <em className={styles.emptyAssistant}>
                     Assistant did not return content. Try retrying the message.
                   </em>
                 ) : (
-                  renderContent(displayedContent)
+                  renderContent(message.content || "")
                 )}
               </div>
             )}

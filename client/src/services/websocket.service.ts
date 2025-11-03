@@ -292,17 +292,26 @@ class WebSocketService {
 
       // logging removed
 
-      this.socket = io(
-        import.meta.env.VITE_API_URL || "http://localhost:3000",
-        {
-          auth: {
-            token,
-          },
-          transports: ["websocket", "polling"],
-          timeout: 20000,
-          autoConnect: false,
-        }
-      );
+      // In production (Docker), use the current origin (nginx will proxy)
+      // In development, use VITE_BACKEND_URL or fallback to localhost
+      let socketUrl: string;
+
+      if (import.meta.env.PROD) {
+        // Production: use current origin (nginx handles proxy)
+        socketUrl = typeof window !== "undefined" ? window.location.origin : "";
+      } else {
+        // Development: use explicit backend URL
+        socketUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+      }
+
+      this.socket = io(socketUrl, {
+        auth: {
+          token,
+        },
+        transports: ["websocket", "polling"],
+        timeout: 20000,
+        autoConnect: false,
+      });
 
       // Connection events
       this.socket.on("connect", () => {
