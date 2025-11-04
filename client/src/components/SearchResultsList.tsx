@@ -11,14 +11,12 @@ interface SearchResultWithTags {
 interface SearchResultsListProps {
   results: SearchResultWithTags[];
   query: string;
-  searchType?: "keyword" | "tags";
   onMessageClick: (conversationId: string, messageId: string) => void;
 }
 
 export const SearchResultsList: React.FC<SearchResultsListProps> = ({
   results,
   query,
-  searchType = "keyword",
   onMessageClick,
 }) => {
   if (results.length === 0) {
@@ -36,7 +34,6 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
           key={result.conversation_id}
           result={result}
           query={query}
-          searchType={searchType}
           onMessageClick={onMessageClick}
           tags={tags}
         />

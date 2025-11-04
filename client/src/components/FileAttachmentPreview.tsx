@@ -42,6 +42,8 @@ export const FileAttachmentPreview: React.FC<FileAttachmentPreviewProps> = ({
     <div className={styles.attachmentsList}>
       {attachments.map((attachment) => {
         const isUploading = attachment.status === "uploading";
+        const isProcessing = attachment.status === "processing";
+        const isFailed = attachment.status === "failed";
         const progress =
           uploadProgress?.[attachment.public_id] || attachment.progress || 0;
 
@@ -54,6 +56,11 @@ export const FileAttachmentPreview: React.FC<FileAttachmentPreviewProps> = ({
               {
                 ["--upload-progress" as string]: `${progress}%`,
               } as React.CSSProperties
+            }
+            title={
+              isProcessing
+                ? "Processing file... (extracting text from PDF)"
+                : attachment.original_filename || "File"
             }
           >
             {attachment.resource_type === "image" ? (
@@ -89,13 +96,23 @@ export const FileAttachmentPreview: React.FC<FileAttachmentPreviewProps> = ({
               </>
             )}
 
+            {/* Processing overlay (for PDFs being parsed) */}
+            {isProcessing && (
+              <div className={styles.processingOverlay}>
+                <span className={styles.processingSpinner}>⏳</span>
+                <span>Processing...</span>
+              </div>
+            )}
+
             {/* Error overlay */}
-            {attachment.status === "failed" && (
-              <div className={styles.errorOverlay}>Upload failed</div>
+            {isFailed && (
+              <div className={styles.errorOverlay}>
+                {attachment.error || "Upload failed"}
+              </div>
             )}
 
             {/* Remove button */}
-            {!readOnly && !isUploading && onRemove && (
+            {!readOnly && !isUploading && !isProcessing && onRemove && (
               <button
                 className={styles.removeButton}
                 onClick={() => onRemove(attachment.public_id)}

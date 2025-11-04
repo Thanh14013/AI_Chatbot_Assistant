@@ -220,63 +220,6 @@
   white-space: pre-wrap;
 }
 
-/* Code block styling - Modern dark theme */
-.codeBlock {
-  background: #1f2937;
-  border-radius: 8px;
-  padding: 0;
-  margin: 12px 0;
-  overflow: hidden;
-  font-family: "Fira Code", "Consolas", "Monaco", "Courier New", monospace;
-  font-size: 13px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.codeBlock pre {
-  background: #1f2937;
-  padding: 16px;
-  margin: 0;
-  overflow-x: auto;
-  color: #f9fafb;
-  line-height: 1.6;
-}
-
-.codeBlock code {
-  background: transparent;
-  padding: 0;
-  color: inherit;
-  font-family: inherit;
-  font-size: inherit;
-}
-
-/* Code block scrollbar */
-.codeBlock pre::-webkit-scrollbar {
-  height: 8px;
-}
-
-.codeBlock pre::-webkit-scrollbar-track {
-  background: #111827;
-  border-radius: 4px;
-}
-
-.codeBlock pre::-webkit-scrollbar-thumb {
-  background: #4b5563;
-  border-radius: 4px;
-}
-
-.codeBlock pre::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
-}
-
-.userMessage .codeBlock {
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.userMessage .codeBlock pre {
-  background: rgba(0, 0, 0, 0.2);
-}
-
 /* Message footer with timestamp and actions */
 .messageFooter {
   display: flex;

@@ -10,7 +10,7 @@ dotenv.config();
 
 // Redis connection configuration
 const redisConfig = {
-  host: process.env.REDIS_HOST || "localhost",
+  host: process.env.REDIS_HOST || "127.0.0.1", // Use 127.0.0.1 instead of localhost
   port: parseInt(process.env.REDIS_PORT || "6379"),
   password: process.env.REDIS_PASSWORD ? process.env.REDIS_PASSWORD : undefined,
   db: parseInt(process.env.REDIS_DB || "0"),

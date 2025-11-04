@@ -24,6 +24,7 @@ import { PendingMessage } from "../types/offline-message.type";
 import styles from "./MessageBubble.module.css";
 import { pinMessage, unpinMessage } from "../services/chat.service";
 import SelectionAskButton from "./SelectionAskButton";
+import CodeBlock from "./CodeBlock";
 
 const { Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -39,11 +40,13 @@ interface MessageBubbleProps {
   // Optional handler for when a message is pinned/unpinned
   onPinToggle?: (messageId: string, isPinned: boolean) => void;
   // Optional handler for asking about selected text
-  onAskAboutSelection?: (selectedText: string) => void;
+  onAskAboutSelection?: (question: string, selectedText: string) => void;
   // Optional handler for resending a user message
   onResend?: (message: Message | PendingMessage) => void;
   // Optional handler for editing and resending a user message
   onEdit?: (message: Message | PendingMessage, newContent: string) => void;
+  // AI typing state to disable interactive elements
+  isAITyping?: boolean;
 }
 
 /**
@@ -59,6 +62,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   onAskAboutSelection,
   onResend,
   onEdit,
+  isAITyping = false,
 }) => {
   const { message: antMessage } = App.useApp();
   const [isCopied, setIsCopied] = useState(false);
@@ -301,21 +305,41 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   /**
-   * Render message content with basic markdown support
-   * For now, just render as text. Full markdown rendering can be added later
+   * Render message content with markdown code blocks
+   * Detects code blocks with language specification (```language\ncode```)
+   * and renders them with syntax highlighting
    */
   const renderContent = (content: string) => {
-    // Split content by code blocks (simple detection)
+    // Split content by code blocks (```language\ncode```)
     const parts = content.split(/(```[\s\S]*?```)/g);
 
     return parts.map((part, index) => {
       // Check if this is a code block
       if (part.startsWith("```") && part.endsWith("```")) {
-        const code = part.slice(3, -3).trim();
+        // Extract language and code
+        const withoutBackticks = part.slice(3, -3);
+        const firstNewline = withoutBackticks.indexOf("\n");
+
+        let language = "javascript";
+        let code = withoutBackticks;
+
+        if (firstNewline !== -1) {
+          const potentialLanguage = withoutBackticks
+            .slice(0, firstNewline)
+            .trim();
+          if (potentialLanguage) {
+            language = potentialLanguage;
+            code = withoutBackticks.slice(firstNewline + 1);
+          }
+        }
+
         return (
-          <pre key={index} className={styles.codeBlock}>
-            <code>{code}</code>
-          </pre>
+          <CodeBlock
+            key={index}
+            code={code}
+            language={language}
+            isUserMessage={isUser}
+          />
         );
       }
 
@@ -501,7 +525,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                     icon={<RedoOutlined />}
                     onClick={handleResend}
                     className={styles.resendButton}
-                    disabled={isSending || isPending}
+                    disabled={isSending || isPending || isAITyping}
                     title="Resend this message"
                   />
                 )}
@@ -605,6 +629,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           isAIMessage={!isUser}
           messageId={message.id}
           contentKey={message.content?.length || 0}
+          isAITyping={isAITyping}
         />
       )}
     </div>

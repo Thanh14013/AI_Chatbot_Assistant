@@ -52,9 +52,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     import("../services/searchService").ConversationSearchResult[] | null
   >(null);
   const [currentSearchQuery, setCurrentSearchQuery] = useState("");
-  const [currentSearchType, setCurrentSearchType] = useState<
-    "keyword" | "tags"
-  >("keyword");
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
@@ -442,7 +439,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             setSemanticResults(results);
             setCurrentSearchQuery(query || "");
           }}
-          onSearchTypeChange={(type) => setCurrentSearchType(type)}
           onHighlightMessage={onHighlightMessage}
           currentConversationId={currentConversationId}
         />
@@ -501,7 +497,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                   ?.tags || [],
             }))}
             query={currentSearchQuery}
-            searchType={currentSearchType}
             onMessageClick={(conversationId, messageId) => {
               // Navigate to conversation and highlight message (if messageId provided)
               const url = messageId

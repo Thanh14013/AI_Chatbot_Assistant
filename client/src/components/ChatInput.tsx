@@ -87,6 +87,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
     const value = e.target.value;
     setMessage(value);
 
+    // Auto-hide dropdown when user starts typing
+    if (dropdownVisible) {
+      setDropdownVisible(false);
+    }
+
     // Detect if textarea has multiple lines (contains newlines or is tall)
     const hasNewlines = value.includes("\n");
     const lineCount = value.split("\n").length;
@@ -166,6 +171,42 @@ const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   /**
+   * Handle paste event to detect and upload images
+   */
+  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    // Check if any item is an image
+    const imageItems: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) {
+          imageItems.push(file);
+        }
+      }
+    }
+
+    // If images found, upload them
+    if (imageItems.length > 0) {
+      e.preventDefault(); // Prevent default paste behavior for images
+      try {
+        await uploadFiles(imageItems);
+        antdMessage.success(
+          `${imageItems.length} image${
+            imageItems.length > 1 ? "s" : ""
+          } pasted successfully`
+        );
+      } catch (error) {
+        antdMessage.error("Failed to upload pasted image");
+      }
+    }
+    // If no images, allow default paste behavior (text)
+  };
+
+  /**
    * Handle keyboard shortcuts
    * - Enter: Send message
    * - Shift + Enter: New line
@@ -179,12 +220,18 @@ const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   /**
-   * Handle lightbulb button click
+   * Handle lightbulb button click - Toggle dropdown
    */
   const handleRequestSuggestions = () => {
-    if (onRequestSuggestions && !isLoadingSuggestions) {
+    if (!conversationId || disabled) return;
+
+    // Toggle dropdown visibility
+    const newVisibility = !dropdownVisible;
+    setDropdownVisible(newVisibility);
+
+    // Only fetch new suggestions if opening and not already loading
+    if (newVisibility && onRequestSuggestions && !isLoadingSuggestions) {
       onRequestSuggestions();
-      setDropdownVisible(true);
     }
   };
 
@@ -214,13 +261,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
       }
     };
   }, []);
-
-  // Show dropdown when suggestions arrive
-  useEffect(() => {
-    if (suggestions.length > 0) {
-      setDropdownVisible(true);
-    }
-  }, [suggestions]);
 
   // Create dropdown menu for suggestions
   const suggestionsMenu = (
@@ -310,6 +350,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           value={message}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder={placeholder}
           disabled={disabled || uploading}
           autoSize={{ minRows: 1, maxRows: 2 }}
@@ -335,7 +376,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
       {/* Hint text */}
       <div className={styles.hintText}>
         Press <strong>Enter</strong> to send, <strong>Shift + Enter</strong> for
-        new line
+        new line, <strong>Ctrl + V</strong> to paste images
         {uploading && <span> • Uploading files...</span>}
       </div>
     </div>

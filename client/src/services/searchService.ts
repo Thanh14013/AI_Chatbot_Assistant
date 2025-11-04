@@ -2,6 +2,7 @@ import axiosInstance from "./axios.service";
 
 export interface GlobalSearchParams {
   query: string;
+  tags?: string[]; // Optional: filter by conversation tags (match any tag)
   limit?: number;
   messagesPerConversation?: number;
   similarity_threshold?: number;

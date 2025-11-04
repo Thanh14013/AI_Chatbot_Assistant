@@ -10,12 +10,28 @@ import {
 } from "../utils/token.util";
 import { websocketService } from "./websocket.service";
 import type { ApiErrorResponse, RefreshTokenResponse } from "../types";
+
+// Determine the base URL based on environment
+// In development: use /api (Vite proxy will forward to backend)
+// In production: use full backend URL
+const getBaseURL = (): string => {
+  const isDevelopment = import.meta.env.DEV;
+  const apiBasePath = import.meta.env.VITE_API_BASE_URL || "/api";
+
+  if (isDevelopment) {
+    // Use relative path in development to utilize Vite's proxy
+    return apiBasePath;
+  } else {
+    // Use full URL in production
+    const backendUrl =
+      import.meta.env.VITE_BACKEND_URL || window.location.origin;
+    return `${backendUrl}${apiBasePath}`;
+  }
+};
+
 // Create axios instance with base configuration
-// Use Vite's import.meta.env for client environment variables
 const axiosInstance = axios.create({
-  baseURL: `${import.meta.env.VITE_BACKEND_URL}${
-    import.meta.env.VITE_API_BASE_URL
-  }`,
+  baseURL: getBaseURL(),
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",
@@ -103,6 +119,12 @@ axiosInstance.interceptors.response.use(
       // don't attempt a token refresh or redirect — let the caller handle the error.
       const url = originalRequest.url || "";
       if (url.includes("/auth/login") || url.includes("/auth/register")) {
+        return Promise.reject(error);
+      }
+
+      // If /auth/me fails, just reject without trying to refresh
+      // This handles the case when user has no token yet
+      if (url.includes("/auth/me")) {
         return Promise.reject(error);
       }
 

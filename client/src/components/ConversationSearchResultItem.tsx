@@ -9,14 +9,13 @@ import styles from "./ConversationSearchResultItem.module.css";
 interface ConversationSearchResultItemProps {
   result: ConversationSearchResult;
   query: string;
-  searchType?: "keyword" | "tags";
   onMessageClick: (conversationId: string, messageId: string) => void;
   tags?: string[];
 }
 
 export const ConversationSearchResultItem: React.FC<
   ConversationSearchResultItemProps
-> = ({ result, query, searchType = "keyword", onMessageClick, tags }) => {
+> = ({ result, query, onMessageClick, tags }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -47,14 +46,6 @@ export const ConversationSearchResultItem: React.FC<
     onMessageClick(result.conversation_id, message.message_id);
   };
 
-  const handleConversationClick = () => {
-    // For tag search, navigate to conversation directly
-    if (searchType === "tags") {
-      // Navigate to the conversation
-      onMessageClick(result.conversation_id, "");
-    }
-  };
-
   const highlightKeyword = (text: string, keyword: string): React.ReactNode => {
     if (!keyword.trim()) return text;
 
@@ -83,10 +74,7 @@ export const ConversationSearchResultItem: React.FC<
   return (
     <div className={styles.searchResultItem} ref={dropdownRef}>
       {/* Main conversation item */}
-      <div
-        className={styles.conversationItem}
-        onClick={searchType === "tags" ? handleConversationClick : undefined}
-      >
+      <div className={styles.conversationItem}>
         {/* Chat icon */}
         <div className={styles.iconContainer}>
           <MessageOutlined className={styles.icon} />
@@ -106,27 +94,25 @@ export const ConversationSearchResultItem: React.FC<
           )}
         </div>
 
-        {/* Badge with matched messages count - only show for keyword search */}
-        {searchType === "keyword" && (
-          <div
-            className={styles.badge}
-            onClick={handleBadgeClick}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                handleBadgeClick(e as any);
-              }
-            }}
-          >
-            {result.message_count}
-          </div>
-        )}
+        {/* Badge with matched messages count */}
+        <div
+          className={styles.badge}
+          onClick={handleBadgeClick}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handleBadgeClick(e as any);
+            }
+          }}
+        >
+          {result.message_count}
+        </div>
       </div>
 
-      {/* Dropdown panel - only show for keyword search */}
-      {searchType === "keyword" && isDropdownOpen && (
+      {/* Dropdown panel with message previews */}
+      {isDropdownOpen && (
         <div className={styles.dropdown}>
           <div className={styles.dropdownHeader}>Matched Messages</div>
           <div className={styles.messageList}>

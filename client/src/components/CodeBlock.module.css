@@ -1,0 +1,118 @@
+/* CodeBlock Component Styles */
+
+.codeBlockContainer {
+  margin: 12px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  background: #1e1e1e;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Code header with language label and copy button */
+.codeHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #2d2d30;
+  border-bottom: 1px solid #3e3e42;
+}
+
+.languageLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: #d4d4d4;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Copy code button */
+.copyCodeButton {
+  color: #d4d4d4;
+  height: 28px;
+  font-size: 12px;
+  padding: 0 12px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.copyCodeButton:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.copyCodeButton:active {
+  transform: scale(0.95);
+}
+
+/* Styling for user message code blocks */
+.userCodeBlock {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.userCodeBlock .codeHeader {
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.userCodeBlock .languageLabel {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.userCodeBlock .copyCodeButton {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.userCodeBlock .copyCodeButton:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Scrollbar styling for code blocks */
+.codeBlockContainer :global(.react-syntax-highlighter) {
+  max-height: 500px;
+  overflow: auto;
+}
+
+.codeBlockContainer :global(.react-syntax-highlighter)::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.codeBlockContainer
+  :global(.react-syntax-highlighter)::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.codeBlockContainer
+  :global(.react-syntax-highlighter)::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 5px;
+}
+
+.codeBlockContainer
+  :global(.react-syntax-highlighter)::-webkit-scrollbar-thumb:hover {
+  background: #4e4e4e;
+}
+
+.codeBlockContainer
+  :global(.react-syntax-highlighter)::-webkit-scrollbar-corner {
+  background: #1e1e1e;
+}

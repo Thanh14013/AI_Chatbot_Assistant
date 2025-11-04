@@ -1,0 +1,128 @@
+/* AskAIModal Component Styles - Inline Input (GitHub Copilot style) */
+
+.inlineInput {
+  position: fixed;
+  z-index: 9999;
+  animation: slideIn 0.2s ease-out;
+}
+
+.inputWrapper {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  min-width: 320px;
+  max-width: 400px;
+}
+
+.input {
+  border: none;
+  font-size: 13px;
+  padding: 4px 8px;
+}
+
+.input:focus,
+.input:hover {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.input :global(.ant-input) {
+  border: none;
+  box-shadow: none;
+  padding-right: 70px; /* Space for buttons */
+}
+
+.input :global(.ant-input):focus {
+  border: none;
+  box-shadow: none;
+}
+
+.input :global(.ant-input-suffix) {
+  margin-left: 8px;
+}
+
+/* Actions (send + close buttons) */
+.actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.sendButton,
+.closeButton {
+  padding: 4px;
+  height: 24px;
+  width: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.sendButton {
+  color: #667eea;
+}
+
+.sendButton:hover:not(:disabled) {
+  background: #f0f4ff;
+  color: #4f46e5;
+}
+
+.sendButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.closeButton {
+  color: #64748b;
+}
+
+.closeButton:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+/* Animation */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .inputWrapper {
+    background: #1e293b;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3),
+      0 0 0 1px rgba(255, 255, 255, 0.1);
+  }
+
+  .input :global(.ant-input) {
+    background: #1e293b;
+    color: #e2e8f0;
+  }
+
+  .sendButton {
+    color: #818cf8;
+  }
+
+  .sendButton:hover:not(:disabled) {
+    background: rgba(129, 140, 248, 0.1);
+    color: #a5b4fc;
+  }
+
+  .closeButton {
+    color: #94a3b8;
+  }
+
+  .closeButton:hover {
+    background: rgba(148, 163, 184, 0.1);
+    color: #cbd5e1;
+  }
+}

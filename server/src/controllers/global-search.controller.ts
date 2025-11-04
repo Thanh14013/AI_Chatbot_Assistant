@@ -39,7 +39,7 @@ export const globalSearch = async (req: Request, res: Response): Promise<void> =
     }
 
     // Get search parameters from request body
-    const { query, limit, messagesPerConversation, similarity_threshold } = req.body;
+    const { query, tags, limit, messagesPerConversation, similarity_threshold } = req.body;
 
     // Validate query
     if (!query || query.trim().length === 0) {
@@ -91,12 +91,34 @@ export const globalSearch = async (req: Request, res: Response): Promise<void> =
       }
     }
 
+    // Validate tags if provided
+    if (tags !== undefined) {
+      if (!Array.isArray(tags)) {
+        res.status(400).json({
+          error: "Bad Request",
+          message: "Tags must be an array of strings",
+        });
+        return;
+      }
+      // Validate each tag
+      for (const tag of tags) {
+        if (typeof tag !== "string" || tag.trim().length === 0) {
+          res.status(400).json({
+            error: "Bad Request",
+            message: "Each tag must be a non-empty string",
+          });
+          return;
+        }
+      }
+    }
+
     // Perform global search
     // If userId not directly available, pass the decoded.email so the service layer can resolve it
     const searchInputUser = userId || decoded?.email;
 
     const searchResult = await searchAllConversations(searchInputUser, {
       query,
+      tags,
       limit,
       messagesPerConversation,
       similarity_threshold,

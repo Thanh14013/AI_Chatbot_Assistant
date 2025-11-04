@@ -26,3 +26,5 @@ export { AvatarUpload } from "./AvatarUpload";
 export { ChangePasswordModal } from "./ChangePasswordModal";
 export { FileAttachmentPreview } from "./FileAttachmentPreview";
 export { default as SelectionAskButton } from "./SelectionAskButton";
+export { default as CodeBlock } from "./CodeBlock";
+export { default as AskAIModal } from "./AskAIModal";

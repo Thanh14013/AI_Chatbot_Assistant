@@ -2,24 +2,33 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  padding: 8px 0;
-  margin-bottom: 8px;
+  padding: 12px 16px 8px 16px;
+  margin-bottom: 4px;
+  background: #f9fafb;
+  border-radius: 12px 12px 0 0;
+  border: 1px solid #e5e7eb;
+  border-bottom: none;
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .attachmentItem {
   position: relative;
-  width: 80px;
-  height: 80px;
-  border-radius: 8px;
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
   overflow: hidden;
-  border: 1px solid var(--border-color, #e0e0e0);
-  background: var(--bg-secondary, #f5f5f5);
+  border: 2px solid #e5e7eb;
+  background: white;
   transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
 .attachmentItem:hover {
-  border-color: var(--primary-color, #1976d2);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-color: #4f46e5;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
+  transform: translateY(-2px);
 }
 
 .attachmentImage {
@@ -54,26 +63,29 @@
 
 .removeButton {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 20px;
-  height: 20px;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.6);
+  background: #ef4444;
   color: white;
-  border: none;
+  border: 2px solid white;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 12px;
+  font-weight: bold;
   transition: all 0.2s ease;
   padding: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  z-index: 10;
 }
 
 .removeButton:hover {
-  background: rgba(255, 0, 0, 0.8);
-  transform: scale(1.1);
+  background: #dc2626;
+  transform: scale(1.15) rotate(90deg);
 }
 
 .uploadingOverlay {
@@ -89,6 +101,37 @@
   color: white;
   font-size: 12px;
   font-weight: 500;
+}
+
+.processingOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(79, 70, 229, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 11px;
+  font-weight: 500;
+  gap: 4px;
+}
+
+.processingSpinner {
+  font-size: 20px;
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .progressBar {

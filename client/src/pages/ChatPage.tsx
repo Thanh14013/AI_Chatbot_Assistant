@@ -628,7 +628,17 @@ const ChatPage: React.FC = () => {
               console.log(
                 `[MessageComplete] Replacing ${m.id} with ${userMessage.id}`
               );
-              processedMessages.push(userMessage);
+
+              // IMPORTANT: Preserve attachments from optimistic message if server doesn't return them
+              const mergedUserMessage = {
+                ...userMessage,
+                attachments:
+                  userMessage.attachments && userMessage.attachments.length > 0
+                    ? userMessage.attachments
+                    : m.attachments || [],
+              };
+
+              processedMessages.push(mergedUserMessage);
               existingIds.add(userMessage.id);
               replacedUser = true;
               continue;
@@ -807,9 +817,21 @@ const ChatPage: React.FC = () => {
         });
 
         // If found matching optimistic message, REPLACE it with real message
+        // IMPORTANT: Preserve attachments from optimistic message if server message doesn't have them
         if (matchingPendingIndex !== -1) {
+          const optimisticMsg = prev[matchingPendingIndex];
           const newMessages = [...prev];
-          newMessages[matchingPendingIndex] = message;
+
+          // Merge attachments: prefer server's attachments, fallback to optimistic
+          const mergedMessage = {
+            ...message,
+            attachments:
+              message.attachments && message.attachments.length > 0
+                ? message.attachments
+                : optimisticMsg.attachments || [],
+          };
+
+          newMessages[matchingPendingIndex] = mergedMessage;
           return newMessages;
         }
 
@@ -2209,9 +2231,10 @@ const ChatPage: React.FC = () => {
   /**
    * Handle asking about selected text from AI message
    */
-  const handleAskAboutSelection = (selectedText: string) => {
+  const handleAskAboutSelection = (question: string, selectedText: string) => {
     if (!currentConversation) return;
-    const message = `Tôi chưa rõ đoạn này, giải thích lại cho tôi: "${selectedText}"`;
+    // Combine user's question with the selected text
+    const message = `${question} : ${selectedText}`;
     handleSendMessage(message);
   };
 
@@ -2515,6 +2538,7 @@ const ChatPage: React.FC = () => {
                 onAskAboutSelection={handleAskAboutSelection}
                 onResend={handleResendMessage}
                 onEdit={handleEditMessage}
+                isAITyping={isAITyping}
               />
 
               {/* Chat input - disable while AI is typing to mirror sender tab behaviour */}

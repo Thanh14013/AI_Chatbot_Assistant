@@ -53,6 +53,7 @@ export async function searchAllConversations(
   userIdOrEmail: string,
   searchParams: {
     query: string;
+    tags?: string[]; // Optional: filter by conversation tags (match any tag)
     limit?: number; // Max conversations to return (default: 10)
     messagesPerConversation?: number; // Top messages per conversation (default: 3)
     similarity_threshold?: number; // Minimum similarity (default: 0.5, tuned for Vietnamese text with text-embedding-3-small)
@@ -60,6 +61,7 @@ export async function searchAllConversations(
 ): Promise<GlobalSearchResponse> {
   const {
     query,
+    tags,
     limit = 10,
     messagesPerConversation = 3,
     similarity_threshold = 0.37, // Lowered default to 0.4 for better recall on short Vietnamese queries
@@ -86,40 +88,85 @@ export async function searchAllConversations(
 
   // Step 1: Find all matching messages across user's conversations
   // Group by conversation and get top messages per conversation
-  const results = await sequelize.query(
-    `
-    WITH user_conversations AS (
-      SELECT id FROM conversations 
-      WHERE user_id = $1 AND deleted_at IS NULL AND project_id IS NULL
-    ),
-    ranked_messages AS (
-      SELECT 
-        m.id as message_id,
-        m.conversation_id,
-        m.role,
-        m.content,
-        m.tokens_used,
-        m.model,
-        m."createdAt",
-        (1 - (e.embedding <=> $2::vector)) as similarity,
-        ROW_NUMBER() OVER (
-          PARTITION BY m.conversation_id 
-          ORDER BY (e.embedding <=> $2::vector) ASC
-        ) as rank_in_conversation
-      FROM messages m
-      INNER JOIN message_embeddings e ON m.id = e.message_id
-      WHERE m.conversation_id IN (SELECT id FROM user_conversations)
-        AND (1 - (e.embedding <=> $2::vector)) >= $3
-    )
-    SELECT * FROM ranked_messages
-    WHERE rank_in_conversation <= $4
-    ORDER BY similarity DESC
-    `,
-    {
-      bind: [userId, vectorString, similarity_threshold, messagesPerConversation],
-      type: QueryTypes.SELECT,
-    }
-  );
+  // If tags are provided, only search in conversations that have at least one of the tags
+  let results;
+
+  if (tags && tags.length > 0) {
+    // Filter by tags - conversation must have at least one of the specified tags
+    results = await sequelize.query(
+      `
+      WITH user_conversations AS (
+        SELECT id FROM conversations 
+        WHERE user_id = $1 
+          AND deleted_at IS NULL 
+          AND project_id IS NULL
+          AND tags && $5::text[]
+      ),
+      ranked_messages AS (
+        SELECT 
+          m.id as message_id,
+          m.conversation_id,
+          m.role,
+          m.content,
+          m.tokens_used,
+          m.model,
+          m."createdAt",
+          (1 - (e.embedding <=> $2::vector)) as similarity,
+          ROW_NUMBER() OVER (
+            PARTITION BY m.conversation_id 
+            ORDER BY (e.embedding <=> $2::vector) ASC
+          ) as rank_in_conversation
+        FROM messages m
+        INNER JOIN message_embeddings e ON m.id = e.message_id
+        WHERE m.conversation_id IN (SELECT id FROM user_conversations)
+          AND (1 - (e.embedding <=> $2::vector)) >= $3
+      )
+      SELECT * FROM ranked_messages
+      WHERE rank_in_conversation <= $4
+      ORDER BY similarity DESC
+      `,
+      {
+        bind: [userId, vectorString, similarity_threshold, messagesPerConversation, tags],
+        type: QueryTypes.SELECT,
+      }
+    );
+  } else {
+    // No tag filter - search all conversations
+    results = await sequelize.query(
+      `
+      WITH user_conversations AS (
+        SELECT id FROM conversations 
+        WHERE user_id = $1 AND deleted_at IS NULL AND project_id IS NULL
+      ),
+      ranked_messages AS (
+        SELECT 
+          m.id as message_id,
+          m.conversation_id,
+          m.role,
+          m.content,
+          m.tokens_used,
+          m.model,
+          m."createdAt",
+          (1 - (e.embedding <=> $2::vector)) as similarity,
+          ROW_NUMBER() OVER (
+            PARTITION BY m.conversation_id 
+            ORDER BY (e.embedding <=> $2::vector) ASC
+          ) as rank_in_conversation
+        FROM messages m
+        INNER JOIN message_embeddings e ON m.id = e.message_id
+        WHERE m.conversation_id IN (SELECT id FROM user_conversations)
+          AND (1 - (e.embedding <=> $2::vector)) >= $3
+      )
+      SELECT * FROM ranked_messages
+      WHERE rank_in_conversation <= $4
+      ORDER BY similarity DESC
+      `,
+      {
+        bind: [userId, vectorString, similarity_threshold, messagesPerConversation],
+        type: QueryTypes.SELECT,
+      }
+    );
+  }
 
   if (results.length === 0) {
     return {

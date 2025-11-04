@@ -10,6 +10,7 @@
   z-index: 50;
 }
 
+/* When files are attached, adjust input wrapper styling */
 .inputWrapper {
   max-width: 900px;
   min-height: 36px;
@@ -24,6 +25,12 @@
   padding: 8px 8px 8px 10px;
   transition: all 0.2s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* When there are attachments, connect input to preview */
+.chatInputContainer:has(.attachmentsList) .inputWrapper {
+  border-radius: 0 0 20px 20px;
+  border-top: 1px solid #e5e7eb;
 }
 
 .inputWrapper:focus-within {

@@ -8,18 +8,21 @@ import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { Button, Tooltip } from "antd";
 import { QuestionCircleOutlined } from "@ant-design/icons";
 import styles from "./SelectionAskButton.module.css";
+import AskAIModal from "./AskAIModal";
 
 interface SelectionAskButtonProps {
   /** The container element to monitor for text selection */
   containerRef: React.RefObject<HTMLDivElement>;
-  /** Callback when user clicks the ask button */
-  onAskAboutSelection: (selectedText: string) => void;
+  /** Callback when user submits a question with selected text */
+  onAskAboutSelection: (question: string, selectedText: string) => void;
   /** Only show for AI messages (not user messages) */
   isAIMessage: boolean;
   /** Message ID to track changes and re-attach listeners */
   messageId?: string;
   /** Content hash to detect content changes (for streaming messages) */
   contentKey?: string | number;
+  /** AI typing state to disable ask functionality */
+  isAITyping?: boolean;
 }
 
 /**
@@ -32,12 +35,18 @@ const SelectionAskButton: React.FC<SelectionAskButtonProps> = ({
   isAIMessage,
   messageId,
   contentKey,
+  isAITyping = false,
 }) => {
   const [selectedText, setSelectedText] = useState<string>("");
   const [buttonPosition, setButtonPosition] = useState<{
     top: number;
     left: number;
   } | null>(null);
+  const [inputPosition, setInputPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
   const buttonRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
 
@@ -148,43 +157,74 @@ const SelectionAskButton: React.FC<SelectionAskButtonProps> = ({
   }, [isAIMessage, isReady, messageId, contentKey]); // Added contentKey
 
   const handleAskClick = () => {
-    if (selectedText) {
-      onAskAboutSelection(selectedText);
-      // Clear selection and hide button
-      window.getSelection()?.removeAllRanges();
-      setButtonPosition(null);
-      setSelectedText("");
+    if (selectedText && buttonPosition) {
+      // Save position for input and hide button
+      setInputPosition(buttonPosition);
+      setIsModalVisible(true);
+      setButtonPosition(null); // Hide button when input opens
     }
   };
 
-  if (!buttonPosition || !isAIMessage) return null;
+  const handleModalSubmit = (question: string, text: string) => {
+    onAskAboutSelection(question, text);
+    // Clear everything
+    window.getSelection()?.removeAllRanges();
+    setButtonPosition(null);
+    setSelectedText("");
+    setIsModalVisible(false);
+  };
+
+  const handleModalClose = () => {
+    setIsModalVisible(false);
+    // Also clear selection and hide button
+    window.getSelection()?.removeAllRanges();
+    setButtonPosition(null);
+    setSelectedText("");
+  };
+
+  if (!isAIMessage) return null;
 
   return (
     <>
-      <style>
-        {`
-          .${styles.floatingButton}[data-position="true"] {
-            top: ${buttonPosition.top}px;
-            left: ${buttonPosition.left}px;
-          }
-        `}
-      </style>
-      <div
-        ref={buttonRef}
-        className={styles.floatingButton}
-        data-position="true"
-      >
-        <Tooltip title="Ask AI to explain this" placement="top">
-          <Button
-            type="primary"
-            shape="circle"
-            icon={<QuestionCircleOutlined />}
-            onClick={handleAskClick}
-            className={styles.askButton}
-            size="small"
-          />
-        </Tooltip>
-      </div>
+      {/* AskAI Button - only show when not in modal mode */}
+      {buttonPosition && !isModalVisible && (
+        <>
+          <style>
+            {`
+              .${styles.floatingButton}[data-position="true"] {
+                top: ${buttonPosition.top}px;
+                left: ${buttonPosition.left}px;
+              }
+            `}
+          </style>
+          <div
+            ref={buttonRef}
+            className={styles.floatingButton}
+            data-position="true"
+          >
+            <Tooltip title="Ask AI about this" placement="top">
+              <Button
+                type="primary"
+                shape="circle"
+                icon={<QuestionCircleOutlined />}
+                onClick={handleAskClick}
+                className={styles.askButton}
+                size="small"
+                disabled={isAITyping}
+              />
+            </Tooltip>
+          </div>
+        </>
+      )}
+
+      {/* AskAI Modal */}
+      <AskAIModal
+        visible={isModalVisible}
+        position={inputPosition}
+        selectedText={selectedText}
+        onClose={handleModalClose}
+        onSubmit={handleModalSubmit}
+      />
     </>
   );
 };

@@ -29,10 +29,12 @@ interface MessageListProps {
   // Pin toggle handler
   onPinToggle?: (messageId: string, isPinned: boolean) => void;
   // Selection ask handler
-  onAskAboutSelection?: (selectedText: string) => void;
+  onAskAboutSelection?: (question: string, selectedText: string) => void;
   // Resend and edit handlers
   onResend?: (message: Message | PendingMessage) => void;
   onEdit?: (message: Message | PendingMessage, newContent: string) => void;
+  // AI typing state to disable interactive elements
+  isAITyping?: boolean;
 }
 
 /**
@@ -55,6 +57,7 @@ const MessageList: React.FC<MessageListProps> = ({
   onAskAboutSelection,
   onResend,
   onEdit,
+  isAITyping = false,
 }) => {
   // Merge pending messages with real messages and sort by timestamp
   const allMessages = React.useMemo(() => {
@@ -368,6 +371,7 @@ const MessageList: React.FC<MessageListProps> = ({
               onAskAboutSelection={onAskAboutSelection}
               onResend={onResend}
               onEdit={onEdit}
+              isAITyping={isAITyping}
             />
           </div>
         ))}
