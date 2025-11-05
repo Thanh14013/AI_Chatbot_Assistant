@@ -22,7 +22,7 @@ interface UseChatReturn {
   hasMore: boolean;
   page: number;
   // Methods
-  loadConversations: (reset?: boolean) => Promise<void>;
+  loadConversations: (reset?: boolean, force?: boolean) => Promise<void>;
   loadMore: () => Promise<void>;
   updateConversationOptimistic: (
     conversationId: string,
@@ -56,9 +56,9 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
    * @param reset - If true, resets to page 1 and replaces list
    */
   const loadConversations = useCallback(
-    async (reset = false) => {
-      // Prevent duplicate concurrent requests
-      if (fetchingRef.current) return;
+    async (reset = false, force = false) => {
+      // Prevent duplicate concurrent requests unless forced
+      if (fetchingRef.current && !force) return;
 
       const targetPage = reset ? 1 : page;
 
@@ -68,6 +68,7 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
         setIsLoadingMore(true);
       }
 
+      // Mark as fetching (force will still set this so other calls will wait)
       fetchingRef.current = true;
 
       try {
@@ -181,7 +182,8 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
    * Refresh conversations from server (full reload from page 1)
    */
   const refreshConversations = useCallback(async () => {
-    await loadConversations(true);
+    // Force an immediate refresh even if a background fetch is in progress
+    await loadConversations(true, true);
   }, [loadConversations]);
 
   // Auto-load on mount or when search changes

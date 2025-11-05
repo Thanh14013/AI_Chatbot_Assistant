@@ -30,11 +30,7 @@ export class AppError extends Error {
 export const errorLogger = (error: Error, context?: Record<string, any>) => {
   // Always log to console in development
   if (process.env.NODE_ENV !== "production") {
-    console.error("❌ Error:", error.message);
-    if (context) {
-      console.error("📋 Context:", context);
-    }
-    console.error("📚 Stack:", error.stack);
+    // Error logging removed
   }
 
   // Send to Sentry in production

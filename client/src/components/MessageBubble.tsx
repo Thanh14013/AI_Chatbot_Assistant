@@ -311,33 +311,60 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
    */
   const renderContent = (content: string) => {
     // Split content by code blocks (```language\ncode```)
-    const parts = content.split(/(```[\s\S]*?```)/g);
+    // Match code blocks with optional language specifier
+    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
+    const parts: Array<{
+      type: "text" | "code";
+      content: string;
+      language?: string;
+    }> = [];
+
+    let lastIndex = 0;
+    let match;
+
+    // Find all code blocks
+    while ((match = codeBlockRegex.exec(content)) !== null) {
+      // Add text before code block
+      if (match.index > lastIndex) {
+        parts.push({
+          type: "text",
+          content: content.slice(lastIndex, match.index),
+        });
+      }
+
+      // Add code block
+      parts.push({
+        type: "code",
+        content: match[2] || match[0], // Use captured code or full match
+        language: match[1] || "plaintext",
+      });
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Add remaining text after last code block
+    if (lastIndex < content.length) {
+      parts.push({
+        type: "text",
+        content: content.slice(lastIndex),
+      });
+    }
+
+    // If no code blocks found, return content as single text part
+    if (parts.length === 0) {
+      parts.push({
+        type: "text",
+        content: content,
+      });
+    }
 
     return parts.map((part, index) => {
-      // Check if this is a code block
-      if (part.startsWith("```") && part.endsWith("```")) {
-        // Extract language and code
-        const withoutBackticks = part.slice(3, -3);
-        const firstNewline = withoutBackticks.indexOf("\n");
-
-        let language = "javascript";
-        let code = withoutBackticks;
-
-        if (firstNewline !== -1) {
-          const potentialLanguage = withoutBackticks
-            .slice(0, firstNewline)
-            .trim();
-          if (potentialLanguage) {
-            language = potentialLanguage;
-            code = withoutBackticks.slice(firstNewline + 1);
-          }
-        }
-
+      if (part.type === "code") {
         return (
           <CodeBlock
             key={index}
-            code={code}
-            language={language}
+            code={part.content}
+            language={part.language}
             isUserMessage={isUser}
           />
         );
@@ -346,7 +373,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       // Regular text with line breaks preserved
       return (
         <span key={index} className={styles.textContent}>
-          {part}
+          {part.content}
         </span>
       );
     });

@@ -202,13 +202,19 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
             pinned: msg.pinned,
             createdAt: msg.createdAt,
         }));
-        // Fetch attachments for all messages
-        const { default: fileUploadModel } = await import("../models/fileUpload.model.js");
-        for (const msgResponse of messageResponses) {
+        // Fetch attachments for all messages (batch query to avoid N+1)
+        const messageIds = messageResponses.map((m) => m.id);
+        if (messageIds.length > 0) {
             try {
-                const attachments = await fileUploadModel.findByMessageId(msgResponse.id);
-                if (attachments && attachments.length > 0) {
-                    msgResponse.attachments = attachments.map((att) => ({
+                const { default: pool } = await import("../db/pool.js");
+                const attachmentsResult = await pool.query(`SELECT * FROM files_upload WHERE message_id = ANY($1) ORDER BY created_at ASC`, [messageIds]);
+                // Group attachments by message_id
+                const attachmentsByMessage = new Map();
+                for (const att of attachmentsResult.rows) {
+                    if (!attachmentsByMessage.has(att.message_id)) {
+                        attachmentsByMessage.set(att.message_id, []);
+                    }
+                    attachmentsByMessage.get(att.message_id).push({
                         id: att.id,
                         public_id: att.public_id,
                         secure_url: att.secure_url,
@@ -220,7 +226,11 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
                         height: att.height,
                         thumbnail_url: att.thumbnail_url,
                         extracted_text: att.extracted_text,
-                    }));
+                    });
+                }
+                // Attach to messages
+                for (const msgResponse of messageResponses) {
+                    msgResponse.attachments = attachmentsByMessage.get(msgResponse.id) || [];
                 }
             }
             catch (err) {
@@ -272,7 +282,9 @@ onUserMessageCreated,
 // optional attachments array
 attachments, 
 // optional metadata for resend/edit operations
-metadata) => {
+metadata, 
+// optional enhanced system prompt (from LTM)
+enhancedSystemPrompt) => {
     if (!content || content.trim().length === 0) {
         throw new Error("Message content cannot be empty");
     }
@@ -333,7 +345,9 @@ metadata) => {
                         }));
                     }
                 }
-                catch (err) { }
+                catch (err) {
+                    // Don't fail the entire request if linking fails
+                }
             }
             await onUserMessageCreated({
                 id: userMessage.id,
@@ -361,8 +375,8 @@ metadata) => {
     });
     // Build context with user preferences
     const baseSystemPrompt = "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.";
-    // Get system prompt with user preferences applied
-    const systemPrompt = await buildSystemPromptWithPreferences(userId, baseSystemPrompt);
+    // Use enhanced system prompt if provided (from LTM), otherwise get with user preferences
+    const systemPrompt = enhancedSystemPrompt || (await buildSystemPromptWithPreferences(userId, baseSystemPrompt));
     const disableContext = String(process.env.DISABLE_CONTEXT || "false").toLowerCase() === "true";
     const useSemanticContext = String(process.env.USE_SEMANTIC_CONTEXT || "false").toLowerCase() === "true";
     let contextMessages;
@@ -593,7 +607,9 @@ metadata) => {
         await invalidateCachePattern(contextPattern(conversationId));
         await invalidateCachePattern(conversationListPattern(conversation.user_id));
         // Generate and store embedding for assistant message (async, non-blocking)
-        generateAndStoreEmbedding(assistantMessage.id, assistantMessage.content).catch((error) => { });
+        generateAndStoreEmbedding(assistantMessage.id, assistantMessage.content).catch((error) => {
+            // Error generating embedding for assistant message
+        });
         // Return userMessage, assistantMessage, and updated conversation for client sync
         return {
             userMessage: {

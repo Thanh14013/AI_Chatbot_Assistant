@@ -1,7 +1,7 @@
 import { registerUser, loginUser, refreshAccessToken, logoutUser, } from "../services/auth.service.js";
 import User from "../models/user.model.js";
 /**
- * Register a new user
+ * Register a new user....
  * POST /api/auth/register
  */
 export const register = async (req, res) => {

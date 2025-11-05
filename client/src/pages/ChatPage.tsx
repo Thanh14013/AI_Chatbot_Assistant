@@ -20,6 +20,7 @@ import {
   SettingsModal,
   ProfileModal,
   PinnedMessagesDropdown,
+  NewChatSuggestions,
 } from "../components";
 // ConversationForm not used anymore in new draft mode flow
 // import ConversationForm, {
@@ -131,6 +132,11 @@ const ChatPage: React.FC = () => {
     isLoadingConversationSuggestions,
     setIsLoadingConversationSuggestions,
   ] = useState(false);
+
+  // New Chat suggestions state (for empty chat screen)
+  const [newChatSuggestions, setNewChatSuggestions] = useState<string[]>([]);
+  const [isLoadingNewChatSuggestions, setIsLoadingNewChatSuggestions] =
+    useState(false);
 
   // Sidebar is rendered by the new Sidebar component
 
@@ -244,6 +250,7 @@ const ChatPage: React.FC = () => {
   /**
    * Handle New Conversation button click
    * Navigate to home route to show empty chat (draft mode)
+   * Force regenerate new chat suggestions
    */
   const handleNewConversation = () => {
     // Navigate to home route to show empty chat interface
@@ -253,6 +260,9 @@ const ChatPage: React.FC = () => {
     setMessages([]);
     setMessagesPage(1);
     setMessagesHasMore(false);
+
+    // Force regenerate new chat suggestions
+    fetchNewChatSuggestions(true);
   };
 
   /**
@@ -1000,6 +1010,85 @@ const ChatPage: React.FC = () => {
     };
   }, []);
 
+  /**
+   * Fetch New Chat suggestions when entering empty chat screen
+   * Based on recent messages across all conversations and user profile
+   */
+  useEffect(() => {
+    // Only fetch when there's no current conversation (New Chat screen)
+    if (currentConversation || !user) {
+      return;
+    }
+
+    // Fetch suggestions after a small delay to avoid rapid refetching
+    const timer = setTimeout(() => {
+      fetchNewChatSuggestions();
+    }, 300);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentConversation, user]);
+
+  /**
+   * Listen for conversation followup suggestions response
+   */
+  useEffect(() => {
+    const handleConversationFollowupsResponse = (event: CustomEvent) => {
+      const { conversationId, suggestions } = event.detail;
+
+      // For current conversation suggestions (lightbulb in input)
+      if (currentConversation && conversationId === currentConversation.id) {
+        setConversationSuggestions(suggestions);
+        setIsLoadingConversationSuggestions(false);
+      }
+      // For new chat suggestions (empty screen)
+      else if (
+        !currentConversation &&
+        conversationId === "new_chat_suggestions"
+      ) {
+        setNewChatSuggestions(suggestions);
+        setIsLoadingNewChatSuggestions(false);
+      }
+    };
+
+    const handleConversationFollowupsError = (event: CustomEvent) => {
+      const { conversationId, error } = event.detail;
+      console.error("[Followups] Error:", error);
+
+      // Check which type of suggestion request failed
+      if (currentConversation && conversationId === currentConversation.id) {
+        setIsLoadingConversationSuggestions(false);
+        setConversationSuggestions([]);
+      } else if (
+        !currentConversation &&
+        conversationId === "new_chat_suggestions"
+      ) {
+        setIsLoadingNewChatSuggestions(false);
+        setNewChatSuggestions([]);
+      }
+    };
+
+    window.addEventListener(
+      "conversation_followups_response",
+      handleConversationFollowupsResponse as EventListener
+    );
+    window.addEventListener(
+      "conversation_followups_error",
+      handleConversationFollowupsError as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "conversation_followups_response",
+        handleConversationFollowupsResponse as EventListener
+      );
+      window.removeEventListener(
+        "conversation_followups_error",
+        handleConversationFollowupsError as EventListener
+      );
+    };
+  }, [currentConversation]);
+
   // Listen for location changes to handle highlight params from navigation
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -1256,6 +1345,21 @@ const ChatPage: React.FC = () => {
         if (isConnected) {
           try {
             console.log("[NewConv] Sending message via WebSocket");
+
+            // INSTANT AI TYPING INDICATOR - Add typing message BEFORE sending
+            const typingId = `typing_ai_${Date.now()}`;
+            const typingMsg: Message = {
+              id: typingId,
+              conversation_id: newConversation.id,
+              role: "assistant",
+              content: "",
+              tokens_used: 0,
+              model: newConversation.model,
+              createdAt: new Date().toISOString(),
+              isTyping: true,
+            };
+            setMessages((prev) => [...prev, typingMsg]);
+
             // Send directly via websocketService instead of hook
             // (hook may not have updated conversation prop yet)
             websocketService.sendMessage(
@@ -1491,11 +1595,36 @@ const ChatPage: React.FC = () => {
       };
       setMessages((prev) => [...prev, userMsg]);
 
+      // INSTANT AI TYPING INDICATOR - Add typing message immediately
+      const typingId = `typing_ai_${Date.now()}`;
+      const typingMsg: Message = {
+        id: typingId,
+        conversation_id: currentConversation.id,
+        role: "assistant",
+        content: "",
+        tokens_used: 0,
+        model: currentConversation.model,
+        createdAt: new Date().toISOString(),
+        isTyping: true,
+      };
+      setMessages((prev) => [...prev, typingMsg]);
+
       try {
         setTimeout(
           () => window.dispatchEvent(new Event("messages:scrollToBottom")),
           40
         );
+      } catch {}
+
+      // IMMEDIATELY fire event for Sidebar to start refreshing FIRST
+      try {
+        // Fire event FIRST - Sidebar will start loading immediately
+        window.dispatchEvent(new Event("message:sent"));
+        // Then do optimistic updates on ChatPage's list
+        moveConversationToTop(currentConversation.id);
+        updateConversationOptimistic(currentConversation.id, {
+          updatedAt: new Date().toISOString(),
+        });
       } catch {}
 
       try {
@@ -1602,6 +1731,17 @@ const ChatPage: React.FC = () => {
 
     setMessages((prev) => [...prev, userMsg]);
     setIsSendingMessage(true);
+
+    // IMMEDIATELY fire event for Sidebar to start refreshing FIRST
+    try {
+      // Fire event FIRST - Sidebar will start loading immediately
+      window.dispatchEvent(new Event("message:sent"));
+      // Then do optimistic updates on ChatPage's list
+      moveConversationToTop(currentConversation.id);
+      updateConversationOptimistic(currentConversation.id, {
+        updatedAt: new Date().toISOString(),
+      });
+    } catch {}
 
     const typingId = `typing_${Date.now()}`;
     const typingMsg: Message = {
@@ -2221,6 +2361,53 @@ const ChatPage: React.FC = () => {
   };
 
   /**
+   * Fetch New Chat suggestions based on recent activity across all conversations
+   */
+  const fetchNewChatSuggestions = async (forceRegenerate = false) => {
+    if (!user?.id) return;
+
+    try {
+      setIsLoadingNewChatSuggestions(true);
+      setNewChatSuggestions([]);
+
+      // Ensure websocket is connected so we can use the conversation followups socket handler.
+      // If it's not connected, attempt to connect first (this is fast and resolves when ready).
+      try {
+        await websocketService.connect();
+      } catch (connErr) {
+        // If socket connection fails, we still proceed to attempt an HTTP fallback below.
+        console.warn(
+          "[NewChat] WebSocket connect failed, will try socket request fallback",
+          connErr
+        );
+      }
+
+      // Request suggestions via websocket if connected
+      const sessionId = String(user.id);
+      const tempConversationId = "new_chat_suggestions";
+
+      if (websocketService.isConnected()) {
+        // For new chat suggestions, we pass forceRegenerate flag
+        // Server will use cached suggestions unless forceRegenerate is true
+        websocketService.requestConversationFollowups(
+          tempConversationId,
+          [], // Empty messages array - server will handle context
+          sessionId,
+          forceRegenerate
+        );
+      } else {
+        // Could not connect to websocket; bail out and clear loading state
+        setIsLoadingNewChatSuggestions(false);
+        setNewChatSuggestions([]);
+      }
+    } catch (err) {
+      console.error("[NewChat] Failed to fetch suggestions:", err);
+      setIsLoadingNewChatSuggestions(false);
+      setNewChatSuggestions([]);
+    }
+  };
+
+  /**
    * Handle clicking a follow-up suggestion
    */
   const handleFollowupClick = (suggestion: string) => {
@@ -2479,6 +2666,16 @@ const ChatPage: React.FC = () => {
                 onAskAboutSelection={handleAskAboutSelection}
                 onResend={handleResendMessage}
                 onEdit={handleEditMessage}
+              />
+
+              {/* New Chat suggestions - display above input */}
+              <NewChatSuggestions
+                suggestions={newChatSuggestions}
+                isLoading={isLoadingNewChatSuggestions}
+                onSuggestionClick={(suggestion) => {
+                  // Send the suggestion as a message to create new conversation
+                  handleSendMessage(suggestion);
+                }}
               />
 
               {/* Chat input for new conversation */}

@@ -23,7 +23,6 @@ export const pinMessage = async (req, res) => {
         // Get user ID from authenticated request
         const userId = await getUserIdFromRequest(req);
         if (!userId) {
-            console.warn("⚠️ [PIN_MESSAGE] Authentication failed - no user ID");
             res.status(401).json({
                 success: false,
                 message: "Authentication required",
@@ -33,7 +32,6 @@ export const pinMessage = async (req, res) => {
         // Extract message ID from params
         const messageId = req.params.messageId;
         if (!messageId) {
-            console.warn("⚠️ [PIN_MESSAGE] No message ID provided");
             res.status(400).json({
                 success: false,
                 message: "Message ID is required",
@@ -59,7 +57,6 @@ export const pinMessage = async (req, res) => {
             return;
         }
         if (conversation.user_id !== userId) {
-            console.warn(`⚠️ [PIN_MESSAGE] Unauthorized access attempt by user ${userId} for conversation ${conversation.id}`);
             res.status(403).json({
                 success: false,
                 message: "Unauthorized: You can only pin messages in your own conversations",
@@ -81,7 +78,6 @@ export const pinMessage = async (req, res) => {
         // Check pinned message limit (max 10 per conversation)
         const pinnedCount = await Message.countPinnedByConversation(message.conversation_id);
         if (pinnedCount >= 10) {
-            console.warn(`⚠️ [PIN_MESSAGE] Pin limit reached (${pinnedCount}/10) for conversation ${message.conversation_id}`);
             res.status(400).json({
                 success: false,
                 message: "Maximum number of pinned messages reached (10). Please unpin a message first.",
@@ -101,7 +97,7 @@ export const pinMessage = async (req, res) => {
         try {
             const io = getSocketIOInstance();
             if (!io) {
-                console.warn(`⚠️ [PIN_MESSAGE] Socket.io instance not available`);
+                // Socket.io instance not available
             }
             else {
                 const roomName = `conversation:${message.conversation_id}`;
@@ -194,7 +190,6 @@ export const unpinMessage = async (req, res) => {
         // Get user ID from authenticated request
         const userId = await getUserIdFromRequest(req);
         if (!userId) {
-            console.warn("⚠️ [UNPIN_MESSAGE] Authentication failed - no user ID");
             res.status(401).json({
                 success: false,
                 message: "Authentication required",
@@ -204,7 +199,6 @@ export const unpinMessage = async (req, res) => {
         // Extract message ID from params
         const messageId = req.params.messageId;
         if (!messageId) {
-            console.warn("⚠️ [UNPIN_MESSAGE] No message ID provided");
             res.status(400).json({
                 success: false,
                 message: "Message ID is required",
@@ -230,7 +224,6 @@ export const unpinMessage = async (req, res) => {
             return;
         }
         if (conversation.user_id !== userId) {
-            console.warn(`⚠️ [UNPIN_MESSAGE] Unauthorized access attempt by user ${userId} for conversation ${conversation.id}`);
             res.status(403).json({
                 success: false,
                 message: "Unauthorized: You can only unpin messages in your own conversations",
@@ -262,7 +255,7 @@ export const unpinMessage = async (req, res) => {
         try {
             const io = getSocketIOInstance();
             if (!io) {
-                console.warn(`⚠️ [UNPIN_MESSAGE] Socket.io instance not available`);
+                // Socket.io instance not available
             }
             else {
                 const roomName = `conversation:${message.conversation_id}`;
@@ -325,7 +318,6 @@ export const getPinnedMessages = async (req, res) => {
         // Get user ID from authenticated request
         const userId = await getUserIdFromRequest(req);
         if (!userId) {
-            console.warn("⚠️ [GET_PINNED] Authentication failed - no user ID");
             res.status(401).json({
                 success: false,
                 message: "Authentication required",
@@ -335,7 +327,6 @@ export const getPinnedMessages = async (req, res) => {
         // Extract conversation ID from params
         const conversationId = req.params.id;
         if (!conversationId) {
-            console.warn("⚠️ [GET_PINNED] No conversation ID provided");
             res.status(400).json({
                 success: false,
                 message: "Conversation ID is required",
@@ -352,7 +343,6 @@ export const getPinnedMessages = async (req, res) => {
             return;
         }
         if (conversation.user_id !== userId) {
-            console.warn(`⚠️ [GET_PINNED] Unauthorized access attempt by user ${userId} for conversation ${conversationId}`);
             res.status(403).json({
                 success: false,
                 message: "Unauthorized: You can only view pinned messages in your own conversations",

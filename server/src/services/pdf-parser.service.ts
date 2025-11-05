@@ -51,11 +51,8 @@ function downloadPDF(url: string): Promise<Buffer> {
  */
 export async function extractTextFromPDF(pdfUrl: string): Promise<string> {
   try {
-    console.log(`[PDF Parser] Starting extraction from: ${pdfUrl}`);
-
     // Download PDF as buffer using https/http
     const pdfBuffer = await downloadPDF(pdfUrl);
-    console.log(`[PDF Parser] Downloaded ${pdfBuffer.length} bytes`);
 
     // Parse PDF using PDFParse class
     const pdfParser = new PDFParse({ data: pdfBuffer });
@@ -65,24 +62,18 @@ export async function extractTextFromPDF(pdfUrl: string): Promise<string> {
     const pageCount = data.total;
     const textLength = extractedText.length;
 
-    console.log(`[PDF Parser] Extracted ${textLength} characters from ${pageCount} pages`);
-
     // If no text extracted, return helpful message
     if (!extractedText || extractedText.length === 0) {
-      console.warn("[PDF Parser] No text extracted - PDF may be image-based");
       return "[This PDF appears to be image-based or contains no extractable text. The file may be a scanned document. For image-based PDFs, consider using OCR (Optical Character Recognition) tools to extract text first.]";
     }
 
     // If extracted text is very short (< 50 chars), might be metadata only
     if (textLength < 50) {
-      console.warn(`[PDF Parser] Very short text extracted: ${textLength} chars`);
       return `${extractedText}\n\n[Note: Only ${textLength} characters were extracted. This PDF may contain primarily images or have limited text content.]`;
     }
 
-    console.log("[PDF Parser] ✅ Text extraction successful");
     return extractedText;
   } catch (error: any) {
-    console.error("[PDF Parser] ❌ Extraction failed:", error.message);
     // Return error message instead of throwing
     return `[Failed to extract text from PDF: ${error?.message || "Unknown error"}. The file may be corrupted, encrypted, or in an unsupported format.]`;
   }

@@ -37,7 +37,7 @@ export const authenticateAccessToken = (req: Req, res: Response, next: NextFunct
       try {
         // Log token validation for debugging
       } catch (error) {
-        console.error("Error in development logging:", error);
+        // Development logging error suppressed
       }
     }
 
@@ -67,7 +67,7 @@ export const authenticateAccessToken = (req: Req, res: Response, next: NextFunct
       try {
         // Log successful authentication
       } catch (error) {
-        console.error("Error in development logging:", error);
+        // Development logging error suppressed
       }
     }
 

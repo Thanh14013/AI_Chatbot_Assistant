@@ -68,7 +68,6 @@ const extractTextFromPDF = async (url: string): Promise<FileProcessingResult> =>
       pages: data.numpages || 1,
     };
   } catch (error: any) {
-    console.error("PDF extraction error:", error);
     return {
       error: `Failed to extract text from PDF: ${error.message}`,
       extracted_text: "[PDF text extraction failed]",
@@ -93,7 +92,6 @@ const extractTextFromDOCX = async (url: string): Promise<FileProcessingResult> =
       extracted_text: result.value || "[DOCX contains no extractable text]",
     };
   } catch (error: any) {
-    console.error("DOCX extraction error:", error);
     return {
       error: `Failed to extract text from DOCX: ${error.message}`,
       extracted_text: "[DOCX text extraction failed]",

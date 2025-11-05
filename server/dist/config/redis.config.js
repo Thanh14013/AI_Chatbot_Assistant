@@ -7,11 +7,16 @@ dotenv.config();
  */
 // Redis connection configuration
 const redisConfig = {
-    host: process.env.REDIS_HOST || "localhost",
+    host: process.env.REDIS_HOST || "127.0.0.1", // Use 127.0.0.1 instead of localhost
     port: parseInt(process.env.REDIS_PORT || "6379"),
-    password: process.env.REDIS_PASSWORD || undefined,
+    password: process.env.REDIS_PASSWORD ? process.env.REDIS_PASSWORD : undefined,
     db: parseInt(process.env.REDIS_DB || "0"),
     retryStrategy: (times) => {
+        // Stop retrying after 10 attempts to prevent infinite loop
+        if (times > 10) {
+            return null; // Return null to stop retrying
+        }
+        // Exponential backoff with max 2 seconds delay
         const delay = Math.min(times * 50, 2000);
         return delay;
     },
@@ -28,7 +33,7 @@ redisClient.on("connect", () => { });
 redisClient.on("ready", () => { });
 redisClient.on("error", (error) => { });
 redisClient.on("close", () => {
-    console.warn("⚠ Redis connection closed");
+    // Redis connection closed
 });
 redisClient.on("reconnecting", () => { });
 /**
@@ -44,7 +49,9 @@ export const disconnectRedis = async () => {
     try {
         await redisClient.quit();
     }
-    catch (error) { }
+    catch (error) {
+        // Error disconnecting Redis
+    }
 };
 // Export Redis client instance
 export default redisClient;

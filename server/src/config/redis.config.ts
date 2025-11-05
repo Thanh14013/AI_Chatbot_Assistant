@@ -17,7 +17,6 @@ const redisConfig = {
   retryStrategy: (times: number) => {
     // Stop retrying after 10 attempts to prevent infinite loop
     if (times > 10) {
-      console.error("Redis: Max retry attempts (10) reached. Stopping retry.");
       return null; // Return null to stop retrying
     }
     // Exponential backoff with max 2 seconds delay
@@ -42,7 +41,7 @@ redisClient.on("ready", () => {});
 redisClient.on("error", (error: Error) => {});
 
 redisClient.on("close", () => {
-  console.warn("⚠ Redis connection closed");
+  // Redis connection closed
 });
 
 redisClient.on("reconnecting", () => {});
@@ -61,7 +60,7 @@ export const disconnectRedis = async (): Promise<void> => {
   try {
     await redisClient.quit();
   } catch (error) {
-    console.error("Error disconnecting Redis:", error);
+    // Error disconnecting Redis
   }
 };
 

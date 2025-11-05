@@ -46,6 +46,48 @@ export async function testOpenAIConnection() {
     }
 }
 /**
+ * Call OpenAI Chat Completion API with automatic retry mechanism
+ * Retries on transient errors with exponential backoff
+ * Does not retry on authentication or client errors
+ *
+ * @param params - Chat completion parameters
+ * @param maxRetries - Maximum number of retry attempts (default: 3)
+ * @returns Promise with AI response and token usage
+ * @throws Error if all retries fail
+ */
+export async function getChatCompletionWithRetry(params, maxRetries = 3) {
+    let lastError = null;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const result = await getChatCompletion(params);
+            // Validate result has content
+            if (!result.content || result.content.trim() === "") {
+                throw new Error("OpenAI returned empty content");
+            }
+            return result;
+        }
+        catch (error) {
+            lastError = error;
+            // Don't retry on auth errors (401)
+            if (error.message?.includes("Invalid OpenAI API key") || error.status === 401) {
+                throw error;
+            }
+            // Don't retry on client errors (400-499 except 429)
+            if (error.status >= 400 && error.status < 500 && error.status !== 429) {
+                throw error;
+            }
+            // If this was the last attempt, throw the error
+            if (attempt >= maxRetries) {
+                break;
+            }
+            // Exponential backoff: 2^attempt * 1000ms (1s, 2s, 4s, 8s...)
+            const delay = Math.pow(2, attempt) * 1000;
+            await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+    }
+    throw lastError || new Error("Max retries exceeded");
+}
+/**
  * Call OpenAI Chat Completion API
  * Supports system prompt, temperature, and max_tokens parameters
  * Handles streaming and non-streaming responses

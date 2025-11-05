@@ -52,13 +52,17 @@ export async function extractTextFromPDF(pdfUrl) {
         const textLength = extractedText.length;
         // If no text extracted, return helpful message
         if (!extractedText || extractedText.length === 0) {
-            return "[This PDF appears to be image-based or encrypted. Text extraction not available.]";
+            return "[This PDF appears to be image-based or contains no extractable text. The file may be a scanned document. For image-based PDFs, consider using OCR (Optical Character Recognition) tools to extract text first.]";
+        }
+        // If extracted text is very short (< 50 chars), might be metadata only
+        if (textLength < 50) {
+            return `${extractedText}\n\n[Note: Only ${textLength} characters were extracted. This PDF may contain primarily images or have limited text content.]`;
         }
         return extractedText;
     }
     catch (error) {
         // Return error message instead of throwing
-        return `[Failed to extract text from PDF: ${error?.message || "Unknown error"}]`;
+        return `[Failed to extract text from PDF: ${error?.message || "Unknown error"}. The file may be corrupted, encrypted, or in an unsupported format.]`;
     }
 }
 /**

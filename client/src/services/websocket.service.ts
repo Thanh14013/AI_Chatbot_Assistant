@@ -163,6 +163,7 @@ interface ClientToServerEvents {
     conversationId: string;
     messages: Array<{ role: string; content: string }>;
     sessionId: string;
+    forceRegenerate?: boolean;
   }) => void;
 
   // Conversation events (multi-tab sync)
@@ -826,12 +827,13 @@ class WebSocketService {
   }
 
   /**
-   * Request conversation-based follow-up suggestions (for input lightbulb)
+   * Request conversation follow-up suggestions (for lightbulb in input or new chat)
    */
   requestConversationFollowups(
     conversationId: string,
     messages: Array<{ role: string; content: string }>,
-    sessionId: string
+    sessionId: string,
+    forceRegenerate?: boolean
   ): void {
     if (!this.socket?.connected) {
       throw new Error("WebSocket not connected");
@@ -840,6 +842,7 @@ class WebSocketService {
       conversationId,
       messages,
       sessionId,
+      forceRegenerate,
     });
   }
 

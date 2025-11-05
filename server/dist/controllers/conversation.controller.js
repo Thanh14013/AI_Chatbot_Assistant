@@ -99,9 +99,12 @@ export const getAll = async (req, res) => {
             return;
         }
         // Extract pagination params and search query
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
+        let page = parseInt(req.query.page) || 1;
+        let limit = parseInt(req.query.limit) || 20;
         const search = req.query.search;
+        // Validate and sanitize pagination parameters
+        page = Math.max(1, page); // Minimum page 1
+        limit = Math.max(1, Math.min(100, limit)); // Between 1-100
         // Extract standalone filter (for filtering by project_id)
         const standaloneParam = req.query.standalone;
         const standalone = standaloneParam === "true" ? true : standaloneParam === "false" ? false : undefined;
@@ -114,14 +117,6 @@ export const getAll = async (req, res) => {
                 .map((t) => t.trim())
                 .filter(Boolean)
             : undefined;
-        // Validate pagination params
-        if (page < 1 || limit < 1 || limit > 100) {
-            res.status(400).json({
-                success: false,
-                message: "Invalid pagination parameters",
-            });
-            return;
-        }
         // Validate tag mode
         if (tagMode !== "any" && tagMode !== "all") {
             res.status(400).json({
@@ -343,8 +338,11 @@ export const remove = async (req, res) => {
         // After deletion, fetch refreshed conversation list for the user.
         // Use page/limit from query params if provided so the client can
         // control which page is returned after delete; default to 1/20.
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
+        let page = parseInt(req.query.page) || 1;
+        let limit = parseInt(req.query.limit) || 20;
+        // Validate and sanitize pagination parameters
+        page = Math.max(1, page); // Minimum page 1
+        limit = Math.max(1, Math.min(100, limit)); // Between 1-100
         const conversationsResult = await getUserConversations(userId, page, limit);
         // Send success response with refreshed list
         res.status(200).json({

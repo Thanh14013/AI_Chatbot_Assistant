@@ -104,6 +104,7 @@ export interface RequestConversationFollowupsData {
   sessionId: string;
   conversationId: string;
   messages: Array<{ role: string; content: string }>;
+  forceRegenerate?: boolean; // Force regenerate suggestions (for new chat button)
 }
 
 export interface FollowupsResponseData {

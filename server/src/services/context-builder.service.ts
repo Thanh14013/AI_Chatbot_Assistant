@@ -72,7 +72,6 @@ export async function buildEnhancedContext(
       );
     } catch (error: any) {
       // If semantic search fails (e.g., no API key, no embeddings), continue without it
-      console.warn("Semantic search unavailable, using recent messages only:", error.message);
     }
   }
 

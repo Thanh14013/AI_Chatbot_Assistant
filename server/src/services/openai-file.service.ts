@@ -18,7 +18,6 @@ let openai: any;
 try {
   openai = new (OpenAI as any)({ apiKey: apiKey ?? undefined });
 } catch (e) {
-  console.error("❌ [OpenAI File Service] Failed to initialize OpenAI client");
   openai = null;
 }
 

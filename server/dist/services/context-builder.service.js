@@ -44,7 +44,6 @@ export async function buildEnhancedContext(conversationId, currentMessageContent
         }
         catch (error) {
             // If semantic search fails (e.g., no API key, no embeddings), continue without it
-            console.warn("Semantic search unavailable, using recent messages only:", error.message);
         }
     }
     // Step 3: Combine and deduplicate messages

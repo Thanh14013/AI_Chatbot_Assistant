@@ -5,7 +5,7 @@
 import Project from "../models/project.model.js";
 import Conversation from "../models/conversation.model.js";
 import { invalidateCachePattern } from "./cache.service.js";
-import { conversationListPattern } from "../utils/cache-key.util.js";
+import { conversationListPattern, projectListPattern } from "../utils/cache-key.util.js";
 /**
  * Get all projects for a user
  */
@@ -175,6 +175,8 @@ export const moveConversationToProject = async (conversationId, projectId, userI
     await conversation.save();
     // Invalidate conversation list cache for this user to ensure fresh data
     await invalidateCachePattern(conversationListPattern(userId));
+    // Invalidate project list cache (conversation counts changed)
+    await invalidateCachePattern(projectListPattern(userId));
     return {
         message: projectId
             ? "Conversation moved to project successfully"

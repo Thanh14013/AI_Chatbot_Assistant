@@ -10,10 +10,7 @@ async function listDatabases() {
     { db: "chatbot_db", desc: "chatbot_db database" },
   ];
 
-  console.log("🔍 Testing PostgreSQL connections...\n");
-  console.log("Host: localhost:5432");
-  console.log("User: postgres");
-  console.log("Password: thanh123\n");
+  // logging removed for cleaner output
 
   for (const config of configs) {
     const connectionString = `postgresql://postgres:thanh123@localhost:5432/${config.db}`;
@@ -21,7 +18,7 @@ async function listDatabases() {
 
     try {
       await client.connect();
-      console.log(`✅ Connected to "${config.db}" (${config.desc})`);
+      // logging removed
 
       // List all databases
       const result = await client.query(`
@@ -30,18 +27,13 @@ async function listDatabases() {
         ORDER BY datname;
       `);
 
-      console.log("   Available databases:");
-      result.rows.forEach((row) => {
-        console.log(`   - ${row.datname}`);
-      });
-
+      // logging removed
       await client.end();
-      console.log("");
       break; // Stop after first successful connection
     } catch (error) {
-      console.log(`❌ Cannot connect to "${config.db}": ${error.message}`);
+      // logging removed
     }
   }
 }
 
-listDatabases().catch(console.error);
+listDatabases().catch(() => {});

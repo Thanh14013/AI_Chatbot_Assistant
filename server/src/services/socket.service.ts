@@ -394,8 +394,11 @@ export const initializeSocketIO = (
 
         // incoming message received
 
-        // Import message service dynamically to avoid circular imports
+        // Import services dynamically to avoid circular imports
         const { sendMessageAndStreamResponse } = await import("./message.service.js");
+        const { buildMemoryEnhancedPrompt, analyzeAndUpdateMemory, isLTMEnabled } = await import(
+          "./memory.service.js"
+        );
 
         // CRITICAL FIX: Fetch attachments from database to get openai_file_id
         let enrichedAttachments: any[] | undefined;
@@ -429,6 +432,25 @@ export const initializeSocketIO = (
         let assistantContent = "";
 
         try {
+          // STEP 1: Build memory-enhanced context (if LTM enabled)
+          // This happens BEFORE sending to OpenAI
+          let enhancedSystemPrompt: string | undefined;
+
+          if (isLTMEnabled()) {
+            try {
+              const basePrompt =
+                "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.";
+              enhancedSystemPrompt = await buildMemoryEnhancedPrompt(
+                socket.userId!,
+                content,
+                basePrompt
+              );
+            } catch (memError) {
+              enhancedSystemPrompt = undefined; // Fall back to default in message service
+            }
+          }
+
+          // STEP 2: Send message with enhanced context
           const result = await sendMessageAndStreamResponse(
             conversationId,
             socket.userId!,
@@ -524,8 +546,24 @@ export const initializeSocketIO = (
                 // ignore
               }
             },
-            enrichedAttachments // Pass ENRICHED attachments with openai_file_id
+            enrichedAttachments, // Pass ENRICHED attachments with openai_file_id
+            undefined, // metadata (resend/edit) - not used here
+            enhancedSystemPrompt // Pass enhanced system prompt if LTM enabled
           );
+
+          // STEP 3: Background memory analysis (non-blocking)
+          // Run AFTER sending response to user
+          if (isLTMEnabled() && result.assistantMessage) {
+            // Don't await - let it run in background
+            analyzeAndUpdateMemory(
+              socket.userId!,
+              conversationId,
+              content,
+              result.assistantMessage.content
+            ).catch((err) => {
+              // Background memory analysis failed
+            });
+          }
 
           // CRITICAL FIX: Broadcast complete messages with different content for sender vs others
           // - Others (non-sender): Get both userMessage and assistantMessage
@@ -593,10 +631,6 @@ export const initializeSocketIO = (
           }
         } catch (streamErr: any) {
           // CRITICAL FIX: Handle streaming errors properly
-          console.error(
-            `[Socket] Stream error for conversation ${conversationId}:`,
-            streamErr.message || streamErr
-          );
 
           // Emit error event to client so they can handle it gracefully
           io.to(`conversation:${conversationId}`).emit("error", {
@@ -614,7 +648,7 @@ export const initializeSocketIO = (
           });
         }
       } catch (error) {
-        console.error("Error in typing:start handler:", error);
+        // Error in typing:start handler
       }
     });
 
@@ -683,7 +717,7 @@ export const initializeSocketIO = (
     // Handle conversation-based follow-up suggestions request (for input lightbulb)
     socket.on("request_conversation_followups", async (data) => {
       try {
-        const { sessionId, conversationId, messages } = data;
+        const { sessionId, conversationId, messages, forceRegenerate } = data;
 
         if (!sessionId || !conversationId) {
           socket.emit("conversation_followups_error", {
@@ -693,6 +727,32 @@ export const initializeSocketIO = (
           return;
         }
 
+        // Special handling for new chat suggestions (conversationId === "new_chat_suggestions")
+        if (conversationId === "new_chat_suggestions") {
+          // Import new chat suggestions service
+          const { getNewChatSuggestions } = await import("./new-chat-suggestions.service.js");
+
+          // Get cached or generate new suggestions
+          const userId = socket.userId;
+          if (!userId) {
+            socket.emit("conversation_followups_error", {
+              conversationId,
+              error: "User ID is required",
+            });
+            return;
+          }
+
+          const suggestions = await getNewChatSuggestions(userId, forceRegenerate || false);
+
+          // Broadcast suggestions to all sockets in the same session (multi-tab sync)
+          io.to(`session:${sessionId}`).emit("conversation_followups_response", {
+            conversationId,
+            suggestions,
+          });
+          return;
+        }
+
+        // Regular conversation followups
         if (!messages || !Array.isArray(messages) || messages.length === 0) {
           socket.emit("conversation_followups_error", {
             conversationId,
@@ -790,7 +850,7 @@ export const initializeSocketIO = (
             .emit("conversation:created", conversation);
         }
       } catch (error) {
-        console.error("Error broadcasting conversation:created:", error);
+        // Error broadcasting conversation:created
       }
     });
 
@@ -812,7 +872,7 @@ export const initializeSocketIO = (
           .to(`conversation:${conversationId}`)
           .emit("conversation:deleted", { conversationId });
       } catch (error) {
-        console.error("Error broadcasting conversation:deleted:", error);
+        // Error broadcasting conversation:deleted
       }
 
       // Remove all sockets from the conversation room

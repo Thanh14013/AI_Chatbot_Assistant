@@ -106,13 +106,6 @@ export const syncDatabase = async (force: boolean = false): Promise<void> => {
     await sequelize.sync({ force, alter: !force });
     // Database synchronized (log suppressed)
   } catch (error) {
-    // Log only a concise message to avoid verbose stack traces in normal dev output
-    try {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.warn("Database synchronization failed:", msg);
-    } catch {
-      console.warn("Database synchronization failed");
-    }
     // Re-throw so callers can decide how to handle (we keep behavior unchanged)
     throw error;
   }

@@ -107,6 +107,18 @@ export function globalSearchPattern(userId) {
 export function popularTagsKey(userId) {
     return `tags:popular:user:${userId}`;
 }
+/**
+ * Generate cache key for project list for a user
+ */
+export function projectListKey(userId) {
+    return `projects:user:${userId}`;
+}
+/**
+ * Generate pattern to invalidate all project lists for a user
+ */
+export function projectListPattern(userId) {
+    return `projects:user:${userId}:*`;
+}
 export default {
     userByEmailKey,
     userByIdKey,
@@ -124,4 +136,6 @@ export default {
     globalSearchKey,
     globalSearchPattern,
     popularTagsKey,
+    projectListKey,
+    projectListPattern,
 };

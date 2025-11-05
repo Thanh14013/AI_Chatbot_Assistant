@@ -5,6 +5,7 @@ import searchRoutes from "./search.route.js";
 import userRoutes from "./user.route.js";
 import fileUploadRoutes from "./fileUpload.routes.js";
 import projectRoutes from "./project.routes.js";
+import memoryRoutes from "./memory.route.js";
 const router = Router();
 // Authentication routes
 router.use("/auth", authRoutes);
@@ -18,6 +19,8 @@ router.use("/projects", projectRoutes);
 router.use("/search", searchRoutes);
 // File upload routes
 router.use("/files", fileUploadRoutes);
+// Memory routes (Long Term Memory)
+router.use("/memory", memoryRoutes);
 // Health check route
 router.get("/health", (req, res) => {
     res.json({

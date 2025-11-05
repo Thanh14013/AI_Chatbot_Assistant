@@ -172,23 +172,16 @@ export const saveFileMetadata = async (req: Request, res: Response) => {
     // Extract text from PDF files
     if (format === "pdf") {
       status = "processing";
-      console.log(`[FileUpload] Processing PDF: ${original_filename}`);
 
       try {
         extracted_text = await extractTextFromPDF(secure_url);
         status = "processed";
-        console.log(
-          `[FileUpload] ✅ PDF processed successfully. Text length: ${extracted_text?.length || 0} chars`
-        );
 
         // Check if extraction actually worked
         if (extracted_text && extracted_text.startsWith("[")) {
-          console.warn(
-            `[FileUpload] ⚠️ PDF extraction returned error message: ${extracted_text.substring(0, 100)}`
-          );
+          // PDF extraction returned error message
         }
       } catch (error: any) {
-        console.error(`[FileUpload] ❌ PDF extraction failed:`, error);
         status = "failed";
         extracted_text = "[PDF text extraction failed]";
       }

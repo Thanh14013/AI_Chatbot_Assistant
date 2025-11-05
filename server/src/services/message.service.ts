@@ -283,7 +283,6 @@ export const getConversationMessages = async (
         }
       } catch (err) {
         // Don't fail if attachments fetch fails
-        console.error("Error fetching attachments:", err);
       }
     }
 
@@ -350,7 +349,9 @@ export const sendMessageAndStreamResponse = async (
     resendMessageId?: string;
     editMessageId?: string;
     originalContent?: string;
-  }
+  },
+  // optional enhanced system prompt (from LTM)
+  enhancedSystemPrompt?: string
 ): Promise<any> => {
   if (!content || content.trim().length === 0) {
     throw new Error("Message content cannot be empty");
@@ -414,7 +415,7 @@ export const sendMessageAndStreamResponse = async (
             }));
           }
         } catch (err: any) {
-          console.error("Error fetching attachments for broadcast:", err);
+          // Don't fail the entire request if linking fails
         }
       }
 
@@ -448,8 +449,9 @@ export const sendMessageAndStreamResponse = async (
   const baseSystemPrompt =
     "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.";
 
-  // Get system prompt with user preferences applied
-  const systemPrompt = await buildSystemPromptWithPreferences(userId, baseSystemPrompt);
+  // Use enhanced system prompt if provided (from LTM), otherwise get with user preferences
+  const systemPrompt =
+    enhancedSystemPrompt || (await buildSystemPromptWithPreferences(userId, baseSystemPrompt));
 
   const disableContext = String(process.env.DISABLE_CONTEXT || "false").toLowerCase() === "true";
   const useSemanticContext =
@@ -716,7 +718,7 @@ export const sendMessageAndStreamResponse = async (
 
     // Generate and store embedding for assistant message (async, non-blocking)
     generateAndStoreEmbedding(assistantMessage.id, assistantMessage.content).catch((error) => {
-      console.error("Error generating embedding for assistant message:", error);
+      // Error generating embedding for assistant message
     });
 
     // Return userMessage, assistantMessage, and updated conversation for client sync

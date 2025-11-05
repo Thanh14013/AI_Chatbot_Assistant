@@ -132,10 +132,6 @@ export async function getChatCompletionWithRetry(
 
       // Exponential backoff: 2^attempt * 1000ms (1s, 2s, 4s, 8s...)
       const delay = Math.pow(2, attempt) * 1000;
-      console.warn(
-        `OpenAI request failed (attempt ${attempt}/${maxRetries}). Retrying in ${delay}ms...`,
-        error.message
-      );
 
       await new Promise((resolve) => setTimeout(resolve, delay));
     }

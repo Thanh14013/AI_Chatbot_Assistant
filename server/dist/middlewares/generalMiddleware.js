@@ -158,8 +158,6 @@ export const suspiciousActivityDetector = () => {
         // Check for suspicious patterns
         const isSuspicious = suspiciousPatterns.some((pattern) => pattern.test(requestData));
         if (isSuspicious) {
-            // Log suspicious activity (in production, use proper logging)
-            console.warn(`Suspicious activity detected from IP: ${req.ip}, URL: ${req.url}`);
             res.status(400).json({
                 success: false,
                 message: "Suspicious activity detected",

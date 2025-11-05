@@ -5,7 +5,7 @@
  */
 
 export async function up(queryInterface, Sequelize) {
-  console.log("Adding missing performance indexes...");
+  // logging removed
 
   // Fix refresh_tokens index - use correct column name 'is_revoked' instead of 'revoked'
   try {
@@ -13,9 +13,9 @@ export async function up(queryInterface, Sequelize) {
       name: "idx_refresh_tokens_user_is_revoked",
       using: "BTREE",
     });
-    console.log("✅ Added idx_refresh_tokens_user_is_revoked");
+    // logging removed
   } catch (error) {
-    console.log("⚠️  Skipped idx_refresh_tokens_user_is_revoked:", error.message);
+    // logging removed
   }
 
   // Check if message_embeddings table exists and add index
@@ -32,7 +32,7 @@ export async function up(queryInterface, Sequelize) {
         { type: Sequelize.QueryTypes.SELECT }
       );
 
-      console.log("Message embeddings columns:", columns.map((c) => c.column_name).join(", "));
+      // logging removed
 
       // Try different possible column names
       const possibleColumns = ["conversation_id", "conversationId", "message_id", "messageId"];
@@ -45,37 +45,37 @@ export async function up(queryInterface, Sequelize) {
               name: `idx_message_embeddings_${colName.toLowerCase()}`,
               using: "BTREE",
             });
-            console.log(`✅ Added idx_message_embeddings_${colName.toLowerCase()}`);
+            // logging removed
             indexAdded = true;
             break;
           } catch (error) {
-            console.log(`⚠️  Failed to add index on ${colName}:`, error.message);
+            // logging removed
           }
         }
       }
 
       if (!indexAdded) {
-        console.log("⚠️  No suitable column found for message_embeddings index");
+        // logging removed
       }
     } else {
-      console.log("⚠️  message_embeddings table does not exist, skipping");
+      // logging removed
     }
   } catch (error) {
-    console.log("⚠️  Error checking message_embeddings:", error.message);
+    // logging removed
   }
 
-  console.log("✅ Missing indexes migration completed");
+  // logging removed
 }
 
 export async function down(queryInterface, Sequelize) {
-  console.log("Removing missing indexes...");
+  // logging removed
 
   // Remove the indexes we added
   try {
     await queryInterface.removeIndex("refresh_tokens", "idx_refresh_tokens_user_is_revoked");
-    console.log("✅ Removed idx_refresh_tokens_user_is_revoked");
+    // logging removed
   } catch (e) {
-    console.log("⚠️  Failed to remove idx_refresh_tokens_user_is_revoked");
+    // logging removed
   }
 
   // Try to remove message_embeddings indexes
@@ -100,11 +100,11 @@ export async function down(queryInterface, Sequelize) {
           // Ignore errors
         }
       }
-      console.log("✅ Removed message_embeddings indexes");
+      // logging removed
     }
   } catch (e) {
-    console.log("⚠️  Failed to remove message_embeddings indexes");
+    // logging removed
   }
 
-  console.log("✅ Missing indexes removed");
+  // logging removed
 }

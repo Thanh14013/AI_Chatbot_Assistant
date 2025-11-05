@@ -5,7 +5,7 @@ async function testPasswords() {
   const passwords = ["postgres", "thanh123", "password", "123456", "", "chatbot"];
   const databases = ["postgres", "chatbot", "ai_chatbot"];
 
-  console.log("🔍 Testing different password combinations...\n");
+  // logging removed for cleaner output
 
   for (const password of passwords) {
     for (const dbName of databases) {
@@ -14,12 +14,7 @@ async function testPasswords() {
 
       try {
         await client.connect();
-        console.log(`✅✅✅ SUCCESS! ✅✅✅`);
-        console.log(`Database: ${dbName}`);
-        console.log(`Password: ${password}`);
-        console.log(
-          `\nConnection String: postgresql://postgres:${password}@localhost:5432/${dbName}\n`
-        );
+        // logging removed
 
         // List all databases
         const result = await client.query(`
@@ -28,10 +23,7 @@ async function testPasswords() {
           ORDER BY datname;
         `);
 
-        console.log("Available databases in this PostgreSQL:");
-        result.rows.forEach((row) => {
-          console.log(`  - ${row.datname}`);
-        });
+        // logging removed
 
         await client.end();
         return; // Exit after first success
@@ -41,7 +33,7 @@ async function testPasswords() {
     }
   }
 
-  console.log("❌ No valid password found!");
+  // logging removed
 }
 
-testPasswords().catch(console.error);
+testPasswords().catch(() => {});

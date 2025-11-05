@@ -12,7 +12,7 @@ cloudinary.config({
 if (!process.env.CLOUDINARY_NAME ||
     !process.env.CLOUDINARY_API_KEY ||
     !process.env.CLOUDINARY_SECRET_KEY) {
-    console.warn("Warning: Cloudinary credentials not fully configured. File upload features may not work.");
+    // Warning: Cloudinary credentials not fully configured. File upload features may not work.
 }
 export default cloudinary;
 // Export configuration for easy access

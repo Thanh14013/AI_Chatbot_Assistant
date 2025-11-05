@@ -11,3 +11,6 @@ export * from "./conversation.type.js";
 
 // Message types
 export * from "./message.type.js";
+
+// Memory types
+export * from "./memory.type.js";

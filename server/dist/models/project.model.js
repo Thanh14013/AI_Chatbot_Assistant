@@ -1,4 +1,4 @@
-import { DataTypes, Model } from "sequelize";
+import { DataTypes, Model, Op } from "sequelize";
 import sequelize from "../db/database.config.js";
 /**
  * Project Model Class
@@ -119,6 +119,26 @@ Project.init({
     timestamps: true,
     paranoid: false,
     underscored: true, // Use snake_case for timestamps (created_at, updated_at)
+    defaultScope: {
+        // Default scope automatically filters out deleted records
+        where: {
+            deleted_at: null,
+        },
+    },
+    scopes: {
+        // Scope to include deleted records
+        withDeleted: {
+            where: {},
+        },
+        // Scope to get only deleted records
+        onlyDeleted: {
+            where: {
+                deleted_at: {
+                    [Op.ne]: null,
+                },
+            },
+        },
+    },
     indexes: [
         { fields: ["user_id"] },
         { fields: ["user_id", "order"] },

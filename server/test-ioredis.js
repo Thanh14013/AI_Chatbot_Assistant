@@ -1,7 +1,7 @@
 import { Redis } from "ioredis";
 
 async function testRedis() {
-  console.log("🔍 Testing Redis with ioredis...\n");
+  // logging removed for cleaner output
 
   const redisClient = new Redis({
     host: "127.0.0.1", // Try IPv4 instead of localhost
@@ -9,7 +9,7 @@ async function testRedis() {
     password: undefined,
     db: 0,
     retryStrategy: (times) => {
-      console.log(`Retry attempt ${times}`);
+      // logging removed
       if (times > 3) return null;
       return Math.min(times * 50, 2000);
     },
@@ -17,40 +17,39 @@ async function testRedis() {
   });
 
   redisClient.on("connect", () => {
-    console.log("✅ Redis connecting...");
+    // logging removed
   });
 
   redisClient.on("ready", () => {
-    console.log("✅ Redis ready!");
+    // logging removed
   });
 
   redisClient.on("error", (error) => {
-    console.log("❌ Redis error:", error.message);
+    // logging removed
   });
 
   redisClient.on("close", () => {
-    console.log("⚠ Redis connection closed");
+    // logging removed
   });
 
   try {
-    console.log("Attempting to connect...");
+    // logging removed
     await redisClient.connect();
 
-    console.log("\n✅✅✅ Redis connected! ✅✅✅\n");
+    // logging removed
 
     const pong = await redisClient.ping();
-    console.log(`PING response: ${pong}`);
+    // logging removed
 
     await redisClient.set("test-key", "Hello from ioredis!");
     const value = await redisClient.get("test-key");
-    console.log(`Test SET/GET: ${value}`);
+    // logging removed
 
     await redisClient.quit();
-    console.log("\n✅ Redis test completed successfully!");
+    // logging removed
   } catch (error) {
-    console.log("\n❌ Connection failed:", error.message);
-    console.log("Error details:", error);
+    // logging removed
   }
 }
 
-testRedis().catch(console.error);
+testRedis().catch(() => {});

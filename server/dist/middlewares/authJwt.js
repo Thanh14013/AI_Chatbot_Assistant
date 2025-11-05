@@ -17,8 +17,11 @@ export const authenticateAccessToken = (req, res, next) => {
         // Development-only logging to help trace auth issues
         if (process.env.NODE_ENV === "development") {
             try {
+                // Log token validation for debugging
             }
-            catch { }
+            catch (error) {
+                // Development logging error suppressed
+            }
         }
         if (!accessToken) {
             res.status(401).json({ success: false, message: "Access token is required" });
@@ -41,8 +44,11 @@ export const authenticateAccessToken = (req, res, next) => {
         req.body.user = accessResult.decoded;
         if (process.env.NODE_ENV === "development") {
             try {
+                // Log successful authentication
             }
-            catch { }
+            catch (error) {
+                // Development logging error suppressed
+            }
         }
         next();
     }

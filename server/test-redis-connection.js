@@ -1,8 +1,7 @@
 import { createClient } from "redis";
 
 async function testRedis() {
-  console.log("🔍 Testing Redis connection...\n");
-  console.log("Host: localhost:6379\n");
+  // logging removed for cleaner output
 
   const client = createClient({
     socket: {
@@ -12,34 +11,34 @@ async function testRedis() {
   });
 
   client.on("error", (err) => {
-    console.log("❌ Redis Error:", err.message);
+    // logging removed
   });
 
   client.on("connect", () => {
-    console.log("✅ Redis connecting...");
+    // logging removed
   });
 
   client.on("ready", () => {
-    console.log("✅ Redis ready!");
+    // logging removed
   });
 
   try {
     await client.connect();
-    console.log("✅✅✅ Redis connected successfully! ✅✅✅\n");
+    // logging removed
 
     const pong = await client.ping();
-    console.log(`PING response: ${pong}\n`);
+    // logging removed
 
     // Test set/get
     await client.set("test-key", "Hello Redis!");
     const value = await client.get("test-key");
-    console.log(`Test SET/GET: ${value}`);
+    // logging removed
 
     await client.disconnect();
-    console.log("\n✅ Redis test completed!");
+    // logging removed
   } catch (error) {
-    console.log("\n❌ Redis connection failed:", error.message);
+    // logging removed
   }
 }
 
-testRedis().catch(console.error);
+testRedis().catch(() => {});

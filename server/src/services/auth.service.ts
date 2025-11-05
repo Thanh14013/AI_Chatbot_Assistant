@@ -139,13 +139,11 @@ export const logoutUser = async (token: string) => {
 
   // If token not found, treat logout as idempotent success (token may have been removed already)
   if (!storedToken) {
-    console.debug && console.debug(`logoutUser: token not found`);
     return { message: "Logout successful" };
   }
 
   // If already revoked, nothing to do
   if (storedToken.is_revoked) {
-    console.debug && console.debug(`logoutUser: token already revoked id=${storedToken.id}`);
     return { message: "Logout successful" };
   }
 

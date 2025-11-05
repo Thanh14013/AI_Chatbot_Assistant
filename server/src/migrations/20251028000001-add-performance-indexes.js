@@ -7,7 +7,7 @@
 export async function up(queryInterface, Sequelize) {
   // Note: Some indexes already exist in model definitions, we only add missing ones
 
-  console.log("Adding performance indexes...");
+  // logging removed
 
   try {
     // 1. Index for active conversations by user (composite partial index)
@@ -16,9 +16,9 @@ export async function up(queryInterface, Sequelize) {
         ON conversations(user_id, "updatedAt" DESC, deleted_at)
         WHERE deleted_at IS NULL;
       `);
-    console.log("✅ Added idx_conversations_user_active");
+    // logging removed
   } catch (error) {
-    console.log("⚠️  Skipped idx_conversations_user_active:", error.message);
+    // logging removed
   }
 
   try {
@@ -27,9 +27,9 @@ export async function up(queryInterface, Sequelize) {
       name: "idx_file_uploads_message",
       using: "BTREE",
     });
-    console.log("✅ Added idx_file_uploads_message");
+    // logging removed
   } catch (error) {
-    console.log("⚠️  Skipped idx_file_uploads_message:", error.message);
+    // logging removed
   }
 
   try {
@@ -39,9 +39,9 @@ export async function up(queryInterface, Sequelize) {
       unique: true,
       using: "BTREE",
     });
-    console.log("✅ Added idx_file_uploads_public_id");
+    // logging removed
   } catch (error) {
-    console.log("⚠️  Skipped idx_file_uploads_public_id:", error.message);
+    // logging removed
   }
 
   try {
@@ -50,9 +50,9 @@ export async function up(queryInterface, Sequelize) {
         CREATE INDEX IF NOT EXISTS idx_messages_conversation_created 
         ON messages(conversation_id, "createdAt" DESC);
       `);
-    console.log("✅ Added idx_messages_conversation_created");
+    // logging removed
   } catch (error) {
-    console.log("⚠️  Skipped idx_messages_conversation_created:", error.message);
+    // logging removed
   }
 
   try {
@@ -62,9 +62,9 @@ export async function up(queryInterface, Sequelize) {
         ON messages(conversation_id, pinned, "createdAt" DESC)
         WHERE pinned = true;
       `);
-    console.log("✅ Added idx_messages_pinned");
+    // logging removed
   } catch (error) {
-    console.log("⚠️  Skipped idx_messages_pinned:", error.message);
+    // logging removed
   }
 
   try {
@@ -73,9 +73,9 @@ export async function up(queryInterface, Sequelize) {
       name: "idx_refresh_tokens_token",
       using: "HASH",
     });
-    console.log("✅ Added idx_refresh_tokens_token");
+    // logging removed
   } catch (error) {
-    console.log("⚠️  Skipped idx_refresh_tokens_token:", error.message);
+    // logging removed
   }
 
   try {
@@ -84,9 +84,9 @@ export async function up(queryInterface, Sequelize) {
       name: "idx_refresh_tokens_user_revoked",
       using: "BTREE",
     });
-    console.log("✅ Added idx_refresh_tokens_user_revoked");
+    // logging removed
   } catch (error) {
-    console.log("⚠️  Skipped idx_refresh_tokens_user_revoked:", error.message);
+    // logging removed
   }
 
   try {
@@ -96,9 +96,9 @@ export async function up(queryInterface, Sequelize) {
         ON conversations(project_id, order_in_project)
         WHERE project_id IS NOT NULL;
       `);
-    console.log("✅ Added idx_conversations_project_order");
+    // logging removed
   } catch (error) {
-    console.log("⚠️  Skipped idx_conversations_project_order:", error.message);
+    // logging removed
   }
 
   try {
@@ -107,9 +107,9 @@ export async function up(queryInterface, Sequelize) {
         CREATE INDEX IF NOT EXISTS idx_conversations_tags 
         ON conversations USING GIN(tags);
       `);
-    console.log("✅ Added idx_conversations_tags (GIN)");
+    // logging removed
   } catch (error) {
-    console.log("⚠️  Skipped idx_conversations_tags:", error.message);
+    // logging removed
   }
 
   // Try to add message_embeddings index only if table exists
@@ -124,19 +124,19 @@ export async function up(queryInterface, Sequelize) {
         name: "idx_message_embeddings_conversation",
         using: "BTREE",
       });
-      console.log("✅ Added idx_message_embeddings_conversation");
+      // logging removed
     } else {
-      console.log("⚠️  Skipped idx_message_embeddings_conversation: table doesn't exist");
+      // logging removed
     }
   } catch (error) {
-    console.log("⚠️  Skipped idx_message_embeddings_conversation:", error.message);
+    // logging removed
   }
 
-  console.log("✅ Performance indexes migration completed");
+  // logging removed
 }
 
 export async function down(queryInterface, Sequelize) {
-  console.log("Removing performance indexes...");
+  // logging removed
 
   // Remove all added indexes (ignore errors if they don't exist)
   try {
@@ -186,5 +186,5 @@ export async function down(queryInterface, Sequelize) {
     await queryInterface.sequelize.query("DROP INDEX IF EXISTS idx_conversations_user_active;");
   } catch (e) {}
 
-  console.log("✅ Performance indexes removed");
+  // logging removed
 }

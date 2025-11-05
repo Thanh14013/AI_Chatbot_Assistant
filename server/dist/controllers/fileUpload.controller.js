@@ -7,16 +7,77 @@ import * as FileProcessorService from "../services/fileProcessor.service.js";
 import * as OpenAIFileService from "../services/openai-file.service.js";
 import { extractTextFromPDF } from "../services/pdf-parser.service.js";
 import FileUploadModel from "../models/fileUpload.model.js";
+// Security: Allowed MIME types
+const ALLOWED_MIME_TYPES = [
+    // Images
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "image/jpg",
+    // Videos
+    "video/mp4",
+    "video/webm",
+    "video/quicktime",
+    // Documents
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain",
+    "text/csv",
+];
+// Security: Allowed file extensions
+const ALLOWED_EXTENSIONS = [
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".webp",
+    ".mp4",
+    ".webm",
+    ".mov",
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".txt",
+    ".csv",
+];
+// Maximum file size (50MB)
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
 /**
  * Generate presigned upload signature for client
  * POST /api/files/upload-signature
  */
 export const generateUploadSignature = async (req, res) => {
     try {
-        const { folder } = req.body;
+        const { folder, filename, fileSize, fileType } = req.body;
         const userId = req.user?.id;
         if (!userId) {
             return res.status(401).json({ error: "Unauthorized" });
+        }
+        // Validate file size
+        if (fileSize && fileSize > MAX_FILE_SIZE) {
+            return res.status(413).json({
+                success: false,
+                error: `File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB`,
+            });
+        }
+        // Validate file type
+        if (fileType && !ALLOWED_MIME_TYPES.includes(fileType)) {
+            return res.status(400).json({
+                success: false,
+                error: "File type not allowed. Allowed types: images, videos, PDF, DOC, DOCX, TXT, CSV",
+            });
+        }
+        // Validate file extension
+        if (filename) {
+            const ext = filename.substring(filename.lastIndexOf(".")).toLowerCase();
+            if (!ALLOWED_EXTENSIONS.includes(ext)) {
+                return res.status(400).json({
+                    success: false,
+                    error: `File extension not allowed. Allowed extensions: ${ALLOWED_EXTENSIONS.join(", ")}`,
+                });
+            }
         }
         const signature = CloudinaryService.generateUploadSignature(folder);
         res.json({
@@ -49,6 +110,23 @@ export const saveFileMetadata = async (req, res) => {
                 error: "Missing required fields: public_id, secure_url, resource_type",
             });
         }
+        // Validate file size
+        if (size_bytes && size_bytes > MAX_FILE_SIZE) {
+            return res.status(400).json({
+                success: false,
+                error: `File size exceeds maximum allowed size of ${MAX_FILE_SIZE / 1024 / 1024}MB`,
+            });
+        }
+        // Validate file type (extension)
+        if (format) {
+            const ext = `.${format.toLowerCase()}`;
+            if (!ALLOWED_EXTENSIONS.includes(ext)) {
+                return res.status(400).json({
+                    success: false,
+                    error: "File extension not allowed",
+                });
+            }
+        }
         // Generate thumbnail for images/videos
         let thumbnail_url;
         if (resource_type === "image" || resource_type === "video") {
@@ -64,6 +142,10 @@ export const saveFileMetadata = async (req, res) => {
             try {
                 extracted_text = await extractTextFromPDF(secure_url);
                 status = "processed";
+                // Check if extraction actually worked
+                if (extracted_text && extracted_text.startsWith("[")) {
+                    // PDF extraction returned error message
+                }
             }
             catch (error) {
                 status = "failed";
@@ -190,7 +272,21 @@ export const getConversationFiles = async (req, res) => {
         if (!userId) {
             return res.status(401).json({ error: "Unauthorized" });
         }
-        // TODO: Verify user has access to this conversation
+        // Verify user has access to this conversation
+        const { default: Conversation } = await import("../models/conversation.model.js");
+        const conversation = await Conversation.findByPk(conversationId);
+        if (!conversation) {
+            return res.status(404).json({
+                success: false,
+                error: "Conversation not found",
+            });
+        }
+        if (conversation.user_id !== userId) {
+            return res.status(403).json({
+                success: false,
+                error: "Access denied to this conversation",
+            });
+        }
         const files = await FileUploadModel.findByConversationId(conversationId);
         res.json({
             success: true,
