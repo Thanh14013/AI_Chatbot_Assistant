@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MessageList Component
  * Displays list of messages with auto-scroll functionality
  */
@@ -242,7 +242,7 @@ const MessageList: React.FC<MessageListProps> = ({
     // If messages were appended and the last message is a user or assistant message
     // (covers optimistic user sends and AI responses), force scroll to bottom.
     // Also handle streaming updates where the assistant updates the content of
-    // the existing typing message (same id but content changes) — scroll then too.
+    // the existing typing message (same id but content changes) â€” scroll then too.
     const prevLen = prevMessagesLengthRef.current;
     const currLen = allMessages.length;
 
@@ -275,7 +275,7 @@ const MessageList: React.FC<MessageListProps> = ({
         }, 100);
       }
     } else {
-      // No new message appended — check for assistant streaming updates where
+      // No new message appended â€” check for assistant streaming updates where
       // the last message id stays the same but content changed. In that case
       // we want to scroll to keep the user view on the streaming response.
       if (

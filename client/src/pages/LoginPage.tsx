@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Login Page Component
  * User authentication page with form validation
  */

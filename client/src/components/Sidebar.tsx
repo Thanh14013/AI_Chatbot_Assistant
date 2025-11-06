@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+﻿import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Layout, App } from "antd";
 import { useAuth } from "../hooks";
 import { getConversations } from "../services/chat.service";
@@ -134,7 +134,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   // Determine which conversations to show in the sidebar.
   // Only use semantic search results provided by the header. Do NOT
-  // perform any client-side filtering by conversation title here — the
+  // perform any client-side filtering by conversation title here â€” the
   // global search is semantic-only per product decision.
   useEffect(() => {
     if (semanticResults && semanticResults.length > 0) {
@@ -382,7 +382,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           setConversations((prev) => [convListItem, ...prev]);
           setFilteredConversations((prev) => [convListItem, ...prev]);
         } catch (fetchError) {
-          console.error("Failed to fetch conversation:", fetchError);
+
           // Continue with API call anyway
         }
       }

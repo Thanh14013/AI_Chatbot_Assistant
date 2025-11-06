@@ -1,4 +1,4 @@
-/**
+﻿/**
  * FileAttachmentPreview Component
  * Displays preview thumbnails of uploaded files
  */
@@ -25,17 +25,17 @@ export const FileAttachmentPreview: React.FC<FileAttachmentPreviewProps> = ({
   }
 
   const getFileIcon = (resourceType: string, filename?: string) => {
-    if (resourceType === "image") return "🖼️";
-    if (resourceType === "video") return "🎥";
+    if (resourceType === "image") return "ðŸ–¼ï¸";
+    if (resourceType === "video") return "ðŸŽ¥";
 
     // Determine icon by file extension
     const ext = filename?.split(".").pop()?.toLowerCase();
-    if (ext === "pdf") return "📄";
-    if (["doc", "docx"].includes(ext || "")) return "📝";
-    if (["xls", "xlsx", "csv"].includes(ext || "")) return "📊";
-    if (["zip", "rar", "7z"].includes(ext || "")) return "📦";
+    if (ext === "pdf") return "ðŸ“„";
+    if (["doc", "docx"].includes(ext || "")) return "ðŸ“";
+    if (["xls", "xlsx", "csv"].includes(ext || "")) return "ðŸ“Š";
+    if (["zip", "rar", "7z"].includes(ext || "")) return "ðŸ“¦";
 
-    return "📎";
+    return "ðŸ“Ž";
   };
 
   return (
@@ -99,7 +99,7 @@ export const FileAttachmentPreview: React.FC<FileAttachmentPreviewProps> = ({
             {/* Processing overlay (for PDFs being parsed) */}
             {isProcessing && (
               <div className={styles.processingOverlay}>
-                <span className={styles.processingSpinner}>⏳</span>
+                <span className={styles.processingSpinner}>â³</span>
                 <span>Processing...</span>
               </div>
             )}
@@ -119,7 +119,7 @@ export const FileAttachmentPreview: React.FC<FileAttachmentPreviewProps> = ({
                 aria-label="Remove attachment"
                 type="button"
               >
-                ×
+                Ã—
               </button>
             )}
           </div>

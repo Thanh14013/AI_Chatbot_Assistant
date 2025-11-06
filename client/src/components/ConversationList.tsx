@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ConversationList Component - Simplified to use unified ConversationItem
  */
 

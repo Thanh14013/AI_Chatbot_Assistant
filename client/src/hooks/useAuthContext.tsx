@@ -1,4 +1,4 @@
-/* eslint-disable react-refresh/only-export-components */
+﻿/* eslint-disable react-refresh/only-export-components */
 /**
  * Authentication context
  * Provides authentication state and methods globally
@@ -49,11 +49,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Check authentication status on mount
   useEffect(() => {
     const initializeAuth = async () => {
-      console.log("[AuthProvider] 🔵 Initializing auth...");
+
       try {
         const rawToken = getAccessToken();
         const authenticated = checkAuth();
-        console.log(
           "[AuthProvider] Token exists:",
           !!rawToken,
           "Authenticated:",
@@ -62,7 +61,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // If no token exists, skip API call
         if (!rawToken || !authenticated) {
-          console.log("[AuthProvider] ✅ No token - skipping API call");
+
           setAuthenticated(false);
           setUser(null);
           setLoading(false);
@@ -70,7 +69,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
 
         // We have a token - verify it with the server
-        console.log("[AuthProvider] 🔄 Verifying token with server...");
+
         setAuthenticated(true);
 
         try {
@@ -84,7 +83,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             timeoutPromise,
           ])) as any;
 
-          console.log("[AuthProvider] ✅ Token verified, user loaded");
+
 
           if (response.success && response.data) {
             setUser(response.data);
@@ -93,8 +92,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setUser(null);
           }
         } catch (getCurrentUserError: any) {
-          console.error(
-            "[AuthProvider] ❌ getCurrentUser failed:",
+            "[AuthProvider] âŒ getCurrentUser failed:",
             getCurrentUserError
           );
 
@@ -103,8 +101,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             getCurrentUserError?.message === "Request timeout" ||
             !getCurrentUserError?.response
           ) {
-            console.log(
-              "[AuthProvider] ⏰ Request timeout or network error - clearing token"
+              "[AuthProvider] â° Request timeout or network error - clearing token"
             );
             setAuthenticated(false);
             setUser(null);
@@ -112,7 +109,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
           // Only clear auth state when server explicitly says token is invalid/expired
           else if (getCurrentUserError?.response?.status === 401) {
-            console.log("[AuthProvider] Token invalid - clearing auth");
+
             setAuthenticated(false);
             setUser(null);
             // Clear the invalid token properly
@@ -123,11 +120,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         }
       } catch (error) {
-        console.error("[AuthProvider] ❌ Error:", error);
+
         setAuthenticated(false);
         setUser(null);
       } finally {
-        console.log("[AuthProvider] ✅ Auth initialization complete");
+
         setLoading(false);
       }
     };

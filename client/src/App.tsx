@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Main App Component
  * Configures routing and authentication
  */

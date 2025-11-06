@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SelectionAskButton Component
  * Displays a floating button when user selects text in AI message
  * Allows user to ask AI to explain the selected text
@@ -54,7 +54,6 @@ const SelectionAskButton: React.FC<SelectionAskButtonProps> = ({
   // This ensures we don't miss the ref being set
   // Effect re-runs when messageId OR contentKey changes (new message or content update)
   useLayoutEffect(() => {
-    console.log("[SelectionAskButton] useLayoutEffect triggered", {
       messageId,
       contentKey,
       isAIMessage,
@@ -64,13 +63,11 @@ const SelectionAskButton: React.FC<SelectionAskButtonProps> = ({
     // Use a small timeout to ensure DOM is fully rendered
     const timer = setTimeout(() => {
       if (containerRef.current && isAIMessage) {
-        console.log(
           "[SelectionAskButton] Setting isReady=true for message",
           messageId
         );
         setIsReady(true);
       } else {
-        console.log(
           "[SelectionAskButton] Setting isReady=false for message",
           messageId
         );
@@ -82,7 +79,6 @@ const SelectionAskButton: React.FC<SelectionAskButtonProps> = ({
   }, [isAIMessage, messageId, contentKey]); // Added contentKey to detect content changes
 
   useEffect(() => {
-    console.log("[SelectionAskButton] Main effect triggered", {
       messageId,
       isAIMessage,
       isReady,
@@ -90,14 +86,12 @@ const SelectionAskButton: React.FC<SelectionAskButtonProps> = ({
     });
 
     if (!isAIMessage || !isReady || !containerRef.current) {
-      console.log(
         "[SelectionAskButton] Early return - not attaching listeners"
       );
       return;
     }
 
     const container = containerRef.current;
-    console.log(
       "[SelectionAskButton] Attaching event listeners for message",
       messageId
     );

@@ -17,6 +17,16 @@ import { getUserConversations } from "./conversation.service.js";
 const SUGGESTIONS_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
 
 /**
+ * Default suggestions for brand new users (no conversation history)
+ * These are shown instantly without calling AI API
+ */
+const DEFAULT_NEW_USER_SUGGESTIONS = [
+  "Giúp tôi debug lỗi trong code JavaScript này",
+  "Giải thích khái niệm async/await trong JavaScript một cách đơn giản",
+  "Tạo một kế hoạch học tập để thành thạo React trong 3 tháng",
+];
+
+/**
  * Generate cache key for user's new chat suggestions
  */
 const getCacheKey = (userId: string): string => {
@@ -30,11 +40,9 @@ const getCacheKey = (userId: string): string => {
 export const getCachedSuggestions = async (userId: string): Promise<string[] | null> => {
   try {
     const key = getCacheKey(userId);
-    console.log(`[NewChatSuggestions] Getting cached suggestions for user ${userId}`);
     const cached = await redisClient.get(key);
 
     if (!cached) {
-      console.log(`[NewChatSuggestions] No cached suggestions found for user ${userId}`);
       return null;
     }
 
@@ -42,16 +50,11 @@ export const getCachedSuggestions = async (userId: string): Promise<string[] | n
 
     // Validate cached data
     if (!Array.isArray(suggestions) || suggestions.length === 0) {
-      console.log(`[NewChatSuggestions] Invalid cached data for user ${userId}`);
       return null;
     }
 
-    console.log(
-      `[NewChatSuggestions] Found ${suggestions.length} cached suggestions for user ${userId}`
-    );
     return suggestions;
   } catch (error) {
-    console.error("[NewChatSuggestions] Error getting cached suggestions:", error);
     return null;
   }
 };
@@ -66,11 +69,7 @@ export const setCachedSuggestions = async (
   try {
     const key = getCacheKey(userId);
     await redisClient.setex(key, SUGGESTIONS_TTL, JSON.stringify(suggestions));
-    console.log(
-      `[NewChatSuggestions] Cached ${suggestions.length} suggestions for user ${userId} (TTL: ${SUGGESTIONS_TTL}s)`
-    );
   } catch (error) {
-    console.error("[NewChatSuggestions] Error setting cached suggestions:", error);
     // Don't throw - fail gracefully
   }
 };
@@ -83,7 +82,7 @@ export const clearCachedSuggestions = async (userId: string): Promise<void> => {
     const key = getCacheKey(userId);
     await redisClient.del(key);
   } catch (error) {
-    console.error("[NewChatSuggestions] Error clearing cached suggestions:", error);
+    // Silent fail
   }
 };
 
@@ -101,9 +100,13 @@ export const generateAndCacheSuggestions = async (userId: string): Promise<strin
 
     // Filter out deleted conversations and fetch messages
     for (const conv of conversationsResult.conversations) {
+      // ⚡ Performance: Early exit if we already have enough messages
+      if (recentMessages.length >= 20) {
+        break;
+      }
+
       // Skip if conversation is deleted
       if (conv.deleted_at) {
-        console.log(`[NewChatSuggestions] Skipping deleted conversation ${conv.id}`);
         continue;
       }
 
@@ -127,19 +130,9 @@ export const generateAndCacheSuggestions = async (userId: string): Promise<strin
         }
       } catch (err: any) {
         // Skip this conversation silently if error
-        console.log(
-          `[NewChatSuggestions] Skipping conversation ${conv.id}: ${err.message || "Error"}`
-        );
         continue;
       }
-
-      // Stop if we have enough context (20 messages from valid conversations)
-      if (recentMessages.length >= 20) break;
     }
-
-    console.log(
-      `[NewChatSuggestions] Collected ${recentMessages.length} messages from ${validConversations.length} valid conversations`
-    );
 
     // If no recent messages, use generic context
     const contextMessages =
@@ -169,56 +162,65 @@ export const generateAndCacheSuggestions = async (userId: string): Promise<strin
     // Cache the suggestions
     await setCachedSuggestions(userId, validSuggestions);
 
-    console.log(
-      `[NewChatSuggestions] Generated ${validSuggestions.length} suggestions based on ${recentMessages.length} recent messages`
-    );
-
     return validSuggestions;
   } catch (error) {
-    console.error("[NewChatSuggestions] Error generating suggestions:", error);
-
-    // Return default Vietnamese suggestions on error
-    const defaultSuggestions = [
-      "Tôi nên bắt đầu hỏi bạn về điều gì để giải quyết vấn đề hôm nay?",
-      "Bạn có thể cho tôi một gợi ý nhanh về những gì bạn có thể làm ngay bây giờ không?",
-      "Tôi muốn biết phạm vi trợ giúp của bạn, bạn có thể liệt kê những gì bạn có thể giúp tôi được không?",
-    ];
-
+    // Return default suggestions on error (same as new users)
     // Try to cache defaults
     try {
-      await setCachedSuggestions(userId, defaultSuggestions);
+      await setCachedSuggestions(userId, DEFAULT_NEW_USER_SUGGESTIONS);
     } catch {}
 
-    return defaultSuggestions;
+    return DEFAULT_NEW_USER_SUGGESTIONS;
   }
 };
 
 /**
  * Get new chat suggestions for a user
  * Returns cached suggestions if available, otherwise generates and caches new ones
+ * ⚡ OPTIMIZED: Returns instant default suggestions for brand new users
  */
 export const getNewChatSuggestions = async (
   userId: string,
   forceRegenerate = false
 ): Promise<string[]> => {
-  console.log(
-    `[NewChatSuggestions] Getting suggestions for user ${userId}, forceRegenerate: ${forceRegenerate}`
-  );
+  // ⚡ NEW USER OPTIMIZATION: Check if user has any conversations
+  // If not, return instant defaults without calling AI
+  if (!forceRegenerate) {
+    try {
+      const conversationsResult = await getUserConversations(userId, 1, 1);
+      const isNewUser = conversationsResult.conversations.length === 0;
+
+      if (isNewUser) {
+        // Cache defaults for consistency
+        try {
+          await setCachedSuggestions(userId, DEFAULT_NEW_USER_SUGGESTIONS);
+        } catch (cacheErr) {
+          // Silent fail
+        }
+        return DEFAULT_NEW_USER_SUGGESTIONS;
+      }
+    } catch (err) {
+      // Continue to normal flow
+    }
+  }
 
   // If force regenerate, skip cache and generate new
   if (forceRegenerate) {
-    console.log(`[NewChatSuggestions] Force regenerating suggestions for user ${userId}`);
     return generateAndCacheSuggestions(userId);
   }
 
   // Try to get from cache first
   const cached = await getCachedSuggestions(userId);
   if (cached) {
-    console.log(`[NewChatSuggestions] Returning cached suggestions for user ${userId}`);
     return cached;
   }
 
-  // Cache miss - generate and cache
-  console.log(`[NewChatSuggestions] Cache miss, generating new suggestions for user ${userId}`);
-  return generateAndCacheSuggestions(userId);
+  // Cache miss - DO NOT auto-generate here. Generation should only occur when
+  // the user explicitly requests it (forceRegenerate = true), e.g. by clicking
+  // the "+ New Chat" button. This prevents unexpected AI calls on mount.
+
+  // Return empty list to indicate no cached suggestions available. The client
+  // will show defaults for brand-new users (handled above) or an empty state
+  // and can trigger generation when the user clicks the New Chat button.
+  return [];
 };

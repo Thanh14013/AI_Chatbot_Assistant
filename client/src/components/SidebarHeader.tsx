@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+﻿import React, { useEffect, useState, useCallback } from "react";
 import { Button, Input, Tooltip } from "antd";
 import {
   PlusOutlined,
@@ -32,18 +32,18 @@ interface SidebarHeaderProps {
 /**
  * Parse tags from query string
  * Examples:
- * - "khoa học với tag science" -> { keyword: "khoa học", tags: ["science"] }
- * - "đời sống với tag life, study" -> { keyword: "đời sống", tags: ["life", "study"] }
- * - "khoa học với tag " -> { keyword: "khoa học", tags: [] } (no tags, search all)
+ * - "khoa há»c vá»›i tag science" -> { keyword: "khoa há»c", tags: ["science"] }
+ * - "Ä‘á»i sá»‘ng vá»›i tag life, study" -> { keyword: "Ä‘á»i sá»‘ng", tags: ["life", "study"] }
+ * - "khoa há»c vá»›i tag " -> { keyword: "khoa há»c", tags: [] } (no tags, search all)
  * - "hello world" -> { keyword: "hello world", tags: [] }
  */
 function parseQueryWithTags(query: string): {
   keyword: string;
   tags: string[];
 } {
-  // Match pattern: "với tag <tag1>, <tag2>, ..." (optional tags after "tag")
-  // Support both "với tag" and "voi tag" (without diacritics)
-  const tagPattern = /\s+v[oớ]i\s+tag\s*([a-zA-Z0-9\s,\-_]*)$/i;
+  // Match pattern: "vá»›i tag <tag1>, <tag2>, ..." (optional tags after "tag")
+  // Support both "vá»›i tag" and "voi tag" (without diacritics)
+  const tagPattern = /\s+v[oá»›]i\s+tag\s*([a-zA-Z0-9\s,\-_]*)$/i;
   const match = query.match(tagPattern);
 
   if (match) {
@@ -197,7 +197,7 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
             <div className={styles.searchBar}>
               {/* Search input field - press Enter to search */}
               <Input
-                placeholder="Search (e.g., 'khoa học với tag science')…"
+                placeholder="Search (e.g., 'khoa há»c vá»›i tag science')â€¦"
                 value={localQuery}
                 onChange={handleInputChange}
                 onKeyPress={handleKeyPress}

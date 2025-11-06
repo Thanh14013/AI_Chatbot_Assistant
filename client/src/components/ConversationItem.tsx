@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ConversationItem Component
  * List item for displaying individual conversations in sidebar
  */
@@ -307,9 +307,9 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         {/* Tags as plain text with separators */}
         {conversation.tags && conversation.tags.length > 0 && (
           <div className={styles.tags}>
-            {conversation.tags.slice(0, 4).join(" • ")}
+            {conversation.tags.slice(0, 4).join(" â€¢ ")}
             {conversation.tags.length > 4 &&
-              ` • +${conversation.tags.length - 4} more`}
+              ` â€¢ +${conversation.tags.length - 4} more`}
           </div>
         )}
       </div>

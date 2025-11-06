@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ProjectSection Component
  * Container for displaying all projects with their conversations
  */
@@ -404,7 +404,7 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
         <div className={styles.headerLeft}>
           <FolderOutlined className={styles.headerIcon} />
           <span className={styles.headerText}>PROJECTS</span>
-          <span className={styles.toggleIcon}>{showProjects ? "▼" : "▶"}</span>
+          <span className={styles.toggleIcon}>{showProjects ? "â–¼" : "â–¶"}</span>
         </div>
         <Button
           type="text"

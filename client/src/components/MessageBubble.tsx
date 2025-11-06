@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MessageBubble Component
  * Displays individual chat messages with different styles for user and assistant
  */
@@ -311,8 +311,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
    */
   const renderContent = (content: string) => {
     // Split content by code blocks (```language\ncode```)
-    // Match code blocks with optional language specifier
-    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
+    // Updated regex to handle code blocks with or without newline after backticks
+    // Matches: ```language\ncode``` OR ```language code``` OR ``` code```
+    const codeBlockRegex = /```(\w+)?\s*\n?([\s\S]*?)```/g;
     const parts: Array<{
       type: "text" | "code";
       content: string;
@@ -332,12 +333,15 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         });
       }
 
-      // Add code block
-      parts.push({
-        type: "code",
-        content: match[2] || match[0], // Use captured code or full match
-        language: match[1] || "plaintext",
-      });
+      // Add code block with trimmed content (remove extra newlines)
+      const codeContent = match[2] ? match[2].trim() : "";
+      if (codeContent) {
+        parts.push({
+          type: "code",
+          content: codeContent,
+          language: match[1] || "plaintext",
+        });
+      }
 
       lastIndex = match.index + match[0].length;
     }
@@ -507,7 +511,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                           rel="noopener noreferrer"
                           className={styles.fileAttachment}
                         >
-                          <div className={styles.fileIcon}>📄</div>
+                          <div className={styles.fileIcon}>ðŸ“„</div>
                           <div className={styles.fileInfo}>
                             <div className={styles.fileName}>
                               {attachment.original_filename || "File"}
@@ -515,7 +519,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                             <div className={styles.fileSize}>
                               {attachment.format?.toUpperCase() || "FILE"}
                               {attachment.size_bytes &&
-                                ` • ${(attachment.size_bytes / 1024).toFixed(
+                                ` â€¢ ${(attachment.size_bytes / 1024).toFixed(
                                   1
                                 )} KB`}
                             </div>

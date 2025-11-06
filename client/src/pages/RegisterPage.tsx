@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Register Page Component
  * User registration page with form validation
  */

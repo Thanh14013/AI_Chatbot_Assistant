@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ConversationForm Component
  * Form for creating a new conversation with customizable settings
  */
@@ -49,7 +49,7 @@ const AI_MODELS = [
     value: "gpt-5-nano",
     label: "GPT-5 Nano",
     description:
-      "Default lightweight model — fast, cost-efficient and good for everyday chats",
+      "Default lightweight model â€” fast, cost-efficient and good for everyday chats",
   },
   {
     value: "gpt-4.1-mini",

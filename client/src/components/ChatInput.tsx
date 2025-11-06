@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ChatInput Component
  * Text input area for sending chat messages with file attachments
  */
@@ -377,7 +377,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
       <div className={styles.hintText}>
         Press <strong>Enter</strong> to send, <strong>Shift + Enter</strong> for
         new line, <strong>Ctrl + V</strong> to paste images
-        {uploading && <span> • Uploading files...</span>}
+        {uploading && <span> â€¢ Uploading files...</span>}
       </div>
     </div>
   );

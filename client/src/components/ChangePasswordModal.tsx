@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Change Password Modal Component
  * Allows users to change their password with validation
  */

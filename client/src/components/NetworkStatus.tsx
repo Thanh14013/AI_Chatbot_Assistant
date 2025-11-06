@@ -1,4 +1,4 @@
-/**
+﻿/**
  * NetworkStatus Component
  * Shows online/offline status and connection state
  */
@@ -174,8 +174,8 @@ const NetworkStatus: React.FC<NetworkStatusProps> = ({
       {/* Offline banner */}
       {shouldShowBanner && (
         <Alert
-          message="🔴 Mất kết nối"
-          description="Tin nhắn sẽ tự động gửi khi kết nối lại"
+          message="ðŸ”´ Máº¥t káº¿t ná»‘i"
+          description="Tin nháº¯n sáº½ tá»± Ä‘á»™ng gá»­i khi káº¿t ná»‘i láº¡i"
           type="warning"
           showIcon
           banner
@@ -189,7 +189,7 @@ const NetworkStatus: React.FC<NetworkStatusProps> = ({
         <Alert
           message={
             <span>
-              <SyncOutlined spin /> Đang đồng bộ... ({syncStatus.synced}/
+              <SyncOutlined spin /> Äang Ä‘á»“ng bá»™... ({syncStatus.synced}/
               {syncStatus.total})
             </span>
           }

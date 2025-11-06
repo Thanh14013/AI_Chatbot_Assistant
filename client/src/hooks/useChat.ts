@@ -265,42 +265,65 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
       try {
         const data = (e as CustomEvent).detail as {
           conversationId: string;
-          lastActivity: string;
-          messageCount: number;
-          totalTokens: number;
+          lastActivity?: string;
+          messageCount?: number;
+          totalTokens?: number;
         };
-        if (!data || !data.conversationId) return;
+
+
+        if (!data || !data.conversationId) {
+          return;
+        }
 
         // Optimistically update conversation metadata and move to top
         setConversations((prev) => {
-          const updated = prev.map((c) =>
-            c.id === data.conversationId
-              ? {
-                  ...c,
-                  message_count: data.messageCount,
-                  total_tokens_used: data.totalTokens,
-                  updatedAt: data.lastActivity,
-                }
-              : c
-          );
 
-          // Move the updated conversation to the top
+          // First, update the conversation with new data (only if provided)
+          const updated = prev.map((c) => {
+            if (c.id === data.conversationId) {
+              const updates: Partial<ConversationListItem> = {};
+
+              // Only update fields that are provided and exist in ConversationListItem
+              if (data.lastActivity) {
+                updates.updatedAt = data.lastActivity;
+              }
+              if (data.messageCount !== undefined) {
+                updates.message_count = data.messageCount;
+              }
+              // Note: total_tokens_used is not in ConversationListItem interface
+
+              return { ...c, ...updates };
+            }
+            return c;
+          });
+
+          // Move the updated conversation to the top (if not already at top)
           const targetIndex = updated.findIndex(
             (c) => c.id === data.conversationId
           );
+
+
           if (targetIndex > 0) {
+            // Remove from current position and add to top
             const targetConv = updated[targetIndex];
             updated.splice(targetIndex, 1);
             updated.unshift(targetConv);
+              "[useChat] Moved conversation to top:",
+              targetConv.title
+            );
+          } else if (targetIndex === 0) {
+          } else if (targetIndex === -1) {
+            // Conversation not in list yet - will be added by background refresh
+              "[useChat] Conversation not found in list, waiting for background refresh"
+            );
           }
 
           return updated;
         });
 
-        // Background refresh to ensure consistency
+        // Background refresh to ensure consistency with server
         loadConversations(true).catch(() => {});
-      } catch {
-        // logging removed
+      } catch (err) {
       }
     };
 

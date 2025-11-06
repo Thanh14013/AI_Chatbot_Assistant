@@ -1,4 +1,4 @@
-/**
+﻿/**
  * NewChatSuggestions Component
  * Displays 3 follow-up suggestions on New Chat page based on recent messages and user info
  */

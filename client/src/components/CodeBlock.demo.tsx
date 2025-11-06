@@ -1,4 +1,4 @@
-/**
+﻿/**
  * CodeBlock Demo/Example
  * This file demonstrates how the CodeBlock component works
  */
@@ -16,7 +16,6 @@ export const codeBlockExamples = {
   return fibonacci(n - 1) + fibonacci(n - 2);
 }
 
-console.log(fibonacci(10)); // Output: 55`,
 
   python: `def quick_sort(arr):
     if len(arr) <= 1:

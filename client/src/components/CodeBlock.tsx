@@ -1,4 +1,4 @@
-/**
+﻿/**
  * CodeBlock Component
  * Renders code with syntax highlighting and a copy button
  */

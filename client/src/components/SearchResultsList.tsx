@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { ConversationSearchResultItem } from "./ConversationSearchResultItem";
 import { ConversationSearchResult } from "../services/searchService";
 import styles from "./SearchResultsList.module.css";
