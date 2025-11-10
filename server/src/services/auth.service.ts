@@ -59,7 +59,7 @@ export const registerUser = async (registerData: RegisterInput) => {
  */
 export const loginUser = async (loginData: LoginInput) => {
   const { email, password } = validateLogin(loginData.email, loginData.password);
-  
+
   // Find user by email with cache
   const cacheKey = userByEmailKey(email);
   const user = await cacheAside(cacheKey, () => User.findByEmail(email), CACHE_TTL.USER);
@@ -73,7 +73,7 @@ export const loginUser = async (loginData: LoginInput) => {
   if (!isPasswordValid) {
     throw new Error("Account or password is incorrect");
   }
-  
+
   // Generate authentication tokens
   const accessToken = generateAccessToken({ id: user.id, name: user.name, email: user.email });
   const refreshToken = generateRefreshToken({ id: user.id, name: user.name, email: user.email });
@@ -142,7 +142,7 @@ export const refreshAccessToken = async (token: string) => {
   if (!user) {
     throw new Error("User not found");
   }
-  
+
   // Generate new access token
   const newAccessToken = generateAccessToken({ id: user.id, name: user.name, email: user.email });
 

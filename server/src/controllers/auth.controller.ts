@@ -72,13 +72,13 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Registration failed";
-    
+
     // Handle duplicate email error
     if (errorMessage.includes("Email already registered")) {
       res.status(409).json({ success: false, message: errorMessage });
       return;
     }
-    
+
     res.status(500).json({ success: false, message: "Internal server error", error: errorMessage });
   }
 };
@@ -92,7 +92,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password }: LoginInput = req.body;
-    
+
     // Validate required fields
     if (!email || !password) {
       res.status(400).json({ success: false, message: "Email and password are required" });
@@ -123,13 +123,13 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Login failed";
-    
+
     // Handle authentication errors
     if (errorMessage.includes("Account or password is incorrect")) {
       res.status(401).json({ success: false, message: "Account or password is incorrect" });
       return;
     }
-    
+
     res.status(500).json({ success: false, message: "Internal server error", error: errorMessage });
   }
 };
@@ -144,7 +144,7 @@ export const refresh = async (req: Request, res: Response): Promise<void> => {
   try {
     // Accept token from cookie or body
     const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
-    
+
     if (!refreshToken) {
       res.status(400).json({ success: false, message: "Refresh token is required" });
       return;
@@ -160,7 +160,7 @@ export const refresh = async (req: Request, res: Response): Promise<void> => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Token refresh failed";
-    
+
     // Handle token validation errors
     if (
       errorMessage.includes("Invalid") ||
@@ -171,7 +171,7 @@ export const refresh = async (req: Request, res: Response): Promise<void> => {
       res.status(401).json({ success: false, message: errorMessage });
       return;
     }
-    
+
     res.status(500).json({ success: false, message: "Internal server error", error: errorMessage });
   }
 };
@@ -215,7 +215,7 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
       sameSite: "lax" as const,
       path: "/",
     });
-    
+
     const errorMessage = error instanceof Error ? error.message : "Logout failed";
     res.status(500).json({ success: false, message: errorMessage });
   }

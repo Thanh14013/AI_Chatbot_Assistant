@@ -177,7 +177,7 @@ function tryListen(port: number, attemptsLeft: number) {
   httpServer.once("error", (err: any) => {
     if (err && err.code === "EADDRINUSE") {
       console.warn(`⚠ Port ${port} is already in use.`);
-      
+
       if (attemptsLeft > 0) {
         const nextPort = port + 1;
         console.log(`Trying port ${nextPort}...`);
