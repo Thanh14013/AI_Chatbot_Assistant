@@ -4,6 +4,7 @@ import {
   UserOutlined,
   SettingOutlined,
   LogoutOutlined,
+  BankOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../hooks";
 import { useNavigate } from "react-router-dom";
@@ -17,6 +18,7 @@ interface UserSectionProps {
   collapsed?: boolean;
   onSettingsClick?: () => void; // Add callback for settings
   onProfileClick?: () => void; // Add callback for profile
+  onMemoryClick?: () => void; // Add callback for memory dashboard
 }
 
 const UserSection: React.FC<UserSectionProps> = ({
@@ -24,6 +26,7 @@ const UserSection: React.FC<UserSectionProps> = ({
   collapsed = false,
   onSettingsClick,
   onProfileClick,
+  onMemoryClick,
 }) => {
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -38,6 +41,11 @@ const UserSection: React.FC<UserSectionProps> = ({
       case "settings":
         if (onSettingsClick) {
           onSettingsClick();
+        }
+        break;
+      case "memory":
+        if (onMemoryClick) {
+          onMemoryClick();
         }
         break;
       case "logout":
@@ -63,6 +71,12 @@ const UserSection: React.FC<UserSectionProps> = ({
         label: "Settings",
         icon: <SettingOutlined />,
         onClick: () => handleMenuClick("settings"),
+      },
+      {
+        key: "memory",
+        label: "Memory Dashboard",
+        icon: <BankOutlined />,
+        onClick: () => handleMenuClick("memory"),
       },
       {
         type: "divider",

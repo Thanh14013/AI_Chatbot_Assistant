@@ -1,0 +1,45 @@
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+}
+
+.profileTab {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.statsRow {
+  margin-bottom: 24px;
+}
+
+.factsCard,
+.topicsCard,
+.preferencesCard {
+  margin-bottom: 16px;
+}
+
+.categorySection {
+  margin-bottom: 20px;
+}
+
+.categorySection:last-child {
+  margin-bottom: 0;
+}
+
+.timeline {
+  max-height: 600px;
+  overflow-y: auto;
+  padding: 16px 0;
+}
+
+.timelineItem {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.timelineDate {
+  font-size: 12px;
+}

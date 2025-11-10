@@ -7,3 +7,4 @@ export { useAuth } from "./useAuth";
 export { useChat } from "./useChat";
 export { useWebSocket } from "./useWebSocket";
 export { useRealTimeChat } from "./useRealTimeChat";
+export { useAutoTitle } from "./useAutoTitle";

@@ -29,3 +29,6 @@ export { default as SelectionAskButton } from "./SelectionAskButton";
 export { default as CodeBlock } from "./CodeBlock";
 export { default as AskAIModal } from "./AskAIModal";
 export { default as NewChatSuggestions } from "./NewChatSuggestions";
+export { SmartSuggestions } from "./SmartSuggestions";
+export { MemoryDashboard } from "./MemoryDashboard";
+export { TagSelector } from "./TagSelector";

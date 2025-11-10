@@ -24,6 +24,7 @@ interface SidebarProps {
   unreadConversations?: Set<string>; // For unread tracking (multi-tab)
   onSettingsClick?: () => void; // Add settings callback
   onProfileClick?: () => void; // Add profile callback
+  onMemoryClick?: () => void; // Add memory dashboard callback
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -34,6 +35,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   unreadConversations,
   onSettingsClick,
   onProfileClick,
+  onMemoryClick,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const { user } = useAuth();
@@ -382,7 +384,6 @@ const Sidebar: React.FC<SidebarProps> = ({
           setConversations((prev) => [convListItem, ...prev]);
           setFilteredConversations((prev) => [convListItem, ...prev]);
         } catch (fetchError) {
-
           // Continue with API call anyway
         }
       }
@@ -515,6 +516,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           collapsed={collapsed}
           onSettingsClick={onSettingsClick}
           onProfileClick={onProfileClick}
+          onMemoryClick={onMemoryClick}
         />
       </div>
     </Sider>

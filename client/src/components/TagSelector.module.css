@@ -1,0 +1,33 @@
+.tagSelector {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.select {
+  width: 100%;
+}
+
+.popularTags {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background-color: #fafafa;
+  border-radius: 4px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.popularTag {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.popularTag:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
