@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PinnedMessagesDropdown Component
  * Displays a dropdown list of pinned messages in the conversation header
  */

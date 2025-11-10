@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from "react";
+﻿import React, { useState, useCallback, useRef, useEffect } from "react";
 import { SearchOutlined } from "@ant-design/icons";
 import {
   searchConversation,
@@ -125,7 +125,7 @@ export const ConversationSearch: React.FC<ConversationSearchProps> = ({
                 className={styles.clearButton}
                 title="Clear"
               >
-                ✕
+                âœ•
               </button>
             )}
           </>
@@ -144,7 +144,7 @@ export const ConversationSearch: React.FC<ConversationSearchProps> = ({
         <>
           {error && (
             <div className={styles.error}>
-              <span>⚠️ {error}</span>
+              <span>âš ï¸ {error}</span>
             </div>
           )}
 

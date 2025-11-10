@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from "react";
+﻿import React, { useState, useCallback, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   searchAllConversations,
@@ -153,7 +153,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onResultClick }) => {
             className={styles.clearButton}
             title="Clear"
           >
-            ✕
+            âœ•
           </button>
         )}
         <button
@@ -162,7 +162,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onResultClick }) => {
           className={styles.searchButton}
           title="Search"
         >
-          {isSearching ? "⏳" : "🔍"}
+          {isSearching ? "â³" : "ðŸ”"}
         </button>
       </div>
 
@@ -170,7 +170,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onResultClick }) => {
         <>
           {error && (
             <div className={styles.error}>
-              <span>⚠️ {error}</span>
+              <span>âš ï¸ {error}</span>
             </div>
           )}
 

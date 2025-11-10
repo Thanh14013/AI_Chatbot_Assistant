@@ -47,6 +47,8 @@ export const createMessage = async (data: CreateMessageInput): Promise<MessageRe
   // Update conversation totals to include this message's tokens and count
   conversation.total_tokens_used += tokens_used;
   conversation.message_count += 1;
+  // Explicitly update updatedAt
+  conversation.set("updatedAt", new Date());
   await conversation.save();
 
   // Invalidate related caches
@@ -433,8 +435,12 @@ export const sendMessageAndStreamResponse = async (
   } catch (err) {
     // ignore errors from user callback to avoid breaking streaming
   }
+
+  // ⚡ CRITICAL: Update conversation metadata immediately
   conversation.total_tokens_used += userTokens;
   conversation.message_count += 1;
+  // Explicitly mark updatedAt as changed to ensure Sequelize updates it
+  conversation.set("updatedAt", new Date());
   await conversation.save();
 
   // Invalidate conversation list cache AFTER updating totals
@@ -447,7 +453,7 @@ export const sendMessageAndStreamResponse = async (
 
   // Build context with user preferences
   const baseSystemPrompt =
-    "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.";
+    "You are a helpful AI assistant. Provide clear, accurate, and helpful responses. IMPORTANT: When providing code in your responses, ALWAYS wrap it in markdown code blocks with triple backticks (```) and the language identifier (e.g., ```cpp for C++, ```python for Python, ```javascript for JavaScript). Never provide raw code without proper markdown formatting.";
 
   // Use enhanced system prompt if provided (from LTM), otherwise get with user preferences
   const systemPrompt =
@@ -707,8 +713,11 @@ export const sendMessageAndStreamResponse = async (
       model: conversation.model,
     });
 
+    // ⚡ CRITICAL: Update conversation metadata immediately after assistant message
     conversation.total_tokens_used += estimated_completion_tokens;
     conversation.message_count += 1;
+    // Explicitly update updatedAt to ensure conversation moves to top of list
+    conversation.set("updatedAt", new Date());
     await conversation.save();
 
     // Invalidate related caches for assistant message too
@@ -794,6 +803,8 @@ export const deleteMessage = async (
     0,
     conversation.total_tokens_used - message.tokens_used
   );
+  // Update timestamp when deleting message
+  conversation.set("updatedAt", new Date());
   await conversation.save();
 
   return {

@@ -81,6 +81,30 @@ export function useSendMessage(options: UseSendMessageOptions) {
         // Send via WebSocket with tempId
         websocketService.sendMessageWithId(conversationId, content, tempId);
 
+        // Immediately notify other parts of the app that this conversation had activity
+        // so the conversation list can move it to the top and refresh optimistically.
+        try {
+            "[useSendMessage] Dispatching conversation:activity for:",
+            conversationId
+          );
+          // Use setTimeout to ensure this runs after the current call stack
+          // to avoid any potential race conditions
+          setTimeout(() => {
+            window.dispatchEvent(
+              new CustomEvent("conversation:activity", {
+                detail: {
+                  conversationId,
+                  lastActivity: new Date().toISOString(),
+                },
+              })
+            );
+          }, 0);
+        } catch (err) {
+            "[useSendMessage] Failed to dispatch activity event:",
+            err
+          );
+        }
+
         // Note: Success is confirmed by WebSocket event listener
         // The real message will come back from server via 'message:new' event
         // At that point, we'll remove the pending message
@@ -135,6 +159,22 @@ export function useSendMessage(options: UseSendMessageOptions) {
           message.content,
           message.id
         );
+
+        // Notify conversation activity so sidebar/list updates immediately
+        try {
+          setTimeout(() => {
+            window.dispatchEvent(
+              new CustomEvent("conversation:activity", {
+                detail: {
+                  conversationId,
+                  lastActivity: new Date().toISOString(),
+                },
+              })
+            );
+          }, 0);
+        } catch {
+          // ignore if window unavailable
+        }
         return {
           success: true,
           tempId: message.id,

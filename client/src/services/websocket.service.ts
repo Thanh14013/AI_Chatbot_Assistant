@@ -456,7 +456,6 @@ class WebSocketService {
           );
         } catch (err) {
           // Ignore dispatch errors
-          console.debug("Failed to dispatch project:created", err);
         }
       });
 
@@ -467,7 +466,6 @@ class WebSocketService {
           );
         } catch (err) {
           // Ignore dispatch errors
-          console.debug("Failed to dispatch project:updated", err);
         }
       });
 
@@ -478,7 +476,6 @@ class WebSocketService {
           );
         } catch (err) {
           // Ignore dispatch errors
-          console.debug("Failed to dispatch project:deleted", err);
         }
       });
 

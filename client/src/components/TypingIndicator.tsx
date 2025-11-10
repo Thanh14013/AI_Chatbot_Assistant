@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TypingIndicator Component
  * Animated typing indicator with bouncing dots animation
  */

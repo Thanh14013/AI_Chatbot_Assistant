@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Application entry point
  * Initializes React and renders the App
  */
@@ -26,7 +26,7 @@ if (import.meta.env.VITE_SENTRY_DSN) {
     replaysOnErrorSampleRate: 1.0,
     environment: import.meta.env.MODE,
   });
-  console.log("✅ Sentry initialized");
+
 }
 
 // Get root element from HTML

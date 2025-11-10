@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ChatPage Component
  * Main chat interface with sidebar and message area
  */
@@ -42,6 +42,26 @@ import styles from "./ChatPage.module.css";
 
 const { Content } = Layout;
 const { Title } = Typography;
+
+/**
+ * Helper function to dispatch both message:sent and conversation:activity events
+ * This ensures conversation list updates immediately when a message is sent
+ */
+const notifyMessageSent = (conversationId: string) => {
+  try {
+    window.dispatchEvent(new Event("message:sent"));
+    window.dispatchEvent(
+      new CustomEvent("conversation:activity", {
+        detail: {
+          conversationId,
+          lastActivity: new Date().toISOString(),
+        },
+      })
+    );
+  } catch {
+    // Ignore errors in event dispatch
+  }
+};
 
 /**
  * ChatPage component
@@ -250,7 +270,6 @@ const ChatPage: React.FC = () => {
   /**
    * Handle New Conversation button click
    * Navigate to home route to show empty chat (draft mode)
-   * Force regenerate new chat suggestions
    */
   const handleNewConversation = () => {
     // Navigate to home route to show empty chat interface
@@ -260,9 +279,7 @@ const ChatPage: React.FC = () => {
     setMessages([]);
     setMessagesPage(1);
     setMessagesHasMore(false);
-
-    // Force regenerate new chat suggestions
-    fetchNewChatSuggestions(true);
+    // Note: Suggestions are now generated on 5-minute schedule, not on button click
   };
 
   /**
@@ -402,7 +419,6 @@ const ChatPage: React.FC = () => {
       // IMPORTANT: Don't load if we're in the middle of creating and sending
       // This prevents race condition where useEffect clears optimistic messages
       if (isCreatingAndSendingRef.current) {
-        console.log(
           "[LoadConv] Skipping load - creating and sending in progress"
         );
         return;
@@ -415,7 +431,6 @@ const ChatPage: React.FC = () => {
         messages.length > 0 &&
         !isLoadingMessages
       ) {
-        console.log(
           "[LoadConv] Skipping load - conversation already loaded with messages"
         );
         return;
@@ -573,7 +588,6 @@ const ChatPage: React.FC = () => {
         const lastProcessed = messageCompleteDebouncer.current.get(debounceKey);
         const now = Date.now();
         if (lastProcessed && now - lastProcessed < 500) {
-          console.warn(
             "[DEBOUNCE] Skipping duplicate message:complete for",
             debounceKey
           );
@@ -635,7 +649,6 @@ const ChatPage: React.FC = () => {
               m.id.startsWith("temp_"); // Only match temp IDs
 
             if (standardMatch || contentMatch) {
-              console.log(
                 `[MessageComplete] Replacing ${m.id} with ${userMessage.id}`
               );
 
@@ -681,13 +694,11 @@ const ChatPage: React.FC = () => {
           );
 
           if (!hasDuplicateContent && !existingIds.has(userMessage.id)) {
-            console.log(
               `[MessageComplete] Appending userMessage ${userMessage.id} (no pending found)`
             );
             processedMessages.push(userMessage);
             existingIds.add(userMessage.id);
           } else if (hasDuplicateContent) {
-            console.warn(
               `[MessageComplete] Skipping userMessage ${userMessage.id} - duplicate content found`
             );
           }
@@ -774,7 +785,7 @@ const ChatPage: React.FC = () => {
         return;
       }
 
-      console.error("[ChatPage] Socket error:", errorMessage);
+
 
       // Clear sending flags to allow retry
       setIsSendingMessage(false);
@@ -1011,23 +1022,37 @@ const ChatPage: React.FC = () => {
   }, []);
 
   /**
-   * Fetch New Chat suggestions when entering empty chat screen
-   * Based on recent messages across all conversations and user profile
+   * ðŸ”„ Auto-generate New Chat suggestions every 5 minutes after login
+   * Schedule starts immediately on login, then repeats every 5 minutes
+   * Stops when user logs out or component unmounts
    */
   useEffect(() => {
-    // Only fetch when there's no current conversation (New Chat screen)
-    if (currentConversation || !user) {
+    if (!user?.id) {
+
       return;
     }
 
-    // Fetch suggestions after a small delay to avoid rapid refetching
-    const timer = setTimeout(() => {
-      fetchNewChatSuggestions();
-    }, 300);
+      "[ChatPage] User logged in, starting 5-minute suggestion schedule"
+    );
 
-    return () => clearTimeout(timer);
+    // Generate immediately on login
+    fetchNewChatSuggestions(true);
+
+    // Then generate every 5 minutes
+    const intervalId = setInterval(() => {
+        "[ChatPage] 5-minute interval triggered - generating new suggestions"
+      );
+      fetchNewChatSuggestions(true);
+    }, 5 * 60 * 1000); // 5 minutes in milliseconds
+
+    // Cleanup: stop schedule when user logs out or component unmounts
+    return () => {
+        "[ChatPage] Clearing suggestion schedule (logout or unmount)"
+      );
+      clearInterval(intervalId);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentConversation, user]);
+  }, [user?.id]);
 
   /**
    * Listen for conversation followup suggestions response
@@ -1053,7 +1078,7 @@ const ChatPage: React.FC = () => {
 
     const handleConversationFollowupsError = (event: CustomEvent) => {
       const { conversationId, error } = event.detail;
-      console.error("[Followups] Error:", error);
+
 
       // Check which type of suggestion request failed
       if (currentConversation && conversationId === currentConversation.id) {
@@ -1134,17 +1159,16 @@ const ChatPage: React.FC = () => {
   const processMessageQueue = async () => {
     // Already processing, skip
     if (isProcessingQueueRef.current) {
-      console.debug("[MessageQueue] Already processing, skipping");
+
       return;
     }
 
     // Queue empty, nothing to do
     if (messageQueueRef.current.length === 0) {
-      console.debug("[MessageQueue] Queue empty");
+
       return;
     }
 
-    console.log(
       "[MessageQueue] Starting processing, queue length:",
       messageQueueRef.current.length
     );
@@ -1155,7 +1179,6 @@ const ChatPage: React.FC = () => {
       if (!queuedMsg) break;
 
       try {
-        console.log(
           "[MessageQueue] Processing message:",
           queuedMsg.content.substring(0, 50) + "..."
         );
@@ -1168,13 +1191,13 @@ const ChatPage: React.FC = () => {
         // Small delay between messages to avoid overwhelming server
         await new Promise((resolve) => setTimeout(resolve, 100));
       } catch (err) {
-        console.error("[MessageQueue] Failed to send queued message:", err);
+
         antdMessage.error("Failed to send queued message. Please try again.");
         // Continue processing other messages
       }
     }
 
-    console.log("[MessageQueue] Processing complete");
+
     isProcessingQueueRef.current = false;
   };
 
@@ -1201,12 +1224,12 @@ const ChatPage: React.FC = () => {
     // For new conversation or if not currently processing, send immediately
     // Otherwise queue it to prevent concurrent sends
     if (!currentConversation || !isProcessingQueueRef.current) {
-      console.log("[Send] Sending immediately (not queued)");
+
       return handleSendMessageInternal(content, attachments, metadata);
     }
 
     // Queue the message for sequential processing
-    console.log("[Send] Queueing message for sequential processing");
+
     messageQueueRef.current.push({
       content,
       attachments,
@@ -1239,22 +1262,22 @@ const ChatPage: React.FC = () => {
 
     // ============ NEW CONVERSATION FLOW ============
     if (!currentConversation) {
-      console.log("[NewConv] Starting new conversation flow");
+
 
       // CRITICAL: Set flag to prevent useEffect from interfering
       isCreatingAndSendingRef.current = true;
       setIsSendingMessage(true);
 
       try {
-        // Step 1: Generate title - nếu <= 4 từ thì dùng message, nếu > 4 từ thì dùng "New Chat"
+        // Step 1: Generate title - náº¿u <= 4 tá»« thÃ¬ dÃ¹ng message, náº¿u > 4 tá»« thÃ¬ dÃ¹ng "New Chat"
         const wordCount = content.trim().split(/\s+/).length;
         let title: string;
 
         if (wordCount <= 4) {
-          // Message ngắn: dùng trực tiếp làm title
+          // Message ngáº¯n: dÃ¹ng trá»±c tiáº¿p lÃ m title
           title = content.trim();
         } else {
-          // Message dài: dùng "New Chat"
+          // Message dÃ i: dÃ¹ng "New Chat"
           title = "New Chat";
         }
 
@@ -1264,16 +1287,30 @@ const ChatPage: React.FC = () => {
         }
 
         // Step 2: Create conversation
-        console.log("[NewConv] Creating conversation with title:", title);
+
         const newConversation = await apiCreateConversation({
           title,
           model: "gpt-5-nano",
           context_window: 10,
         });
-        console.log("[NewConv] Conversation created:", newConversation.id);
+
 
         // Mark this conversation as just created to skip message reload
         justCreatedConversationIdRef.current = newConversation.id;
+
+        // âš¡ HIGHEST PRIORITY: Refresh conversation list IMMEDIATELY after creation
+        // This ensures new conversation appears at top of sidebar BEFORE any AI processing
+          "[NewConv] ðŸ”¥ IMMEDIATE: Refreshing conversation list (highest priority)"
+        );
+        try {
+          await refreshConversations();
+          notifyMessageSent(newConversation.id);
+          window.dispatchEvent(new Event("conversations:refresh"));
+        } catch (err) {
+            "[NewConv] Failed to refresh conversations immediately:",
+            err
+          );
+        }
 
         // Step 3: Add optimistic user message FIRST (before navigation)
         const tempId = `temp_${Date.now()}`;
@@ -1302,16 +1339,16 @@ const ChatPage: React.FC = () => {
         };
 
         // Step 4: Batch state updates together
-        console.log("[NewConv] Setting state and messages");
+
         setCurrentConversation(newConversation as any);
         setMessages([userMsg]);
 
         // Step 5: Join WebSocket room SYNCHRONOUSLY before navigation
         if (isConnected) {
-          console.log("[NewConv] Joining WebSocket room");
+
           joinConversation(newConversation.id);
         } else {
-          console.warn("[NewConv] WebSocket not connected, skipping room join");
+
         }
 
         // Step 6: Notify WebSocket about conversation creation
@@ -1319,7 +1356,6 @@ const ChatPage: React.FC = () => {
           try {
             websocketService.notifyConversationCreated(newConversation as any);
           } catch (err) {
-            console.error(
               "[NewConv] Failed to notify conversation creation:",
               err
             );
@@ -1327,7 +1363,7 @@ const ChatPage: React.FC = () => {
         }
 
         // Step 7: Navigate FIRST (before sending)
-        console.log("[NewConv] Navigating to conversation");
+
         navigate(`/conversations/${newConversation.id}`, { replace: true });
 
         // Scroll to show user message
@@ -1335,16 +1371,10 @@ const ChatPage: React.FC = () => {
           window.dispatchEvent(new Event("messages:scrollToBottom"));
         } catch {}
 
-        // Refresh conversations list
-        refreshConversations().catch(() => {});
-        try {
-          window.dispatchEvent(new Event("conversations:refresh"));
-        } catch {}
-
         // Step 8: Send message IMMEDIATELY after navigation (no artificial delay)
         if (isConnected) {
           try {
-            console.log("[NewConv] Sending message via WebSocket");
+
 
             // INSTANT AI TYPING INDICATOR - Add typing message BEFORE sending
             const typingId = `typing_ai_${Date.now()}`;
@@ -1374,19 +1404,18 @@ const ChatPage: React.FC = () => {
               }))
             );
 
-            console.log("[NewConv] Message sent successfully");
 
-            // Update conversation metadata optimistically
+
+            // Final conversation list update after message sent (secondary priority)
             try {
               moveConversationToTop(newConversation.id);
               updateConversationOptimistic(newConversation.id, {
                 message_count: 1,
                 updatedAt: new Date().toISOString(),
               });
+              // Background refresh to sync any server-side changes
               refreshConversations().catch(() => {});
-              window.dispatchEvent(new Event("message:sent"));
             } catch (err) {
-              console.error(
                 "[NewConv] Failed to update conversation metadata:",
                 err
               );
@@ -1401,14 +1430,12 @@ const ChatPage: React.FC = () => {
             // WebSocket is fire-and-forget, response will come via event listeners
             return;
           } catch (err) {
-            console.error(
               "[NewConv] WebSocket send failed, falling back to HTTP:",
               err
             );
             // Continue to HTTP fallback
           }
         } else {
-          console.warn(
             "[NewConv] WebSocket not connected, using HTTP directly"
           );
         }
@@ -1508,13 +1535,13 @@ const ChatPage: React.FC = () => {
                     updatedAt: new Date().toISOString(),
                   });
                   refreshConversations().catch(() => {});
-                  window.dispatchEvent(new Event("message:sent"));
+                  notifyMessageSent(newConversation.id);
                 } catch {}
               }
             },
             // onError
             (err) => {
-              console.error("[NewConv] HTTP streaming error:", err);
+
               antdMessage.error("Failed to send message");
               // Mark optimistic message as failed
               setMessages((prev) =>
@@ -1537,7 +1564,7 @@ const ChatPage: React.FC = () => {
             metadata
           );
         } catch (err) {
-          console.error("[NewConv] HTTP fallback failed:", err);
+
           antdMessage.error("Failed to send message");
           setMessages((prev) =>
             prev.map((m) =>
@@ -1553,7 +1580,7 @@ const ChatPage: React.FC = () => {
 
         return; // End of new conversation flow
       } catch (err: any) {
-        console.error("[NewConv] Conversation creation failed:", err);
+
         antdMessage.error(
           err?.response?.data?.message || "Failed to create conversation"
         );
@@ -1568,6 +1595,24 @@ const ChatPage: React.FC = () => {
 
     // ============ EXISTING CONVERSATION FLOW ============
     if (isConnected) {
+      // âš¡ HIGHEST PRIORITY: Refresh conversation list IMMEDIATELY when user sends message
+      // This ensures conversation moves to top BEFORE AI starts processing
+        "[ExistingConv] ðŸ”¥ IMMEDIATE: Refreshing conversation list (highest priority)"
+      );
+      try {
+        notifyMessageSent(currentConversation.id);
+        moveConversationToTop(currentConversation.id);
+        updateConversationOptimistic(currentConversation.id, {
+          updatedAt: new Date().toISOString(),
+        });
+        // Trigger immediate background refresh
+        refreshConversations().catch(() => {});
+      } catch (err) {
+          "[ExistingConv] Failed to refresh conversations immediately:",
+          err
+        );
+      }
+
       const tempId = `temp_${Date.now()}`;
       const userMsg: Message = {
         id: tempId,
@@ -1616,17 +1661,6 @@ const ChatPage: React.FC = () => {
         );
       } catch {}
 
-      // IMMEDIATELY fire event for Sidebar to start refreshing FIRST
-      try {
-        // Fire event FIRST - Sidebar will start loading immediately
-        window.dispatchEvent(new Event("message:sent"));
-        // Then do optimistic updates on ChatPage's list
-        moveConversationToTop(currentConversation.id);
-        updateConversationOptimistic(currentConversation.id, {
-          updatedAt: new Date().toISOString(),
-        });
-      } catch {}
-
       try {
         // Mark as pending while sending
         setMessages((prev) =>
@@ -1652,14 +1686,12 @@ const ChatPage: React.FC = () => {
           prev.map((m) => (m.id === tempId ? { ...m, localStatus: "sent" } : m))
         );
 
+        // Secondary update after message confirmed sent (background)
         try {
-          moveConversationToTop(currentConversation.id);
           updateConversationOptimistic(currentConversation.id, {
             message_count: (currentConversation.message_count || 0) + 1,
             updatedAt: new Date().toISOString(),
           });
-          await refreshConversations();
-          window.dispatchEvent(new Event("message:sent"));
         } catch {}
 
         return;
@@ -1704,6 +1736,23 @@ const ChatPage: React.FC = () => {
     }
 
     // HTTP fallback for existing conversation
+    // âš¡ HIGHEST PRIORITY: Refresh conversation list IMMEDIATELY (HTTP fallback path)
+      "[ExistingConv-HTTP] ðŸ”¥ IMMEDIATE: Refreshing conversation list (highest priority)"
+    );
+    try {
+      notifyMessageSent(currentConversation.id);
+      moveConversationToTop(currentConversation.id);
+      updateConversationOptimistic(currentConversation.id, {
+        updatedAt: new Date().toISOString(),
+      });
+      // Trigger immediate background refresh
+      refreshConversations().catch(() => {});
+    } catch (err) {
+        "[ExistingConv-HTTP] Failed to refresh conversations immediately:",
+        err
+      );
+    }
+
     const tempId = `temp_${Date.now()}`;
     const userMsg: Message = {
       id: tempId,
@@ -1731,17 +1780,6 @@ const ChatPage: React.FC = () => {
 
     setMessages((prev) => [...prev, userMsg]);
     setIsSendingMessage(true);
-
-    // IMMEDIATELY fire event for Sidebar to start refreshing FIRST
-    try {
-      // Fire event FIRST - Sidebar will start loading immediately
-      window.dispatchEvent(new Event("message:sent"));
-      // Then do optimistic updates on ChatPage's list
-      moveConversationToTop(currentConversation.id);
-      updateConversationOptimistic(currentConversation.id, {
-        updatedAt: new Date().toISOString(),
-      });
-    } catch {}
 
     const typingId = `typing_${Date.now()}`;
     const typingMsg: Message = {
@@ -1882,7 +1920,7 @@ const ChatPage: React.FC = () => {
     }
   };
 
-  // Helper function để tránh duplicate logic
+  // Helper function Ä‘á»ƒ trÃ¡nh duplicate logic
   const sendMessageViaWebSocketOrHTTP = async (
     conversation: Conversation,
     content: string,
@@ -2376,7 +2414,6 @@ const ChatPage: React.FC = () => {
         await websocketService.connect();
       } catch (connErr) {
         // If socket connection fails, we still proceed to attempt an HTTP fallback below.
-        console.warn(
           "[NewChat] WebSocket connect failed, will try socket request fallback",
           connErr
         );
@@ -2401,7 +2438,7 @@ const ChatPage: React.FC = () => {
         setNewChatSuggestions([]);
       }
     } catch (err) {
-      console.error("[NewChat] Failed to fetch suggestions:", err);
+
       setIsLoadingNewChatSuggestions(false);
       setNewChatSuggestions([]);
     }

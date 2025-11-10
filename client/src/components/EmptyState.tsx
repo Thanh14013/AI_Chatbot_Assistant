@@ -1,4 +1,4 @@
-/**
+﻿/**
  * EmptyState Component
  * Displays empty states for conversations and messages
  */

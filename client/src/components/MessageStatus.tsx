@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MessageStatus Component
  * Shows message status indicators (sending, sent, error)
  */

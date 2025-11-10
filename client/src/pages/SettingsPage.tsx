@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Settings Page Component
  * User preferences configuration page
  */
@@ -274,7 +274,7 @@ const SettingsPage: React.FC = () => {
           </Form.Item>
 
           <Paragraph type="secondary" className={styles.hint}>
-            💡 Tip: Custom instructions will be added to every conversation to
+            ðŸ’¡ Tip: Custom instructions will be added to every conversation to
             guide the AI's behavior. Be clear and specific for best results.
           </Paragraph>
 

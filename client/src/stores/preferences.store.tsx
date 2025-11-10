@@ -1,4 +1,4 @@
-/**
+﻿/**
  * User Preferences Context
  * Client-side cache for user preferences to avoid repeated API calls
  */

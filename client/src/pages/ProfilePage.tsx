@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Profile Page Component
  * Main page for user profile management
  */
@@ -291,7 +291,7 @@ export const ProfilePage: React.FC = () => {
               <div>
                 <Text strong>Password</Text>
                 <br />
-                <Text type="secondary">••••••••••</Text>
+                <Text type="secondary">â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢</Text>
               </div>
               <Button
                 icon={<LockOutlined />}

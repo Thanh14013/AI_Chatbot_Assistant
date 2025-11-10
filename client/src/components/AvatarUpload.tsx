@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Avatar Upload Component
  * Handles avatar preview and file selection (upload happens on save)
  */

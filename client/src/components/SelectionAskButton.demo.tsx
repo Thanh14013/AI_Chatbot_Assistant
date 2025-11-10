@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Demo component to test SelectionAskButton functionality
  */
 
@@ -9,8 +9,8 @@ const SelectionAskButtonDemo: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleAskAboutSelection = (question: string, selectedText: string) => {
-    console.log("Question:", question);
-    console.log("Selected text:", selectedText);
+
+
     alert(`Question: ${question}\nSelected: ${selectedText}`);
   };
 

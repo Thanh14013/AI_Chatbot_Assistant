@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+﻿import React, { useState, useRef, useEffect } from "react";
 import { MessageOutlined } from "@ant-design/icons";
 import {
   ConversationSearchResult,
@@ -88,8 +88,8 @@ export const ConversationSearchResultItem: React.FC<
           {/* Tags as plain text with separators */}
           {tags && tags.length > 0 && (
             <div className={styles.tags}>
-              {tags.slice(0, 4).join(" • ")}
-              {tags.length > 4 && ` • +${tags.length - 4} more`}
+              {tags.slice(0, 4).join(" â€¢ ")}
+              {tags.length > 4 && ` â€¢ +${tags.length - 4} more`}
             </div>
           )}
         </div>

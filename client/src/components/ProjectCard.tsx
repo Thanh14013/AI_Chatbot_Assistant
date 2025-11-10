@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ProjectCard Component
  * Displays a project with its nested conversations
  */

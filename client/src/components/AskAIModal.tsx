@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AskAIModal Component
  * Inline input to ask AI about selected text (GitHub Copilot style)
  */

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SettingsModal Component
  * Modal for managing user AI assistant preferences
  */
@@ -182,7 +182,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onCancel }) => {
         // Use context to update (updates cache automatically)
         await updatePreferencesCache(updateData);
 
-        const msg = "Preferences saved successfully! 🎉";
+        const msg = "Preferences saved successfully! ðŸŽ‰";
         message.success(msg);
 
         // Update original values
@@ -287,7 +287,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onCancel }) => {
       maskClosable={!hasUnsavedChanges}
     >
       <div className={styles.modalDescription}>
-        <Text>✨ Customize how your AI assistant responds to you</Text>
+        <Text>âœ¨ Customize how your AI assistant responds to you</Text>
       </div>
 
       {/* Error Message */}
@@ -331,7 +331,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onCancel }) => {
             </div>
             <Form.Item
               name="language"
-              help="🌍 Choose the language for AI responses"
+              help="ðŸŒ Choose the language for AI responses"
               rules={[{ required: true, message: "Please select a language" }]}
             >
               <Select
@@ -354,7 +354,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onCancel }) => {
             </div>
             <Form.Item
               name="response_style"
-              help="📝 How should the AI format its responses?"
+              help="ðŸ“ How should the AI format its responses?"
               rules={[
                 { required: true, message: "Please select a response style" },
               ]}
@@ -389,7 +389,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onCancel }) => {
             </div>
             <Form.Item
               name="custom_instructions"
-              help="✏️ Add specific instructions for the AI (optional, max 2000 characters)"
+              help="âœï¸ Add specific instructions for the AI (optional, max 2000 characters)"
               rules={[
                 {
                   max: 2000,
@@ -407,7 +407,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onCancel }) => {
             </Form.Item>
 
             <div className={styles.hint}>
-              💡 <strong>Tip:</strong> Custom instructions will be added to
+              ðŸ’¡ <strong>Tip:</strong> Custom instructions will be added to
               every conversation to guide the AI's behavior. Be clear and
               specific for best results.
             </div>

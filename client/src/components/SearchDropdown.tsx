@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SearchDropdown Component
  * Dropdown for selecting search type (keyword or tags)
  */
