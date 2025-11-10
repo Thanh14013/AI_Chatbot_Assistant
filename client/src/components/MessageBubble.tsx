@@ -18,6 +18,7 @@ import {
   PushpinOutlined,
   PushpinFilled,
   RedoOutlined,
+  FileOutlined,
 } from "@ant-design/icons";
 import { Message } from "../types/chat.type";
 import { PendingMessage } from "../types/offline-message.type";
@@ -511,7 +512,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                           rel="noopener noreferrer"
                           className={styles.fileAttachment}
                         >
-                          <div className={styles.fileIcon}>ðŸ“„</div>
+                          <div className={styles.fileIcon}>
+                            <FileOutlined />
+                          </div>
                           <div className={styles.fileInfo}>
                             <div className={styles.fileName}>
                               {attachment.original_filename || "File"}
@@ -519,7 +522,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                             <div className={styles.fileSize}>
                               {attachment.format?.toUpperCase() || "FILE"}
                               {attachment.size_bytes &&
-                                ` â€¢ ${(attachment.size_bytes / 1024).toFixed(
+                                ` • ${(attachment.size_bytes / 1024).toFixed(
                                   1
                                 )} KB`}
                             </div>

@@ -84,6 +84,7 @@ export function useSendMessage(options: UseSendMessageOptions) {
         // Immediately notify other parts of the app that this conversation had activity
         // so the conversation list can move it to the top and refresh optimistically.
         try {
+          console.log(
             "[useSendMessage] Dispatching conversation:activity for:",
             conversationId
           );
@@ -100,6 +101,7 @@ export function useSendMessage(options: UseSendMessageOptions) {
             );
           }, 0);
         } catch (err) {
+          console.log(
             "[useSendMessage] Failed to dispatch activity event:",
             err
           );

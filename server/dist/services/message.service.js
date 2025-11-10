@@ -36,6 +36,8 @@ export const createMessage = async (data) => {
     // Update conversation totals to include this message's tokens and count
     conversation.total_tokens_used += tokens_used;
     conversation.message_count += 1;
+    // Explicitly update updatedAt
+    conversation.set("updatedAt", new Date());
     await conversation.save();
     // Invalidate related caches
     await invalidateCachePattern(messageHistoryPattern(data.conversation_id));
@@ -364,8 +366,11 @@ enhancedSystemPrompt) => {
     catch (err) {
         // ignore errors from user callback to avoid breaking streaming
     }
+    // ⚡ CRITICAL: Update conversation metadata immediately
     conversation.total_tokens_used += userTokens;
     conversation.message_count += 1;
+    // Explicitly mark updatedAt as changed to ensure Sequelize updates it
+    conversation.set("updatedAt", new Date());
     await conversation.save();
     // Invalidate conversation list cache AFTER updating totals
     await invalidateCachePattern(conversationListPattern(conversation.user_id));
@@ -374,7 +379,7 @@ enhancedSystemPrompt) => {
         // logging removed: background embedding generation failed for user message
     });
     // Build context with user preferences
-    const baseSystemPrompt = "You are a helpful AI assistant. Provide clear, accurate, and helpful responses.";
+    const baseSystemPrompt = "You are a helpful AI assistant. Provide clear, accurate, and helpful responses. IMPORTANT: When providing code in your responses, ALWAYS wrap it in markdown code blocks with triple backticks (```) and the language identifier (e.g., ```cpp for C++, ```python for Python, ```javascript for JavaScript). Never provide raw code without proper markdown formatting.";
     // Use enhanced system prompt if provided (from LTM), otherwise get with user preferences
     const systemPrompt = enhancedSystemPrompt || (await buildSystemPromptWithPreferences(userId, baseSystemPrompt));
     const disableContext = String(process.env.DISABLE_CONTEXT || "false").toLowerCase() === "true";
@@ -599,8 +604,11 @@ enhancedSystemPrompt) => {
             tokens_used: estimated_completion_tokens,
             model: conversation.model,
         });
+        // ⚡ CRITICAL: Update conversation metadata immediately after assistant message
         conversation.total_tokens_used += estimated_completion_tokens;
         conversation.message_count += 1;
+        // Explicitly update updatedAt to ensure conversation moves to top of list
+        conversation.set("updatedAt", new Date());
         await conversation.save();
         // Invalidate related caches for assistant message too
         await invalidateCachePattern(messageHistoryPattern(conversationId));
@@ -671,6 +679,8 @@ export const deleteMessage = async (messageId, userId) => {
     // Update conversation stats
     conversation.message_count = Math.max(0, conversation.message_count - 1);
     conversation.total_tokens_used = Math.max(0, conversation.total_tokens_used - message.tokens_used);
+    // Update timestamp when deleting message
+    conversation.set("updatedAt", new Date());
     await conversation.save();
     return {
         message: "Message deleted successfully",

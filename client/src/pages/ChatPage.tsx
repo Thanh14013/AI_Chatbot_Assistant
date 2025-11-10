@@ -21,6 +21,7 @@ import {
   ProfileModal,
   PinnedMessagesDropdown,
   NewChatSuggestions,
+  MemoryDashboard,
 } from "../components";
 // ConversationForm not used anymore in new draft mode flow
 // import ConversationForm, {
@@ -42,6 +43,43 @@ import styles from "./ChatPage.module.css";
 
 const { Content } = Layout;
 const { Title } = Typography;
+
+/**
+ * LocalStorage key for cached new chat suggestions
+ */
+const NEW_CHAT_SUGGESTIONS_CACHE_KEY = "newChatSuggestionsCache";
+
+/**
+ * Helper function to load cached suggestions from localStorage
+ */
+const loadCachedSuggestions = (): string[] => {
+  try {
+    const cached = localStorage.getItem(NEW_CHAT_SUGGESTIONS_CACHE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.error("[Cache] Failed to load cached suggestions:", err);
+  }
+  return [];
+};
+
+/**
+ * Helper function to save suggestions to localStorage
+ */
+const saveSuggestionsToCache = (suggestions: string[]): void => {
+  try {
+    localStorage.setItem(
+      NEW_CHAT_SUGGESTIONS_CACHE_KEY,
+      JSON.stringify(suggestions)
+    );
+  } catch (err) {
+    console.error("[Cache] Failed to save suggestions to cache:", err);
+  }
+};
 
 /**
  * Helper function to dispatch both message:sent and conversation:activity events
@@ -79,6 +117,9 @@ const ChatPage: React.FC = () => {
 
   // Profile modal state
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+
+  // Memory Dashboard modal state
+  const [memoryDashboardOpen, setMemoryDashboardOpen] = useState(false);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -154,7 +195,10 @@ const ChatPage: React.FC = () => {
   ] = useState(false);
 
   // New Chat suggestions state (for empty chat screen)
-  const [newChatSuggestions, setNewChatSuggestions] = useState<string[]>([]);
+  // Initialize with cached suggestions for instant display
+  const [newChatSuggestions, setNewChatSuggestions] = useState<string[]>(
+    loadCachedSuggestions()
+  );
   const [isLoadingNewChatSuggestions, setIsLoadingNewChatSuggestions] =
     useState(false);
 
@@ -166,13 +210,6 @@ const ChatPage: React.FC = () => {
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
-
-  /**
-   * Handle search input change
-   */
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-  };
 
   // Load messages for a conversation from server
   const loadMessages = async (conversationId: string, page = 1) => {
@@ -270,6 +307,7 @@ const ChatPage: React.FC = () => {
   /**
    * Handle New Conversation button click
    * Navigate to home route to show empty chat (draft mode)
+   * IMPORTANT: When clicking +, generate NEW suggestions to replace cached ones
    */
   const handleNewConversation = () => {
     // Navigate to home route to show empty chat interface
@@ -279,7 +317,10 @@ const ChatPage: React.FC = () => {
     setMessages([]);
     setMessagesPage(1);
     setMessagesHasMore(false);
-    // Note: Suggestions are now generated on 5-minute schedule, not on button click
+
+    // CRITICAL: Generate fresh suggestions when user clicks + button
+    // This overwrites the cached suggestions with new ones
+    fetchNewChatSuggestions(true); // forceRegenerate = true
   };
 
   /**
@@ -1079,6 +1120,9 @@ const ChatPage: React.FC = () => {
       ) {
         setNewChatSuggestions(suggestions);
         setIsLoadingNewChatSuggestions(false);
+
+        // CRITICAL: Cache suggestions for instant display on next visit
+        saveSuggestionsToCache(suggestions);
       }
     };
 
@@ -2669,6 +2713,7 @@ const ChatPage: React.FC = () => {
           unreadConversations={unreadConversations}
           onSettingsClick={() => setSettingsModalOpen(true)}
           onProfileClick={() => setProfileModalOpen(true)}
+          onMemoryClick={() => setMemoryDashboardOpen(true)}
         />
 
         {/* Main content area */}
@@ -2812,6 +2857,12 @@ const ChatPage: React.FC = () => {
       <ProfileModal
         open={profileModalOpen}
         onCancel={() => setProfileModalOpen(false)}
+      />
+
+      {/* Memory Dashboard Modal */}
+      <MemoryDashboard
+        visible={memoryDashboardOpen}
+        onClose={() => setMemoryDashboardOpen(false)}
       />
     </Layout>
   );

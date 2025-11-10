@@ -14,9 +14,7 @@ export const codeBlockExamples = {
   javascript: `function fibonacci(n) {
   if (n <= 1) return n;
   return fibonacci(n - 1) + fibonacci(n - 2);
-}
-
-
+}`,
   python: `def quick_sort(arr):
     if len(arr) <= 1:
         return arr
@@ -27,7 +25,6 @@ export const codeBlockExamples = {
     return quick_sort(left) + middle + quick_sort(right)
 
 print(quick_sort([3, 6, 8, 10, 1, 2, 1]))`,
-
   typescript: `interface User {
   id: number;
   name: string;
@@ -41,7 +38,6 @@ const createUser = (userData: Omit<User, 'id'>): User => {
     ...userData,
   };
 };`,
-
   html: `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -58,7 +54,6 @@ const createUser = (userData: Omit<User, 'id'>): User => {
   </form>
 </body>
 </html>`,
-
   css: `.card {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 12px;
@@ -71,7 +66,6 @@ const createUser = (userData: Omit<User, 'id'>): User => {
   transform: translateY(-4px);
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
 }`,
-
   json: `{
   "name": "ai-chatbot",
   "version": "1.0.0",
@@ -85,7 +79,6 @@ const createUser = (userData: Omit<User, 'id'>): User => {
     "build": "tsc && vite build"
   }
 }`,
-
   bash: `#!/bin/bash
 
 # Deploy script
@@ -105,7 +98,6 @@ else
   echo "Tests failed! Aborting deployment."
   exit 1
 fi`,
-
   sql: `-- Create users table
 CREATE TABLE users (
   id SERIAL PRIMARY KEY,

@@ -141,6 +141,46 @@ export const buildSystemPromptWithPreferences = async (userId, basePrompt = "You
         const languageName = languageNames[preferences.language] || "English";
         // CRITICAL: Language instruction at the very beginning with STRONG emphasis
         let systemPrompt = `CRITICAL INSTRUCTION: You MUST respond ONLY in ${languageName} language. All your responses must be in ${languageName}, regardless of the language used in previous messages or context.\n\n${basePrompt}`;
+        // Add CODE FORMATTING instruction - CRITICAL for proper code rendering
+        systemPrompt += `\n\n📝 CRITICAL CODE FORMATTING RULE:
+When providing ANY code in your response, you MUST ALWAYS wrap it in markdown code blocks with triple backticks and language identifier.
+
+Required format: \`\`\`language
+your code here
+\`\`\`
+
+Examples:
+- C++ code: \`\`\`cpp
+#include <iostream>
+int main() { return 0; }
+\`\`\`
+
+- Python code: \`\`\`python
+def hello():
+    print("Hello")
+\`\`\`
+
+- JavaScript: \`\`\`javascript
+const x = 10;
+\`\`\`
+
+- Java: \`\`\`java
+public class Main {}
+\`\`\`
+
+- SQL: \`\`\`sql
+SELECT * FROM users;
+\`\`\`
+
+- Shell/Bash: \`\`\`bash
+npm install
+\`\`\`
+
+- Any other code: \`\`\`plaintext
+your code
+\`\`\`
+
+⚠️ IMPORTANT: This applies to ALL code snippets - even single lines, commands, or code fragments. NEVER provide raw code without the triple backtick wrapper and language identifier. This is essential for proper syntax highlighting and user experience.`;
         // Add response style preference
         const styleInstructions = {
             concise: "Keep your responses brief and to the point. Avoid unnecessary details.",

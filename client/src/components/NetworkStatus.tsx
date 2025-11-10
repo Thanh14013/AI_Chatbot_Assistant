@@ -174,8 +174,13 @@ const NetworkStatus: React.FC<NetworkStatusProps> = ({
       {/* Offline banner */}
       {shouldShowBanner && (
         <Alert
-          message="ðŸ”´ Máº¥t káº¿t ná»‘i"
-          description="Tin nháº¯n sáº½ tá»± Ä‘á»™ng gá»­i khi káº¿t ná»‘i láº¡i"
+          message={
+            <span>
+              <DisconnectOutlined style={{ marginRight: 8 }} />
+              Mất kết nối
+            </span>
+          }
+          description="Tin nhắn sẽ tự động gửi khi kết nối lại"
           type="warning"
           showIcon
           banner

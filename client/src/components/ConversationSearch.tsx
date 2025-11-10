@@ -1,5 +1,9 @@
 ﻿import React, { useState, useCallback, useRef, useEffect } from "react";
-import { SearchOutlined } from "@ant-design/icons";
+import {
+  SearchOutlined,
+  CloseOutlined,
+  ExclamationCircleOutlined,
+} from "@ant-design/icons";
 import {
   searchConversation,
   SearchMatchWithContext,
@@ -125,7 +129,7 @@ export const ConversationSearch: React.FC<ConversationSearchProps> = ({
                 className={styles.clearButton}
                 title="Clear"
               >
-                âœ•
+                <CloseOutlined />
               </button>
             )}
           </>
@@ -144,7 +148,8 @@ export const ConversationSearch: React.FC<ConversationSearchProps> = ({
         <>
           {error && (
             <div className={styles.error}>
-              <span>âš ï¸ {error}</span>
+              <ExclamationCircleOutlined style={{ marginRight: 8 }} />
+              <span>{error}</span>
             </div>
           )}
 

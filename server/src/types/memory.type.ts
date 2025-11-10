@@ -225,7 +225,12 @@ export interface MemoryContext {
  */
 export interface GetProfileResponse {
   success: boolean;
-  data: UserProfile | null;
+  data:
+    | (UserProfile & {
+        factsByCategory?: Record<string, string[]>;
+        recentTopics?: string[];
+      })
+    | null;
 }
 
 /**

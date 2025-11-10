@@ -116,12 +116,29 @@ export const globalSearch = async (req: Request, res: Response): Promise<void> =
     // If userId not directly available, pass the decoded.email so the service layer can resolve it
     const searchInputUser = userId || decoded?.email;
 
+    // Log search parameters for debugging tag filtering
+    console.log("[GlobalSearch] Search parameters:", {
+      user: searchInputUser,
+      query,
+      tags,
+      limit,
+      messagesPerConversation,
+      similarity_threshold,
+    });
+
     const searchResult = await searchAllConversations(searchInputUser, {
       query,
       tags,
       limit,
       messagesPerConversation,
       similarity_threshold,
+    });
+
+    // Log search results summary
+    console.log("[GlobalSearch] Results:", {
+      totalConversations: searchResult.totalConversations,
+      resultCount: searchResult.results.length,
+      conversationIds: searchResult.results.map((r) => r.conversation_id),
     });
 
     // Return results

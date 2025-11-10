@@ -1,6 +1,12 @@
 ﻿import React, { useState, useCallback, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  SearchOutlined,
+  CloseOutlined,
+  LoadingOutlined,
+  ExclamationCircleOutlined,
+} from "@ant-design/icons";
+import {
   searchAllConversations,
   ConversationSearchResult,
 } from "../services/searchService";
@@ -153,7 +159,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onResultClick }) => {
             className={styles.clearButton}
             title="Clear"
           >
-            âœ•
+            <CloseOutlined />
           </button>
         )}
         <button
@@ -162,7 +168,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onResultClick }) => {
           className={styles.searchButton}
           title="Search"
         >
-          {isSearching ? "â³" : "ðŸ”"}
+          {isSearching ? <LoadingOutlined /> : <SearchOutlined />}
         </button>
       </div>
 
@@ -170,7 +176,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onResultClick }) => {
         <>
           {error && (
             <div className={styles.error}>
-              <span>âš ï¸ {error}</span>
+              <ExclamationCircleOutlined style={{ marginRight: 8 }} />
+              <span>{error}</span>
             </div>
           )}
 

@@ -291,7 +291,7 @@ export const ProfilePage: React.FC = () => {
               <div>
                 <Text strong>Password</Text>
                 <br />
-                <Text type="secondary">â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢</Text>
+                <Text type="secondary">••••••••••</Text>
               </div>
               <Button
                 icon={<LockOutlined />}

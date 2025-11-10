@@ -274,7 +274,7 @@ const SettingsPage: React.FC = () => {
           </Form.Item>
 
           <Paragraph type="secondary" className={styles.hint}>
-            ðŸ’¡ Tip: Custom instructions will be added to every conversation to
+            Tip: Custom instructions will be added to every conversation to
             guide the AI's behavior. Be clear and specific for best results.
           </Paragraph>
 

@@ -66,10 +66,24 @@ export interface ConversationSearchResponse {
 export async function searchAllConversations(
   params: GlobalSearchParams
 ): Promise<GlobalSearchResponse> {
+  // CRITICAL: Log the exact params being sent to server
+  console.log("[SearchService] Sending request to /search/all:", {
+    params,
+    query: params.query,
+    tags: params.tags,
+    tagsIsArray: Array.isArray(params.tags),
+    tagsLength: params.tags?.length,
+  });
+
   const response = await axiosInstance.post<{
     success: boolean;
     data: GlobalSearchResponse;
   }>(`/search/all`, params);
+
+  console.log("[SearchService] Received response:", {
+    resultCount: response.data.data.results.length,
+    totalConversations: response.data.data.totalConversations,
+  });
 
   return response.data.data;
 }

@@ -574,7 +574,7 @@ export const initializeSocketIO = (httpServer) => {
         // Handle conversation-based follow-up suggestions request (for input lightbulb)
         socket.on("request_conversation_followups", async (data) => {
             try {
-                const { sessionId, conversationId, messages } = data;
+                const { sessionId, conversationId, messages, forceRegenerate } = data;
                 if (!sessionId || !conversationId) {
                     socket.emit("conversation_followups_error", {
                         conversationId: conversationId || "",
@@ -582,6 +582,28 @@ export const initializeSocketIO = (httpServer) => {
                     });
                     return;
                 }
+                // Special handling for new chat suggestions (conversationId === "new_chat_suggestions")
+                if (conversationId === "new_chat_suggestions") {
+                    // Import new chat suggestions service
+                    const { getNewChatSuggestions } = await import("./new-chat-suggestions.service.js");
+                    // Get cached or generate new suggestions
+                    const userId = socket.userId;
+                    if (!userId) {
+                        socket.emit("conversation_followups_error", {
+                            conversationId,
+                            error: "User ID is required",
+                        });
+                        return;
+                    }
+                    const suggestions = await getNewChatSuggestions(userId, forceRegenerate || false);
+                    // Broadcast suggestions to all sockets in the same session (multi-tab sync)
+                    io.to(`session:${sessionId}`).emit("conversation_followups_response", {
+                        conversationId,
+                        suggestions,
+                    });
+                    return;
+                }
+                // Regular conversation followups
                 if (!messages || !Array.isArray(messages) || messages.length === 0) {
                     socket.emit("conversation_followups_error", {
                         conversationId,

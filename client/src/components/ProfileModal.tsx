@@ -201,7 +201,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onCancel }) => {
         setPendingAvatarFile(null);
         setPendingAvatarAction(null);
 
-        message.success("Profile updated successfully! ðŸŽ‰");
+        message.success("Profile updated successfully!");
 
         // Step 3: Reload global user state
         try {
@@ -313,7 +313,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onCancel }) => {
         maskClosable={!hasUnsavedChanges}
       >
         <div className={styles.modalDescription}>
-          âœ¨ Manage your profile information and security settings
+          Manage your profile information and security settings
         </div>
 
         {/* Error Message */}
@@ -363,7 +363,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onCancel }) => {
                 <Form.Item
                   name="username"
                   label="Username"
-                  help="ðŸ”¤ Your unique username (3-50 characters)"
+                  help="Your unique username (3-50 characters)"
                   rules={[
                     {
                       min: 3,
@@ -387,7 +387,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onCancel }) => {
                 <Form.Item
                   name="bio"
                   label="Bio"
-                  help="âœï¸ Tell us about yourself (optional, max 200 characters)"
+                  help="Tell us about yourself (optional, max 200 characters)"
                   rules={[
                     {
                       max: 200,
@@ -405,10 +405,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onCancel }) => {
                 </Form.Item>
 
                 {/* Email (Read-only) */}
-                <Form.Item
-                  label="Email"
-                  help="ðŸ“§ Email address cannot be changed"
-                >
+                <Form.Item label="Email" help="Email address cannot be changed">
                   <Input
                     value={profile?.email}
                     disabled
@@ -417,7 +414,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onCancel }) => {
                 </Form.Item>
 
                 {/* Member Since (Read-only) */}
-                <Form.Item label="Member Since" help="ðŸ“… Account creation date">
+                <Form.Item label="Member Since" help="Account creation date">
                   <Input
                     value={profile ? formatDate(profile.createdAt) : ""}
                     disabled
@@ -440,7 +437,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onCancel }) => {
                 <div>
                   <strong>Password</strong>
                   <br />
-                  <span className={styles.passwordHidden}>â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢</span>
+                  <span className={styles.passwordHidden}>••••••••••</span>
                 </div>
                 <Button
                   icon={<LockOutlined />}
@@ -452,7 +449,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onCancel }) => {
               </div>
 
               <div className={styles.hint}>
-                ðŸ” <strong>Security Tip:</strong> Use a strong password with at
+                <strong>Security Tip:</strong> Use a strong password with at
                 least 8 characters, including uppercase, lowercase, and numbers.
               </div>
             </div>
