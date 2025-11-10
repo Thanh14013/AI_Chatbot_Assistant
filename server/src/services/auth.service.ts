@@ -1,3 +1,8 @@
+/**
+ * Authentication Service
+ * Handles user authentication operations including registration, login, token management
+ */
+
 import User from "../models/user.model.js";
 import RefreshToken from "../models/refresh-token.model.js";
 import { hashPassword, comparePassword } from "../utils/hashPassword.js";
@@ -16,7 +21,11 @@ import { validateRegister, validateLogin, validateChangePassword } from "../util
 import { cacheAside, CACHE_TTL, deleteCache, setCache } from "./cache.service.js";
 import { userByEmailKey, userByIdKey } from "../utils/cache-key.util.js";
 
-//Register a new user
+/**
+ * Register a new user
+ * @param registerData - User registration data (name, email, password)
+ * @throws Error if email already exists
+ */
 export const registerUser = async (registerData: RegisterInput) => {
   // Validate and normalize input
   const { name, email, password } = validateRegister(
@@ -35,39 +44,43 @@ export const registerUser = async (registerData: RegisterInput) => {
   const hashedPassword = await hashPassword(password);
 
   // Create new user
-  const user = await User.create({
+  await User.create({
     name,
     email,
     password: hashedPassword,
   });
-  return;
 };
 
-// Login user
+/**
+ * Login user and generate authentication tokens
+ * @param loginData - User login credentials (email, password)
+ * @returns User data, access token, and refresh token
+ * @throws Error if credentials are invalid
+ */
 export const loginUser = async (loginData: LoginInput) => {
   const { email, password } = validateLogin(loginData.email, loginData.password);
+  
   // Find user by email with cache
   const cacheKey = userByEmailKey(email);
   const user = await cacheAside(cacheKey, () => User.findByEmail(email), CACHE_TTL.USER);
 
   if (!user) {
-    // Standardized error message for wrong credentials
     throw new Error("Account or password is incorrect");
   }
 
   // Verify password
   const isPasswordValid = await comparePassword(password, user.password);
   if (!isPasswordValid) {
-    // Standardized error message for wrong credentials
     throw new Error("Account or password is incorrect");
   }
-  // Generate new tokens
+  
+  // Generate authentication tokens
   const accessToken = generateAccessToken({ id: user.id, name: user.name, email: user.email });
   const refreshToken = generateRefreshToken({ id: user.id, name: user.name, email: user.email });
 
-  // Store refresh token in database
+  // Store refresh token in database with 7 days expiration
   const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiration
+  expiresAt.setDate(expiresAt.getDate() + 7);
 
   await RefreshToken.create({
     user_id: user.id,
@@ -95,9 +108,14 @@ export const loginUser = async (loginData: LoginInput) => {
   };
 };
 
-// Refresh access token using refresh token
+/**
+ * Refresh access token using refresh token
+ * @param token - Refresh token
+ * @returns New access token
+ * @throws Error if token is invalid, expired, or revoked
+ */
 export const refreshAccessToken = async (token: string) => {
-  // Verify refresh token
+  // Verify refresh token signature
   const verificationResult = verifyRefreshToken(token);
   if (!verificationResult.valid) {
     throw new Error("Invalid or expired refresh token");
@@ -124,7 +142,8 @@ export const refreshAccessToken = async (token: string) => {
   if (!user) {
     throw new Error("User not found");
   }
-  // Generate new access token only
+  
+  // Generate new access token
   const newAccessToken = generateAccessToken({ id: user.id, name: user.name, email: user.email });
 
   return {
@@ -132,32 +151,36 @@ export const refreshAccessToken = async (token: string) => {
   };
 };
 
-// Logout user by revoking the specific refresh token
+/**
+ * Logout user by revoking refresh token
+ * @param token - Refresh token to revoke
+ * @returns Success message
+ */
 export const logoutUser = async (token: string) => {
-  // Find token in database to identify the user
+  // Find token in database
   const storedToken = await RefreshToken.findByToken(token);
 
-  // If token not found, treat logout as idempotent success (token may have been removed already)
-  if (!storedToken) {
+  // If token not found or already revoked, treat as successful (idempotent)
+  if (!storedToken || storedToken.is_revoked) {
     return { message: "Logout successful" };
   }
 
-  // If already revoked, nothing to do
-  if (storedToken.is_revoked) {
-    return { message: "Logout successful" };
-  }
-
-  // Revoke only this specific token (logout from current device)
+  // Revoke the token
   storedToken.is_revoked = true;
   await storedToken.save();
-  // refresh token revoked log removed
 
   return {
     message: "Logout successful",
   };
 };
 
-// Change password for a user (identified by email)
+/**
+ * Change user password
+ * @param email - User's email
+ * @param data - Current password and new password
+ * @returns Success message
+ * @throws Error if current password is incorrect
+ */
 export const changePassword = async (email: string, data: ChangePasswordInput) => {
   const { currentPassword, newPassword } = validateChangePassword(
     email,
@@ -167,18 +190,22 @@ export const changePassword = async (email: string, data: ChangePasswordInput) =
 
   // Find user
   const user = await User.findByEmail(email);
-  if (!user) throw new Error("User not found");
+  if (!user) {
+    throw new Error("User not found");
+  }
 
   // Verify current password
   const isValid = await comparePassword(currentPassword, user.password);
-  if (!isValid) throw new Error("Current password is incorrect");
+  if (!isValid) {
+    throw new Error("Current password is incorrect");
+  }
 
-  // Hash new password and save
+  // Hash and save new password
   const hashed = await hashPassword(newPassword);
   user.password = hashed;
   await user.save();
 
-  // Invalidate user cache after password change
+  // Invalidate user cache
   await deleteCache(userByEmailKey(email));
   await deleteCache(userByIdKey(user.id));
 

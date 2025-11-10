@@ -1,3 +1,8 @@
+/**
+ * Authentication Controller
+ * Handles user registration, login, logout, token refresh, and user profile retrieval
+ */
+
 import { Request, Response } from "express";
 import {
   registerUser,
@@ -9,14 +14,19 @@ import User from "../models/user.model.js";
 import type { RegisterInput, LoginInput } from "../types/user.type.js";
 
 /**
- * Register a new user....
+ * Register a new user
  * POST /api/auth/register
+ * @body {string} name - User's full name
+ * @body {string} email - User's email address
+ * @body {string} password - User's password (min 6 characters)
+ * @body {string} confirmPassword - Password confirmation (optional)
  */
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
     const { name, email, password, confirmPassword }: RegisterInput & { confirmPassword?: string } =
       req.body;
 
+    // Validate required fields
     if (!name || !email || !password) {
       res.status(400).json({
         success: false,
@@ -25,6 +35,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       res.status(400).json({
@@ -34,6 +45,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Validate password length
     if (password.length < 6) {
       res.status(400).json({
         success: false,
@@ -42,6 +54,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Validate password confirmation if provided
     if (confirmPassword && password !== confirmPassword) {
       res.status(400).json({
         success: false,
@@ -50,6 +63,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Register user
     await registerUser({ name, email, password });
 
     res.status(201).json({
@@ -58,10 +72,13 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Registration failed";
+    
+    // Handle duplicate email error
     if (errorMessage.includes("Email already registered")) {
       res.status(409).json({ success: false, message: errorMessage });
       return;
     }
+    
     res.status(500).json({ success: false, message: "Internal server error", error: errorMessage });
   }
 };
@@ -69,23 +86,29 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 /**
  * Login user
  * POST /api/auth/login
+ * @body {string} email - User's email address
+ * @body {string} password - User's password
  */
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password }: LoginInput = req.body;
+    
+    // Validate required fields
     if (!email || !password) {
       res.status(400).json({ success: false, message: "Email and password are required" });
       return;
     }
 
+    // Authenticate user
     const result = await loginUser({ email, password });
 
+    // Set refresh token cookie
     const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax" as const,
       path: "/",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     };
 
     res.cookie("refreshToken", result.refreshToken, cookieOptions);
@@ -100,10 +123,13 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Login failed";
+    
+    // Handle authentication errors
     if (errorMessage.includes("Account or password is incorrect")) {
       res.status(401).json({ success: false, message: "Account or password is incorrect" });
       return;
     }
+    
     res.status(500).json({ success: false, message: "Internal server error", error: errorMessage });
   }
 };
@@ -111,15 +137,20 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 /**
  * Refresh access token
  * POST /api/auth/refresh
+ * @cookie {string} refreshToken - Refresh token from cookie
+ * @body {string} refreshToken - Refresh token from body (fallback)
  */
 export const refresh = async (req: Request, res: Response): Promise<void> => {
   try {
+    // Accept token from cookie or body
     const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+    
     if (!refreshToken) {
       res.status(400).json({ success: false, message: "Refresh token is required" });
       return;
     }
 
+    // Generate new access token
     const result = await refreshAccessToken(refreshToken);
 
     res.status(200).json({
@@ -129,6 +160,8 @@ export const refresh = async (req: Request, res: Response): Promise<void> => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Token refresh failed";
+    
+    // Handle token validation errors
     if (
       errorMessage.includes("Invalid") ||
       errorMessage.includes("expired") ||
@@ -138,6 +171,7 @@ export const refresh = async (req: Request, res: Response): Promise<void> => {
       res.status(401).json({ success: false, message: errorMessage });
       return;
     }
+    
     res.status(500).json({ success: false, message: "Internal server error", error: errorMessage });
   }
 };
@@ -145,62 +179,61 @@ export const refresh = async (req: Request, res: Response): Promise<void> => {
 /**
  * Logout user
  * POST /api/auth/logout
+ * @cookie {string} refreshToken - Refresh token from cookie
+ * @body {string} refreshToken - Refresh token from body (fallback)
  */
 export const logout = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Accept refresh token from cookie or request body (body fallback helps debugging and some clients)
+    // Accept token from cookie or body
     const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
 
+    // Clear cookie even if no token present (idempotent operation)
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax" as const,
+      path: "/",
+    };
+
     if (!refreshToken) {
-      // No token present. Still clear cookie and return success (idempotent),
-      // but don't treat this as a failure — caller may have already cleared it client-side.
-      res.clearCookie("refreshToken", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-      });
+      res.clearCookie("refreshToken", cookieOptions);
       res.status(200).json({ success: true, message: "Logout successful" });
       return;
     }
 
-    // Attempt to revoke the token in DB. If it doesn't exist the service will throw;
-    // we catch below and still clear cookie to keep behavior idempotent.
+    // Revoke the token in database
     await logoutUser(refreshToken);
 
     // Clear cookie and respond
-    res.clearCookie("refreshToken", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-    });
-    // logout success log suppressed
+    res.clearCookie("refreshToken", cookieOptions);
     res.status(200).json({ success: true, message: "Logout successful" });
   } catch (error) {
+    // Clear cookie even on error (idempotent operation)
     res.clearCookie("refreshToken", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: "lax" as const,
       path: "/",
     });
-    // Error logging suppressed in server output
+    
     const errorMessage = error instanceof Error ? error.message : "Logout failed";
-    // In development, include the message to help debugging; in production keep generic
     res.status(500).json({ success: false, message: errorMessage });
   }
 };
 
 /**
- * Get current user
+ * Get current user information
  * GET /api/auth/me
+ * Requires authentication via JWT token
  */
 export const getCurrentUser = async (req: Request, res: Response): Promise<void> => {
   try {
+    // Extract user from JWT token (set by auth middleware)
     const decoded = (req as any).user || (req as any).body?.user;
 
     let userRecord = null;
 
+    // Find user by ID or email
     if (decoded?.id) {
       userRecord = await User.findByPk(decoded.id);
     } else if (decoded?.email) {
@@ -215,6 +248,7 @@ export const getCurrentUser = async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    // Return user information (excluding password)
     res.status(200).json({
       success: true,
       data: {
