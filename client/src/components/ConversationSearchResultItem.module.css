@@ -101,6 +101,12 @@
   animation: fadeInSlideDown 0.2s ease-out;
 }
 
+/* Remove the dropdown's box-shadow while hovering over its message list
+   to match UI preference of no shadow on hover. */
+.dropdown:hover {
+  box-shadow: none;
+}
+
 @keyframes fadeInSlideDown {
   from {
     opacity: 0;
@@ -125,6 +131,16 @@
 .messageList {
   max-height: 300px;
   overflow-y: auto;
+}
+
+/* Hide message list scrollbars to remove the small gray bar on hover */
+.messageList {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 10+ */
+}
+.messageList::-webkit-scrollbar {
+  width: 0; /* Hide scrollbar for Chrome, Safari and Opera */
+  height: 0;
 }
 
 .messagePreview {

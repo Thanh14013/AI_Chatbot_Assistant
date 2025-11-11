@@ -225,11 +225,35 @@ export const MemoryDashboard: React.FC<MemoryDashboardProps> = ({
                     title="Your Preferences"
                     className={styles.preferencesCard}
                   >
-                    {Object.entries(profile.preferences).map(([key, value]) => (
-                      <Paragraph key={key}>
-                        <Text strong>{key}:</Text> {String(value)}
-                      </Paragraph>
-                    ))}
+                    {Object.entries(profile.preferences).map(([key, value]) => {
+                      // Parse value - it may be comma-separated or include the key as a prefix
+                      let valueStr = String(value || "");
+                      const prefix = `${key}:`;
+                      // Remove any prefix (e.g., "Programming Languages: Java, ...")
+                      if (valueStr.startsWith(prefix)) {
+                        valueStr = valueStr.slice(prefix.length).trim();
+                      }
+
+                      // Split by common separators and trim
+                      const items = valueStr.includes(",")
+                        ? valueStr.split(",").map((item) => item.trim())
+                        : valueStr.includes(";")
+                        ? valueStr.split(";").map((item) => item.trim())
+                        : [valueStr];
+
+                      return (
+                        <div key={key} className={styles.categorySection}>
+                          <Title level={5}>{key}</Title>
+                          <Space wrap>
+                            {items.map((item, idx) => (
+                              <Tag key={idx} color="cyan">
+                                {item}
+                              </Tag>
+                            ))}
+                          </Space>
+                        </div>
+                      );
+                    })}
                   </Card>
                 )}
             </>

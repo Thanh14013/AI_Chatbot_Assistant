@@ -91,21 +91,10 @@ export async function searchAllConversations(
   // If tags are provided, only search in conversations that have at least one of the tags
   let results;
 
-  console.log("[GlobalSearch.Service] Query parameters:", {
-    userId,
-    queryLength: query.trim().length,
-    tags,
-    tagsCount: tags?.length || 0,
-    limit,
-    messagesPerConversation,
-    similarity_threshold,
-  });
+  // Debug logging removed in production build
 
   if (tags && tags.length > 0) {
-    console.log(
-      "[GlobalSearch.Service] Tag filtering enabled - searching conversations with tags:",
-      tags
-    );
+    // Tag filtering enabled - search limited to conversations with specified tags
 
     // DEBUG: Show ALL user's conversations with their tags
     const allUserConversations = await sequelize.query(
@@ -124,10 +113,7 @@ export async function searchAllConversations(
       }
     );
 
-    console.log("[GlobalSearch.Service] ALL user conversations (for debugging):", {
-      count: allUserConversations.length,
-      conversations: allUserConversations,
-    });
+    // Debug: removed detailed user conversations log
 
     // CRITICAL: First, verify which conversations have the specified tags
     const tagFilterCheck = await sequelize.query(
@@ -145,18 +131,12 @@ export async function searchAllConversations(
       }
     );
 
-    console.log("[GlobalSearch.Service] Conversations with matching tags:", {
-      searchingForTags: tags,
-      count: tagFilterCheck.length,
-      conversations: tagFilterCheck,
-    });
+    // Debug: removed conversations with matching tags log
 
     // If NO conversations have the specified tags, return empty result immediately
     // DO NOT fallback to searching all conversations
     if (tagFilterCheck.length === 0) {
-      console.log(
-        "[GlobalSearch.Service] No conversations found with specified tags - returning empty result"
-      );
+      // No conversations found with specified tags - returning empty result
       return {
         query: query.trim(),
         results: [],
@@ -203,7 +183,7 @@ export async function searchAllConversations(
       }
     );
   } else {
-    console.log("[GlobalSearch.Service] No tag filter - searching all conversations");
+    // No tag filter - searching all conversations
     // No tag filter - search all conversations
     results = await sequelize.query(
       `
@@ -241,13 +221,9 @@ export async function searchAllConversations(
     );
   }
 
-  console.log("[GlobalSearch.Service] Raw query results:", {
-    resultCount: results.length,
-    sampleResults: results.slice(0, 3),
-  });
+  // Raw query results logging removed
 
   if (results.length === 0) {
-    console.log("[GlobalSearch.Service] No results found - empty result set returned");
     return {
       query: query.trim(),
       results: [],
@@ -292,10 +268,7 @@ export async function searchAllConversations(
   // Step 3: Get conversation details and sort by max similarity
   const conversationIds = Array.from(conversationMap.keys());
 
-  console.log("[GlobalSearch.Service] Found conversations:", {
-    conversationCount: conversationIds.length,
-    conversationIds: conversationIds,
-  });
+  // Found conversations logging removed
 
   const conversations = await Conversation.findAll({
     where: {
@@ -304,13 +277,7 @@ export async function searchAllConversations(
     attributes: ["id", "title", "updatedAt", "tags"],
   });
 
-  console.log("[GlobalSearch.Service] Conversation details with tags:", {
-    conversations: conversations.map((c) => ({
-      id: c.id,
-      title: c.title,
-      tags: c.tags,
-    })),
-  });
+  // Conversation details logging removed
 
   const conversationResults: GlobalSearchConversationResult[] = conversations.map((conv) => {
     const data = conversationMap.get(conv.id)!;
@@ -330,11 +297,7 @@ export async function searchAllConversations(
   // Limit results
   const limitedResults = conversationResults.slice(0, limit);
 
-  console.log("[GlobalSearch.Service] Final results:", {
-    totalFound: conversationResults.length,
-    limitedTo: limitedResults.length,
-    titles: limitedResults.map((r) => r.conversation_title),
-  });
+  // Final results logging removed
 
   return {
     query: query.trim(),

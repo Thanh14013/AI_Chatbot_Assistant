@@ -339,6 +339,7 @@ const MessageList: React.FC<MessageListProps> = ({
       <div
         ref={containerRef}
         className={styles.messageList}
+        data-message-list="true"
         onScroll={handleScroll}
       >
         {/* Show empty placeholder when no messages */}

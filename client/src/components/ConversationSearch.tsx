@@ -7,12 +7,17 @@ import {
 import {
   searchConversation,
   SearchMatchWithContext,
+  ContextMessage,
 } from "../services/searchService";
 import styles from "./ConversationSearch.module.css";
 
 interface ConversationSearchProps {
   conversationId: string;
-  onResultClick: (messageId: string) => void;
+  onResultClick: (
+    messageId: string,
+    match?: SearchMatchWithContext["match"],
+    context?: { before: ContextMessage[]; after: ContextMessage[] }
+  ) => void;
 }
 
 export const ConversationSearch: React.FC<ConversationSearchProps> = ({
@@ -62,9 +67,15 @@ export const ConversationSearch: React.FC<ConversationSearchProps> = ({
       setResults(data.results);
       setIsExpanded(true);
 
-      // Auto-scroll to best match
+      // Auto-scroll to best match with context if available
       if (data.bestMatch) {
-        onResultClick(data.bestMatch.message_id);
+        const best = data.results.find(
+          (r) => r.match.message_id === data.bestMatch!.message_id
+        );
+        onResultClick(data.bestMatch.message_id, data.bestMatch, {
+          before: best?.contextBefore ?? [],
+          after: best?.contextAfter ?? [],
+        });
       }
     } catch (err: any) {
       // logging removed: conversation search failed
@@ -76,7 +87,11 @@ export const ConversationSearch: React.FC<ConversationSearchProps> = ({
   }, [conversationId, query, onResultClick]);
 
   const handleResultClick = (messageId: string) => {
-    onResultClick(messageId);
+    const res = results.find((r) => r.match.message_id === messageId);
+    onResultClick(messageId, res?.match, {
+      before: res?.contextBefore ?? [],
+      after: res?.contextAfter ?? [],
+    });
     setIsExpanded(false);
   };
 

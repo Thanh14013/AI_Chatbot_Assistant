@@ -36,7 +36,11 @@ import {
 import { PendingMessage } from "../types/offline-message.type";
 import { websocketService } from "../services/websocket.service";
 import { NetworkStatus, TypingIndicator } from "../components";
-import { searchConversation } from "../services/searchService";
+import {
+  searchConversation,
+  ContextMessage,
+  SearchMessage,
+} from "../services/searchService";
 import { useAuthContext } from "../hooks/useAuthContext";
 import { usePreferences } from "../stores/preferences.store";
 import styles from "./ChatPage.module.css";
@@ -237,22 +241,143 @@ const ChatPage: React.FC = () => {
   /**
    * Handle search result click - scroll to message and highlight
    */
-  const handleSearchResultClick = (messageId: string) => {
-    const messageElement = messageRefs.current.get(messageId);
-    if (messageElement) {
-      // Scroll to message
-      messageElement.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
+  // Keep track of ongoing result scroll attempts to avoid duplicates
+  const resultScrollInProgress = useRef<Map<string, boolean>>(new Map());
 
-      // Add highlight
-      setHighlightedMessageId(messageId);
+  const handleSearchResultClick = async (
+    messageId: string,
+    match?: SearchMessage,
+    context?: { before: ContextMessage[]; after: ContextMessage[] }
+  ) => {
+    if (!messageId) return;
 
-      // Remove highlight after 3 seconds
-      setTimeout(() => {
-        setHighlightedMessageId(null);
-      }, 3000);
+    // Avoid duplicate concurrent attempts for the same message
+    if (resultScrollInProgress.current.get(messageId)) return;
+    resultScrollInProgress.current.set(messageId, true);
+
+    const attemptScroll = async (attemptsLeft = 8): Promise<boolean> => {
+      const messageElement = messageRefs.current.get(messageId);
+      if (messageElement) {
+        try {
+          // Decide whether to use smooth scrolling or instant jump based on distance
+          let behavior: ScrollBehavior = "smooth";
+          try {
+            const container = messageElement.closest(
+              "[data-message-list]"
+            ) as HTMLElement | null;
+            if (container) {
+              const elTop = messageElement.offsetTop;
+              const scrollTop = container.scrollTop;
+              const centerTarget = elTop - container.clientHeight / 2;
+              const distance = Math.abs(centerTarget - scrollTop);
+              if (distance > 1200) {
+                // Large distance -> immediate jump
+                behavior = "auto";
+              }
+            }
+          } catch (e) {
+            /* fail silently */
+          }
+
+          messageElement.scrollIntoView({ behavior, block: "center" });
+        } catch (err) {
+          // ignore scroll errors
+        }
+
+        // Add highlight
+        setHighlightedMessageId(messageId);
+
+        // Remove highlight after 3 seconds
+        setTimeout(() => {
+          setHighlightedMessageId(null);
+        }, 3000);
+
+        return true;
+      }
+
+      // If not found, but we have search context around this message, insert those messages
+      if (
+        !messageElement &&
+        context &&
+        (context.before.length > 0 || context.after.length > 0) &&
+        currentConversation
+      ) {
+        // Convert context messages to Message type and merge (dedupe)
+        const toAdd: Message[] = [];
+
+        const mapToMsg = (cm: ContextMessage | SearchMessage): Message => ({
+          id: cm.message_id,
+          conversation_id:
+            "conversation_id" in cm && cm.conversation_id
+              ? cm.conversation_id
+              : currentConversation.id,
+          role: cm.role,
+          content: cm.content,
+          tokens_used: ("tokens_used" in cm && (cm as any).tokens_used) || 0,
+          model: ("model" in cm && (cm as any).model) || "",
+          createdAt: cm.createdAt || new Date().toISOString(),
+        });
+
+        // Add before, match (if provided), after
+        context.before.forEach((cm) => toAdd.push(mapToMsg(cm)));
+        if (match) toAdd.push(mapToMsg(match));
+        context.after.forEach((cm) => toAdd.push(mapToMsg(cm)));
+
+        // Merge into messages, avoid duplicates by id
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const merged = [...prev];
+          toAdd.forEach((m) => {
+            if (!existingIds.has(m.id)) {
+              merged.push(m);
+            }
+          });
+          // Sort by timestamp
+          merged.sort(
+            (a, b) =>
+              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
+          return merged;
+        });
+
+        // Wait for DOM to update with a small retry loop (up to ~500ms)
+        let retryElement: HTMLElement | undefined = undefined;
+        for (let i = 0; i < 8; i++) {
+          retryElement = messageRefs.current.get(messageId);
+          if (retryElement) break;
+          await new Promise((r) => setTimeout(r, 60));
+        }
+        if (retryElement) {
+          try {
+            retryElement.scrollIntoView({ behavior: "auto", block: "center" });
+          } catch {}
+
+          setHighlightedMessageId(messageId);
+          setTimeout(() => setHighlightedMessageId(null), 3000);
+          return true;
+        }
+      }
+
+      // Otherwise, if not found and there are more messages, load earlier pages and retry
+      if (attemptsLeft > 0 && messagesHasMore) {
+        try {
+          await loadEarlier();
+          // Wait a short period for React refs to be set after loading
+          await new Promise((r) => setTimeout(r, 160));
+          return attemptScroll(attemptsLeft - 1);
+        } catch (err) {
+          // If load earlier fails, stop retrying
+          return false;
+        }
+      }
+
+      return false;
+    };
+
+    try {
+      await attemptScroll();
+    } finally {
+      resultScrollInProgress.current.delete(messageId);
     }
   };
 
@@ -520,9 +645,15 @@ const ChatPage: React.FC = () => {
             const bestMatch = convSearch.bestMatch;
 
             if (bestMatch && bestMatch.message_id) {
-              // Wait a bit for refs to be set, then try to highlight
+              const bestRes = convSearch.results.find(
+                (r) => r.match.message_id === bestMatch.message_id
+              );
+              // Wait a bit for refs to be set, then try to highlight; pass context to avoid reloading many pages
               setTimeout(() => {
-                handleSearchResultClick(bestMatch.message_id);
+                handleSearchResultClick(bestMatch.message_id, bestMatch, {
+                  before: bestRes?.contextBefore ?? [],
+                  after: bestRes?.contextAfter ?? [],
+                });
               }, 200);
               // Remove q param from URL to avoid repeated actions
               try {

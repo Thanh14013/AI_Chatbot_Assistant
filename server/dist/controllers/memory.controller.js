@@ -371,7 +371,7 @@ export const getStats = async (req, res) => {
             const { personal, preferences, technical_context } = profile.facts;
             // Count personal facts
             if (personal) {
-                totalFacts += Object.values(personal).filter(v => v !== undefined && v !== null).length;
+                totalFacts += Object.values(personal).filter((v) => v !== undefined && v !== null).length;
             }
             // Count preference facts
             if (preferences) {

@@ -198,20 +198,12 @@
 }
 
 /* Scrollbar styling */
+.results {
+  /* Hide scrollbar to avoid the small gray bar on hover; keep scroll functional */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 10+ */
+}
 .results::-webkit-scrollbar {
-  width: 8px;
-}
-
-.results::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 0 8px 8px 0;
-}
-
-.results::-webkit-scrollbar-thumb {
-  background: #ccc;
-  border-radius: 4px;
-}
-
-.results::-webkit-scrollbar-thumb:hover {
-  background: #999;
+  width: 0; /* Hide scrollbar for Chrome, Safari and Opera */
+  height: 0;
 }
