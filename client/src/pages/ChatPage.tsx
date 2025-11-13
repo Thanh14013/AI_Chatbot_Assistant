@@ -244,12 +244,10 @@ const ChatPage: React.FC = () => {
       const result = await svc.getMessages(conversationId, page, 20);
 
       // Store in cache for future use
-      messageCache.set(
-        conversationId,
-        page,
-        result.messages,
-        result.pagination
-      );
+      messageCache.set(conversationId, page, result.messages, {
+        ...result.pagination,
+        hasMore: result.pagination.page < result.pagination.totalPages,
+      });
 
       if (page === 1) {
         // initial load: replace messages with the most recent page
@@ -1056,8 +1054,8 @@ const ChatPage: React.FC = () => {
       });
     };
 
-    const handleConversationDeleted = async (event: CustomEvent) => {
-      const { conversationId } = event.detail;
+    const handleConversationDeleted = async (event: Event) => {
+      const { conversationId } = (event as CustomEvent).detail;
 
       // 🚀 PERFORMANCE: Invalidate cache for deleted conversation
       const { default: messageCache } = await import(
@@ -1071,8 +1069,8 @@ const ChatPage: React.FC = () => {
       }
     };
 
-    const handleAITypingStart = (event: CustomEvent) => {
-      const { conversationId } = event.detail;
+    const handleAITypingStart = (event: Event) => {
+      const { conversationId } = (event as CustomEvent).detail;
       if (conversationId !== currentConversation?.id) return;
 
       // Add AI typing message if not already present
@@ -1097,8 +1095,8 @@ const ChatPage: React.FC = () => {
       });
     };
 
-    const handleAITypingStop = (event: CustomEvent) => {
-      const { conversationId } = event.detail;
+    const handleAITypingStop = (event: Event) => {
+      const { conversationId } = (event as CustomEvent).detail;
       if (conversationId !== currentConversation?.id) return;
 
       // IMPORTANT: Don't remove typing messages that have content - just mark them as finalized

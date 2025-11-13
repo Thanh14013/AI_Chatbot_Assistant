@@ -8,3 +8,4 @@ export { useChat } from "./useChat";
 export { useWebSocket } from "./useWebSocket";
 export { useRealTimeChat } from "./useRealTimeChat";
 export { useAutoTitle } from "./useAutoTitle";
+export { useDebounce } from "./useDebounce";
