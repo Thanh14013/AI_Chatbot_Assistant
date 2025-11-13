@@ -995,8 +995,8 @@ const ChatPage: React.FC = () => {
 
     window.addEventListener("socket:error", handleSocketError as EventListener);
 
-    const handleMessageNew = (event: CustomEvent) => {
-      const { conversationId, message } = event.detail;
+    const handleMessageNew = (event: Event) => {
+      const { conversationId, message } = (event as CustomEvent).detail;
 
       if (conversationId !== currentConversation?.id) {
         return;
