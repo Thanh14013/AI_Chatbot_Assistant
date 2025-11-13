@@ -2742,8 +2742,12 @@ const ChatPage: React.FC = () => {
 
   // Listen for pin/unpin events from websocket (real-time sync)
   useEffect(() => {
-    const handleMessagePinned = async (event: CustomEvent) => {
-      const { conversationId: eventConvId, messageId, message } = event.detail;
+    const handleMessagePinned = async (event: Event) => {
+      const {
+        conversationId: eventConvId,
+        messageId,
+        message,
+      } = (event as CustomEvent).detail;
 
       // Only update if it's for the current conversation
       if (eventConvId === currentConversation?.id) {
@@ -2776,8 +2780,9 @@ const ChatPage: React.FC = () => {
       }
     };
 
-    const handleMessageUnpinned = async (event: CustomEvent) => {
-      const { conversationId: eventConvId, messageId } = event.detail;
+    const handleMessageUnpinned = async (event: Event) => {
+      const { conversationId: eventConvId, messageId } = (event as CustomEvent)
+        .detail;
 
       // Only update if it's for the current conversation
       if (eventConvId === currentConversation?.id) {
@@ -2798,24 +2803,12 @@ const ChatPage: React.FC = () => {
       }
     };
 
-    window.addEventListener(
-      "message:pinned",
-      handleMessagePinned as EventListener
-    );
-    window.addEventListener(
-      "message:unpinned",
-      handleMessageUnpinned as EventListener
-    );
+    window.addEventListener("message:pinned", handleMessagePinned);
+    window.addEventListener("message:unpinned", handleMessageUnpinned);
 
     return () => {
-      window.removeEventListener(
-        "message:pinned",
-        handleMessagePinned as EventListener
-      );
-      window.removeEventListener(
-        "message:unpinned",
-        handleMessageUnpinned as EventListener
-      );
+      window.removeEventListener("message:pinned", handleMessagePinned);
+      window.removeEventListener("message:unpinned", handleMessageUnpinned);
     };
   }, [currentConversation?.id]);
 
