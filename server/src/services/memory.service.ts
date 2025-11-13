@@ -18,6 +18,7 @@ import redisClient from "../config/redis.config.js";
 import sequelize from "../db/database.config.js";
 import { getChatCompletion } from "./openai.service.js";
 import { generateEmbedding } from "./embedding.service.js";
+import { buildSystemPromptWithPreferences } from "./user-preference.service.js";
 import type {
   UserProfile,
   UserFacts,
@@ -761,7 +762,10 @@ export async function buildMemoryEnhancedPrompt(
   options: MemoryContextOptions = {}
 ): Promise<string> {
   try {
-    if (!LTM_CONFIG.ENABLED) return baseSystemPrompt;
+    if (!LTM_CONFIG.ENABLED) {
+      // LTM disabled - return prompt with user preferences only
+      return await buildSystemPromptWithPreferences(userId, baseSystemPrompt);
+    }
 
     const {
       includeProfile = true,
@@ -770,7 +774,11 @@ export async function buildMemoryEnhancedPrompt(
       minImportanceScore = 3,
     } = options;
 
-    let enhancedPrompt = baseSystemPrompt + "\n\n";
+    // 🔴 CRITICAL FIX: Build system prompt with user preferences FIRST
+    // This ensures language, response_style, and custom_instructions are applied
+    const promptWithPreferences = await buildSystemPromptWithPreferences(userId, baseSystemPrompt);
+
+    let enhancedPrompt = promptWithPreferences + "\n\n";
 
     // Get memory context
     const context = await getMemoryContext(userId, currentMessage, {
@@ -863,16 +871,23 @@ export async function buildMemoryEnhancedPrompt(
     }
 
     // Add instructions
-    enhancedPrompt += "## Instructions:\n";
+    enhancedPrompt += "## Memory Context Instructions:\n";
     enhancedPrompt += "- Use the user context above to personalize your responses\n";
     enhancedPrompt += "- Reference past interactions when relevant\n";
     enhancedPrompt += "- Be helpful, concise, and respectful\n";
     enhancedPrompt +=
       "- If the user mentions something you already know, acknowledge it naturally\n";
+    enhancedPrompt +=
+      "\n⚠️ IMPORTANT: User preferences (language, response style, custom instructions) specified at the beginning MUST be followed strictly. Memory context is supplementary information only.\n";
 
     return enhancedPrompt;
   } catch (error) {
-    return baseSystemPrompt; // Fallback to base prompt
+    // Fallback: return prompt with preferences (without memory context)
+    try {
+      return await buildSystemPromptWithPreferences(userId, baseSystemPrompt);
+    } catch {
+      return baseSystemPrompt; // Last resort fallback
+    }
   }
 }
 
