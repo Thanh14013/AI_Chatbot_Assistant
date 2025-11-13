@@ -13,7 +13,7 @@ import type { ApiErrorResponse, RefreshTokenResponse } from "../types";
 
 // Determine the base URL based on environment
 // In development: use /api (Vite proxy will forward to backend)
-// In production: use full backend URL
+// In production: use full backend URL from .env
 const getBaseURL = (): string => {
   const isDevelopment = import.meta.env.DEV;
   const apiBasePath = import.meta.env.VITE_API_BASE_URL || "/api";
@@ -22,9 +22,12 @@ const getBaseURL = (): string => {
     // Use relative path in development to utilize Vite's proxy
     return apiBasePath;
   } else {
-    // Use full URL in production
-    const backendUrl =
-      import.meta.env.VITE_BACKEND_URL || window.location.origin;
+    // Use full URL in production - MUST use VITE_BACKEND_URL from .env
+    const backendUrl = import.meta.env.VITE_BACKEND_URL;
+    if (!backendUrl) {
+      console.error("VITE_BACKEND_URL is not set in .env file!");
+      throw new Error("Backend URL is required in production");
+    }
     return `${backendUrl}${apiBasePath}`;
   }
 };

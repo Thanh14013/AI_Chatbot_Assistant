@@ -293,13 +293,19 @@ class WebSocketService {
 
       // logging removed
 
-      // In production (Docker), use the current origin (nginx will proxy)
-      // In development, use VITE_BACKEND_URL or fallback to localhost
+      // Use VITE_BACKEND_URL from .env in both dev and production
+      // Fallback to localhost only in development
       let socketUrl: string;
 
       if (import.meta.env.PROD) {
-        // Production: use current origin (nginx handles proxy)
-        socketUrl = typeof window !== "undefined" ? window.location.origin : "";
+        // Production: MUST use VITE_BACKEND_URL from .env
+        socketUrl = import.meta.env.VITE_BACKEND_URL;
+        if (!socketUrl) {
+          console.error("VITE_BACKEND_URL is not set in .env file!");
+          throw new Error(
+            "Backend URL is required for WebSocket connection in production"
+          );
+        }
       } else {
         // Development: use explicit backend URL
         socketUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
