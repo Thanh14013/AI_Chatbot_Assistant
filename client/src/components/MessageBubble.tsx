@@ -47,7 +47,10 @@ interface MessageBubbleProps {
   // Optional handler for editing and resending a user message
   onEdit?: (message: Message | PendingMessage, newContent: string) => void;
   // AI typing state to disable interactive elements
+  // AI typing state to disable interactive elements
   isAITyping?: boolean;
+  // Highlight state (for search results)
+  isHighlighted?: boolean;
 }
 
 /**
@@ -64,6 +67,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   onResend,
   onEdit,
   isAITyping = false,
+  isHighlighted = false,
 }) => {
   const { message: antMessage } = App.useApp();
   const [isCopied, setIsCopied] = useState(false);
@@ -78,16 +82,28 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const lastStreamedMessageId = useRef<string | null>(null);
   // Reference to message content container for selection detection
   const messageContentRef = useRef<HTMLDivElement>(null);
-  // MessageRole is a string union ('user' | 'assistant' | 'system')
-  // compare against the literal value
-  const isUser = message.role === "user";
 
-  // Type guard to check if message is PendingMessage
+  // Type guard to check if message is PendingMessage (must be before usage)
   const isPendingMessage = (
     msg: Message | PendingMessage
   ): msg is PendingMessage => {
     return "status" in msg && "retryCount" in msg;
   };
+
+  // Track local pin state to sync with message prop
+  const [localPinned, setLocalPinned] = useState(
+    !isPendingMessage(message) && (message.pinned || false)
+  );
+
+  // Sync local pin state when message prop changes
+  useEffect(() => {
+    if (!isPendingMessage(message)) {
+      setLocalPinned(message.pinned || false);
+    }
+  }, [message]);
+  // MessageRole is a string union ('user' | 'assistant' | 'system')
+  // compare against the literal value
+  const isUser = message.role === "user";
 
   // Local status helpers - check both Message.localStatus and PendingMessage.status
   const messageStatus = isPendingMessage(message)
@@ -137,6 +153,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
     const newPinnedStatus = !currentPinned;
 
+    // Update local state immediately for instant UI feedback
+    setLocalPinned(newPinnedStatus);
+
     // 🚀 OPTIMISTIC UPDATE - Update UI immediately BEFORE API call
     if (onPinToggle) {
       onPinToggle(message.id, newPinnedStatus);
@@ -153,12 +172,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       })
     );
 
-    // Show instant feedback
-    antMessage.success(
-      newPinnedStatus ? "Message pinned" : "Message unpinned",
-      0.5
-    );
-
     setIsPinning(true);
     try {
       // Now make the API call in background
@@ -168,9 +181,15 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         await pinMessage(message.id);
       }
 
-      // API call succeeded - no need to update UI again (already optimistic)
+      // API call succeeded - state already updated optimistically
+      antMessage.success(
+        newPinnedStatus ? "Message pinned" : "Message unpinned",
+        0.5
+      );
     } catch (error: unknown) {
       // ❌ API call failed - ROLLBACK optimistic update
+      setLocalPinned(currentPinned); // Revert local state
+
       if (onPinToggle) {
         onPinToggle(message.id, currentPinned); // Revert to original state
       }
@@ -454,13 +473,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 <Button
                   type="text"
                   size="small"
-                  icon={isPinned ? <PushpinFilled /> : <PushpinOutlined />}
+                  icon={localPinned ? <PushpinFilled /> : <PushpinOutlined />}
                   onClick={handlePinToggle}
                   loading={isPinning}
                   className={`${styles.pinButtonCorner} ${
-                    isPinned ? styles.pinned : ""
+                    localPinned ? styles.pinned : ""
                   }`}
-                  title={isPinned ? "Unpin message" : "Pin message"}
+                  title={localPinned ? "Unpin message" : "Pin message"}
                 />
               )}
 

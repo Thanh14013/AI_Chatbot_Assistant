@@ -85,11 +85,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
         icon: selectedIcon || undefined,
       });
 
-      message.success(
-        mode === "create"
-          ? "Project created successfully"
-          : "Project updated successfully"
-      );
+      // Don't show message here - parent component will handle it
       form.resetFields();
       setSelectedColor("#1890ff");
       setSelectedIcon(null);

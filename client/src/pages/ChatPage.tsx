@@ -670,13 +670,15 @@ const ChatPage: React.FC = () => {
               const bestRes = convSearch.results.find(
                 (r) => r.match.message_id === bestMatch.message_id
               );
-              // Wait a bit for refs to be set, then try to highlight; pass context to avoid reloading many pages
-              setTimeout(() => {
-                handleSearchResultClick(bestMatch.message_id, bestMatch, {
-                  before: bestRes?.contextBefore ?? [],
-                  after: bestRes?.contextAfter ?? [],
-                });
-              }, 200);
+              // Wait for refs to be ready, then highlight
+              requestAnimationFrame(() => {
+                setTimeout(() => {
+                  handleSearchResultClick(bestMatch.message_id, bestMatch, {
+                    before: bestRes?.contextBefore ?? [],
+                    after: bestRes?.contextAfter ?? [],
+                  });
+                }, 100);
+              });
               // Remove q param from URL to avoid repeated actions
               try {
                 const url = new URL(window.location.href);
@@ -692,16 +694,17 @@ const ChatPage: React.FC = () => {
         // but skip if we have a highlight or q param (to avoid conflict with highlight scroll).
         const hasHighlightIntent = highlightParam || qParam;
         if (!hasHighlightIntent) {
-          try {
-            window.dispatchEvent(new Event("messages:scrollToBottom"));
-          } catch {}
-          try {
+          // Use requestAnimationFrame for smoother scroll
+          requestAnimationFrame(() => {
+            try {
+              window.dispatchEvent(new Event("messages:scrollToBottom"));
+            } catch {}
             setTimeout(() => {
               try {
                 window.dispatchEvent(new Event("messages:scrollToBottom"));
               } catch {}
-            }, 120);
-          } catch {}
+            }, 100);
+          });
         }
       } catch (err) {
         antdMessage.error("Failed to load conversation");
@@ -2751,29 +2754,28 @@ const ChatPage: React.FC = () => {
 
       // Only update if it's for the current conversation
       if (eventConvId === currentConversation?.id) {
+        // Batch state updates together
         setMessages((prev) => {
-          // If message is provided, update it; otherwise just set pinned flag
-          if (message) {
-            const exists = prev.some((msg) => msg.id === messageId);
-            if (exists) {
-              return prev.map((msg) =>
-                msg.id === messageId ? { ...msg, pinned: true } : msg
-              );
-            }
-            // Message not in list, optionally add it
-            return prev;
-          } else {
-            return prev.map((msg) =>
-              msg.id === messageId ? { ...msg, pinned: true } : msg
-            );
-          }
+          const exists = prev.some((msg) => msg.id === messageId);
+          if (!exists) return prev; // Early return if message not found
+
+          // Check if already pinned to avoid unnecessary update
+          const currentMsg = prev.find((msg) => msg.id === messageId);
+          if (currentMsg?.pinned) return prev;
+
+          return prev.map((msg) =>
+            msg.id === messageId ? { ...msg, pinned: true } : msg
+          );
         });
 
-        // 🚀 PERFORMANCE: Update cache
-        const { default: messageCache } = await import(
-          "../services/message-cache.service"
-        );
-        messageCache.updateMessage(eventConvId, messageId, { pinned: true });
+        // 🚀 PERFORMANCE: Update cache asynchronously without blocking
+        import("../services/message-cache.service")
+          .then(({ default: messageCache }) => {
+            messageCache.updateMessage(eventConvId, messageId, {
+              pinned: true,
+            });
+          })
+          .catch(() => {});
 
         // Trigger dropdown refresh
         setPinnedRefreshTrigger((prev) => prev + 1);
@@ -2786,17 +2788,24 @@ const ChatPage: React.FC = () => {
 
       // Only update if it's for the current conversation
       if (eventConvId === currentConversation?.id) {
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === messageId ? { ...msg, pinned: false } : msg
-          )
-        );
+        setMessages((prev) => {
+          // Check if already unpinned to avoid unnecessary update
+          const currentMsg = prev.find((msg) => msg.id === messageId);
+          if (!currentMsg?.pinned) return prev;
 
-        // 🚀 PERFORMANCE: Update cache
-        const { default: messageCache } = await import(
-          "../services/message-cache.service"
-        );
-        messageCache.updateMessage(eventConvId, messageId, { pinned: false });
+          return prev.map((msg) =>
+            msg.id === messageId ? { ...msg, pinned: false } : msg
+          );
+        });
+
+        // 🚀 PERFORMANCE: Update cache asynchronously without blocking
+        import("../services/message-cache.service")
+          .then(({ default: messageCache }) => {
+            messageCache.updateMessage(eventConvId, messageId, {
+              pinned: false,
+            });
+          })
+          .catch(() => {});
 
         // Trigger dropdown refresh
         setPinnedRefreshTrigger((prev) => prev + 1);

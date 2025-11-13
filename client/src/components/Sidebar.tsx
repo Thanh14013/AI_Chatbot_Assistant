@@ -1,4 +1,10 @@
-﻿import React, { useState, useEffect, useCallback, useRef } from "react";
+﻿import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { Layout, App } from "antd";
 import { useAuth, useDebounce } from "../hooks";
 import { getConversations } from "../services/chat.service";
@@ -12,6 +18,7 @@ import UserSection from "./UserSection";
 import { SearchBar } from "./SearchBar";
 import { SearchResultsList } from "./SearchResultsList";
 import { useNavigate } from "react-router-dom";
+import { rafThrottle } from "../utils/performance.util";
 import styles from "./Sidebar.module.css";
 
 const { Sider } = Layout;
@@ -260,24 +267,28 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   /**
-   * Handle drag over project
+   * Handle drag over project - throttled for performance
    */
-  const handleProjectDragOver = (projectId: string, isValid: boolean) => {
-    setDragDropState((prev) => {
-      // Validate: cannot drop on same project
-      const sourceProjectId = prev.draggedItem?.sourceProjectId;
-      const actualIsValid = sourceProjectId !== projectId;
+  const handleProjectDragOver = useMemo(
+    () =>
+      rafThrottle((projectId: string, isValid: boolean) => {
+        setDragDropState((prev) => {
+          // Validate: cannot drop on same project
+          const sourceProjectId = prev.draggedItem?.sourceProjectId;
+          const actualIsValid = sourceProjectId !== projectId;
 
-      return {
-        ...prev,
-        dropTarget: {
-          projectId,
-          isValid: actualIsValid,
-          type: "project",
-        },
-      };
-    });
-  };
+          return {
+            ...prev,
+            dropTarget: {
+              projectId,
+              isValid: actualIsValid,
+              type: "project",
+            },
+          };
+        });
+      }),
+    []
+  );
 
   /**
    * Handle drop on project
@@ -325,22 +336,25 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   };
   /**
-   * Handle drag over "All Conversations" section
+   * Handle drag over "All Conversations" section - throttled
    */
-  const handleAllConversationsDragOver = () => {
-    setDragDropState((prev) => {
-      const isValid = !!prev.draggedItem?.sourceProjectId;
-      return {
-        ...prev,
-        dropTarget: {
-          projectId: null,
-          // Only valid if coming from a project (has sourceProjectId and not null)
-          isValid,
-          type: "all-conversations",
-        },
-      };
-    });
-  };
+  const handleAllConversationsDragOver = useMemo(
+    () =>
+      rafThrottle(() => {
+        setDragDropState((prev) => {
+          const isValid = !!prev.draggedItem?.sourceProjectId;
+          return {
+            ...prev,
+            dropTarget: {
+              projectId: null,
+              isValid,
+              type: "all-conversations",
+            },
+          };
+        });
+      }),
+    []
+  );
 
   /**
    * Handle drop on "All Conversations" section (remove from project)

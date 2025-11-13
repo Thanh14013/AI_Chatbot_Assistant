@@ -3,7 +3,7 @@
  * Displays a project with its nested conversations
  */
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Button, Dropdown, App, Badge } from "antd";
 import type { MenuProps } from "antd";
 import {
@@ -18,6 +18,7 @@ import {
 import type { Project } from "../types/project.type";
 import type { ConversationListItem } from "../types/chat.type";
 import ConversationItem from "./ConversationItem";
+import { rafThrottle } from "../utils/performance.util";
 import styles from "./ProjectCard.module.css";
 
 interface ProjectCardProps {
@@ -105,20 +106,23 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     },
   ];
 
+  // Throttle drag over to reduce performance overhead during drag
+  const throttledDragOver = useMemo(
+    () =>
+      rafThrottle((projectId: string) => {
+        if (onDragOver) {
+          onDragOver(projectId, true);
+        }
+      }),
+    [onDragOver]
+  );
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    // Cannot read getData() during dragover due to browser security
-    // We rely on parent component (Sidebar) passing draggedConversationId
-    // to determine if this is a valid drop target
-
-    // For now, always call onDragOver and let parent decide validity
-    // Parent has access to dragDropState which knows sourceProjectId
-    if (onDragOver) {
-      // Parent will validate: sourceProjectId !== project.id
-      onDragOver(project.id, true); // Signal drag over, parent validates
-    }
+    // Use throttled version to reduce excessive re-renders
+    throttledDragOver(project.id);
   };
 
   const handleDrop = (e: React.DragEvent) => {
