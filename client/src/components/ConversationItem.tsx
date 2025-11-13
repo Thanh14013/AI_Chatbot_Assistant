@@ -237,9 +237,12 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
 
       // Note: Backend broadcasts conversation:deleted to OTHER tabs (excludes sender socket)
     } catch (error: any) {
-      message.error(
-        error?.response?.data?.message || "Failed to delete conversation"
-      );
+      const errorMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to delete conversation";
+      message.error(errorMsg);
+      console.error("Delete conversation error:", error);
     } finally {
       setIsDeleting(false);
       setShowDeleteModal(false);

@@ -55,3 +55,52 @@ export const clearTokens = (): void => {
 export const hasTokens = (): boolean => {
   return !!getAccessToken();
 };
+
+/**
+ * Decode JWT token payload without verification (for client-side inspection only)
+ * Returns null if token is invalid
+ */
+export const decodeToken = (token: string): any | null => {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+
+    const payload = parts[1];
+    const decoded = JSON.parse(atob(payload));
+    return decoded;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Check if access token is expired or about to expire
+ * Returns true if token is expired or will expire within bufferSeconds
+ */
+export const isTokenExpired = (
+  token: string | null,
+  bufferSeconds: number = 30
+): boolean => {
+  if (!token) return true;
+
+  const decoded = decodeToken(token);
+  if (!decoded || !decoded.exp) return true;
+
+  const expiryTime = decoded.exp * 1000; // Convert to milliseconds
+  const now = Date.now();
+  const bufferMs = bufferSeconds * 1000;
+
+  return expiryTime - now < bufferMs;
+};
+
+/**
+ * Get token expiry time as Date object
+ */
+export const getTokenExpiry = (token: string | null): Date | null => {
+  if (!token) return null;
+
+  const decoded = decodeToken(token);
+  if (!decoded || !decoded.exp) return null;
+
+  return new Date(decoded.exp * 1000);
+};

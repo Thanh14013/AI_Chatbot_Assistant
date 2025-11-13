@@ -320,15 +320,24 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
     try {
       if (modalMode === "create") {
         const newProject = await createProject(data);
+        if (!newProject || !newProject.id) {
+          throw new Error("Invalid response from server");
+        }
         message.success("Project created successfully");
       } else if (editingProject) {
         const updatedProject = await updateProject(editingProject.id, data);
+        if (!updatedProject || !updatedProject.id) {
+          throw new Error("Invalid response from server");
+        }
         message.success("Project updated successfully");
       }
       setModalVisible(false);
       // Note: loadProjects() is called here as fallback, but realtime should handle it
       await loadProjects();
     } catch (error: any) {
+      const errorMsg =
+        error?.response?.data?.message || error?.message || "Operation failed";
+      message.error(errorMsg);
       throw error;
     }
   };
@@ -355,6 +364,10 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
         project_id: selectedProjectId, // Mark as belonging to this project
       });
 
+      if (!newConversation || !newConversation.id) {
+        throw new Error("Invalid response from server");
+      }
+
       message.success("Conversation created successfully");
       setConversationModalVisible(false);
       setSelectedProjectId(null);
@@ -378,7 +391,12 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
 
       // Note: Backend broadcasts conversation:created to OTHER tabs (excludes sender socket)
     } catch (error: any) {
-      message.error(error.message || "Failed to create conversation");
+      const errorMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to create conversation";
+      message.error(errorMsg);
+      console.error("Conversation creation error:", error);
     }
   };
 

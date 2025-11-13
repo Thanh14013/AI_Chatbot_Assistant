@@ -7,6 +7,8 @@ import {
   getAccessToken,
   setAccessToken,
   clearTokens,
+  isTokenExpired,
+  getTokenExpiry,
 } from "../utils/token.util";
 import { websocketService } from "./websocket.service";
 import type { ApiErrorResponse, RefreshTokenResponse } from "../types";
@@ -76,6 +78,21 @@ axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = getAccessToken();
 
+    // Log token state in development
+    if (import.meta.env.DEV && token) {
+      const expired = isTokenExpired(token);
+      const expiry = getTokenExpiry(token);
+      console.log("[Axios Request] Token state:", {
+        url: config.url,
+        hasToken: !!token,
+        expired,
+        expiresAt: expiry?.toISOString(),
+        timeUntilExpiry: expiry
+          ? Math.round((expiry.getTime() - Date.now()) / 1000) + "s"
+          : "N/A",
+      });
+    }
+
     // Attach token to Authorization header if available
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -101,8 +118,6 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   // Success response - pass through
   (response) => {
-    // no debug logs
-
     return response;
   },
 
@@ -112,30 +127,58 @@ axiosInstance.interceptors.response.use(
       _retry?: boolean;
     };
 
+    // Log errors in development for debugging
+    if (import.meta.env.DEV) {
+      console.log("[Axios Interceptor] Error caught:", {
+        status: error.response?.status,
+        url: originalRequest?.url,
+        message: error.response?.data?.message,
+        retry: originalRequest?._retry,
+      });
+    }
+
     // Handle 401 Unauthorized errors
     if (
       error.response?.status === 401 &&
       originalRequest &&
       !originalRequest._retry
     ) {
+      const url = originalRequest.url || "";
+
       // If the 401 came from authentication endpoints (login/register),
       // don't attempt a token refresh or redirect — let the caller handle the error.
-      const url = originalRequest.url || "";
       if (url.includes("/auth/login") || url.includes("/auth/register")) {
+        if (import.meta.env.DEV) {
+          console.log("[Axios Interceptor] Auth endpoint failed, not retrying");
+        }
         return Promise.reject(error);
       }
 
       // If /auth/me fails, just reject without trying to refresh
       // This handles the case when user has no token yet
       if (url.includes("/auth/me")) {
+        if (import.meta.env.DEV) {
+          console.log("[Axios Interceptor] /auth/me failed, not retrying");
+        }
         return Promise.reject(error);
       }
 
       // If refresh endpoint fails, logout user (token expired or invalid)
-      if (originalRequest.url?.includes("/auth/refresh")) {
+      if (url.includes("/auth/refresh")) {
+        if (import.meta.env.DEV) {
+          console.log(
+            "[Axios Interceptor] Refresh endpoint failed, logging out"
+          );
+        }
         clearTokens();
         window.location.href = "/login";
         return Promise.reject(error);
+      }
+
+      if (import.meta.env.DEV) {
+        console.log(
+          "[Axios Interceptor] Access token expired, attempting refresh..."
+        );
       }
 
       // Mark request as retry to prevent infinite loops
@@ -143,6 +186,11 @@ axiosInstance.interceptors.response.use(
 
       // If already refreshing, queue this request
       if (isRefreshing) {
+        if (import.meta.env.DEV) {
+          console.log(
+            "[Axios Interceptor] Already refreshing, queueing request"
+          );
+        }
         return new Promise((resolve, reject) => {
           failedRequestsQueue.push({
             resolve: (token: string) => {
@@ -158,20 +206,57 @@ axiosInstance.interceptors.response.use(
         });
       }
 
-      // Start token refresh process. The server stores the refresh token in an HttpOnly cookie.
+      // Start token refresh process
       isRefreshing = true;
+
+      if (import.meta.env.DEV) {
+        console.log("[Axios Interceptor] Starting token refresh...");
+      }
+
       try {
-        // POST to refresh endpoint without body. Browser will send cookie automatically because
-        // axiosInstance was created with withCredentials: true. Use plain axios to avoid interceptor recursion.
-        // Use the same proxy path as axiosInstance baseURL to ensure consistency
-        const refreshUrl = "/api/auth/refresh";
+        // Use the same base URL as axiosInstance to ensure consistency
+        const baseURL = getBaseURL();
+        const refreshUrl = `${baseURL}/auth/refresh`;
+
+        if (import.meta.env.DEV) {
+          console.log("[Axios Interceptor] Refresh URL:", refreshUrl);
+        }
+
         const response = await axios.post<RefreshTokenResponse>(
           refreshUrl,
           {},
-          { withCredentials: true }
+          {
+            withCredentials: true,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
         );
 
+        if (import.meta.env.DEV) {
+          console.log("[Axios Interceptor] Refresh response:", response.data);
+        }
+
+        // Safely extract access token with validation
+        if (
+          !response.data ||
+          !response.data.data ||
+          !response.data.data.accessToken
+        ) {
+          console.error(
+            "[Axios Interceptor] Invalid refresh token response structure:",
+            response.data
+          );
+          throw new Error("Invalid refresh token response structure");
+        }
+
         const { accessToken } = response.data.data;
+
+        if (import.meta.env.DEV) {
+          console.log(
+            "[Axios Interceptor] New access token received, updating..."
+          );
+        }
 
         // Persist new access token locally
         setAccessToken(accessToken);
@@ -180,7 +265,7 @@ axiosInstance.interceptors.response.use(
         try {
           websocketService.updateToken();
         } catch {
-          // Non-fatal: websocket token update failed (log suppressed)
+          // Non-fatal: websocket token update failed
         }
 
         // Update Authorization header for the original request
@@ -191,9 +276,20 @@ axiosInstance.interceptors.response.use(
         // Resume queued requests
         processQueue(null, accessToken);
 
+        if (import.meta.env.DEV) {
+          console.log(
+            "[Axios Interceptor] Retrying original request with new token"
+          );
+        }
+
         // Retry original request
         return axiosInstance(originalRequest);
       } catch (refreshError) {
+        console.error(
+          "[Axios Interceptor] Token refresh failed:",
+          refreshError
+        );
+
         processQueue(refreshError, null);
 
         // Only clear tokens and redirect if it's a 401/403 (authentication failure)
