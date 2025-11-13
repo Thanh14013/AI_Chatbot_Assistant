@@ -1,23 +1,10 @@
-/**
- * Project Controller
- * Handles HTTP requests for project management
- */
 import { getProjectsByUserId, createProject, updateProject, deleteProject, getProjectConversations, moveConversationToProject, updateConversationOrders, } from "../services/project.service.js";
 import { broadcastToUser } from "../services/socket.service.js";
 import Conversation from "../models/conversation.model.js";
-/**
- * Helper function to get user ID from authenticated request
- */
 const getUserIdFromRequest = (req) => {
-    // Access token is decoded and stored in req.body.user by authJwt middleware
-    // Token payload structure: { id, name, email, type }
     const userId = req.body?.user?.id;
     return userId || null;
 };
-/**
- * Get all projects for authenticated user
- * GET /api/projects
- */
 export const getProjects = async (req, res) => {
     try {
         const userId = getUserIdFromRequest(req);
@@ -44,11 +31,6 @@ export const getProjects = async (req, res) => {
         });
     }
 };
-/**
- * Create a new project
- * POST /api/projects
- * Body: { name, description?, color?, icon? }
- */
 export const create = async (req, res) => {
     try {
         const userId = getUserIdFromRequest(req);
@@ -74,7 +56,6 @@ export const create = async (req, res) => {
             color: color || "#1890ff",
             icon: icon || null,
         });
-        // Broadcast project creation to all user's sockets (realtime), excluding sender
         const socketId = req.headers["x-socket-id"];
         broadcastToUser(userId, "project:created", project, socketId);
         res.status(201).json({
@@ -92,11 +73,6 @@ export const create = async (req, res) => {
         });
     }
 };
-/**
- * Update a project
- * PUT /api/projects/:id
- * Body: { name?, description?, color?, icon?, order? }
- */
 export const update = async (req, res) => {
     try {
         const userId = getUserIdFromRequest(req);
@@ -116,7 +92,6 @@ export const update = async (req, res) => {
             icon,
             order,
         });
-        // Broadcast project update to all user's sockets (realtime), excluding sender
         const socketId = req.headers["x-socket-id"];
         broadcastToUser(userId, "project:updated", project, socketId);
         res.json({
@@ -148,10 +123,6 @@ export const update = async (req, res) => {
         });
     }
 };
-/**
- * Delete a project (soft delete)
- * DELETE /api/projects/:id
- */
 export const remove = async (req, res) => {
     try {
         const userId = getUserIdFromRequest(req);
@@ -164,7 +135,6 @@ export const remove = async (req, res) => {
         }
         const { id } = req.params;
         const result = await deleteProject(id, userId);
-        // Broadcast project deletion to all user's sockets (realtime), excluding sender
         const socketId = req.headers["x-socket-id"];
         broadcastToUser(userId, "project:deleted", { projectId: id }, socketId);
         res.status(200).json({
@@ -195,10 +165,6 @@ export const remove = async (req, res) => {
         });
     }
 };
-/**
- * Get all conversations in a project
- * GET /api/projects/:id/conversations
- */
 export const getConversations = async (req, res) => {
     try {
         const userId = getUserIdFromRequest(req);
@@ -240,11 +206,6 @@ export const getConversations = async (req, res) => {
         });
     }
 };
-/**
- * Move a conversation to a project
- * PUT /api/conversations/:id/move
- * Body: { projectId: string | null }
- */
 export const moveConversation = async (req, res) => {
     try {
         const userId = getUserIdFromRequest(req);
@@ -257,14 +218,11 @@ export const moveConversation = async (req, res) => {
         }
         const { id } = req.params;
         const { projectId } = req.body;
-        // Get old project ID before moving (for WebSocket broadcast)
         const conversation = await Conversation.findByIdActive(id);
         const oldProjectId = conversation?.project_id || null;
         const result = await moveConversationToProject(id, projectId, userId);
-        // Broadcast conversation:moved event via WebSocket for multi-tab sync
         if (global.socketIO) {
             const senderSocketId = req.headers["x-socket-id"];
-            // Broadcast to all sockets except sender (to avoid duplication)
             if (senderSocketId) {
                 const senderSocket = global.socketIO.sockets.sockets.get(senderSocketId);
                 if (senderSocket) {
@@ -276,7 +234,6 @@ export const moveConversation = async (req, res) => {
                     });
                 }
                 else {
-                    // Socket not found, broadcast to all
                     global.socketIO.emit("conversation:moved", {
                         conversationId: id,
                         oldProjectId,
@@ -286,7 +243,6 @@ export const moveConversation = async (req, res) => {
                 }
             }
             else {
-                // No socket ID provided, broadcast to all
                 global.socketIO.emit("conversation:moved", {
                     conversationId: id,
                     oldProjectId,
@@ -323,11 +279,6 @@ export const moveConversation = async (req, res) => {
         });
     }
 };
-/**
- * Update conversation orders within a project
- * PUT /api/projects/:id/conversations/order
- * Body: { orders: Array<{ conversationId: string, order: number }> }
- */
 export const updateOrders = async (req, res) => {
     try {
         const userId = getUserIdFromRequest(req);

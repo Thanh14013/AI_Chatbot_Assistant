@@ -1,15 +1,6 @@
 import { DataTypes, Model, Op } from "sequelize";
 import sequelize from "../db/database.config.js";
-/**
- * Project Model Class
- * Represents a project that groups multiple conversations
- */
 class Project extends Model {
-    /**
-     * Find all active projects for a user
-     * @param userId - The user's ID
-     * @returns Promise with array of projects
-     */
     static async findByUserId(userId) {
         return Project.findAll({
             where: {
@@ -22,11 +13,6 @@ class Project extends Model {
             ],
         });
     }
-    /**
-     * Find a specific project by ID (only if not deleted)
-     * @param projectId - The project's ID
-     * @returns Promise with project or null
-     */
     static async findByIdActive(projectId) {
         return Project.findOne({
             where: {
@@ -35,11 +21,6 @@ class Project extends Model {
             },
         });
     }
-    /**
-     * Soft delete a project
-     * @param projectId - The project's ID
-     * @returns Promise with deleted project or null
-     */
     static async softDelete(projectId) {
         const project = await Project.findByPk(projectId);
         if (project) {
@@ -49,16 +30,11 @@ class Project extends Model {
         }
         return null;
     }
-    /**
-     * Update order for multiple projects
-     * @param updates - Array of {id, order} objects
-     */
     static async updateOrders(updates) {
         const promises = updates.map(({ id, order }) => Project.update({ order }, { where: { id } }));
         await Promise.all(promises);
     }
 }
-// Initialize Project model
 Project.init({
     id: {
         type: DataTypes.UUID,
@@ -118,19 +94,16 @@ Project.init({
     modelName: "Project",
     timestamps: true,
     paranoid: false,
-    underscored: true, // Use snake_case for timestamps (created_at, updated_at)
+    underscored: true,
     defaultScope: {
-        // Default scope automatically filters out deleted records
         where: {
             deleted_at: null,
         },
     },
     scopes: {
-        // Scope to include deleted records
         withDeleted: {
             where: {},
         },
-        // Scope to get only deleted records
         onlyDeleted: {
             where: {
                 deleted_at: {

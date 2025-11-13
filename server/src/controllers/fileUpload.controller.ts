@@ -54,7 +54,7 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024;
  * Generate presigned upload signature for client
  * POST /api/files/upload-signature
  */
-export const generateUploadSignature = async (req: Request, res: Response) => {
+export const generateUploadSignature = async (req: Request, res: Response): Promise<any> => {
   try {
     const { folder, filename, fileSize, fileType } = req.body;
     const userId = (req as any).user?.id;
@@ -108,7 +108,7 @@ export const generateUploadSignature = async (req: Request, res: Response) => {
  * Save file metadata after successful upload to Cloudinary
  * POST /api/files/metadata
  */
-export const saveFileMetadata = async (req: Request, res: Response) => {
+export const saveFileMetadata = async (req: Request, res: Response): Promise<any> => {
   try {
     const userId = (req as any).user?.id;
 
@@ -276,7 +276,7 @@ export const saveFileMetadata = async (req: Request, res: Response) => {
  * Get file by ID
  * GET /api/files/:id
  */
-export const getFileById = async (req: Request, res: Response) => {
+export const getFileById = async (req: Request, res: Response): Promise<any> => {
   try {
     const userId = (req as any).user?.id;
     const fileId = parseInt(req.params.id);
@@ -318,7 +318,7 @@ export const getFileById = async (req: Request, res: Response) => {
  * Get files for a conversation
  * GET /api/files/conversation/:conversationId
  */
-export const getConversationFiles = async (req: Request, res: Response) => {
+export const getConversationFiles = async (req: Request, res: Response): Promise<any> => {
   try {
     const userId = (req as any).user?.id;
     const conversationId = req.params.conversationId; // UUID string
@@ -363,7 +363,7 @@ export const getConversationFiles = async (req: Request, res: Response) => {
  * Delete file
  * DELETE /api/files/:id
  */
-export const deleteFile = async (req: Request, res: Response) => {
+export const deleteFile = async (req: Request, res: Response): Promise<any> => {
   try {
     const userId = (req as any).user?.id;
     const fileId = parseInt(req.params.id);
@@ -424,7 +424,7 @@ export const deleteFile = async (req: Request, res: Response) => {
  * Get user's upload statistics
  * GET /api/files/stats
  */
-export const getUserStats = async (req: Request, res: Response) => {
+export const getUserStats = async (req: Request, res: Response): Promise<any> => {
   try {
     const userId = (req as any).user?.id;
 

@@ -2,9 +2,6 @@ import { createConversation, getUserConversations, getConversationById, updateCo
 import User from "../models/user.model.js";
 import { validateAndNormalizeTags } from "../utils/tag.util.js";
 import { broadcastToUser } from "../services/socket.service.js";
-/**
- * Helper function to get user ID from authenticated request
- */
 const getUserIdFromRequest = async (req) => {
     const userEmail = req.body?.user?.email;
     if (!userEmail)
@@ -12,13 +9,8 @@ const getUserIdFromRequest = async (req) => {
     const user = await User.findByEmail(userEmail);
     return user ? user.id : null;
 };
-/**
- * Create a new conversation
- * POST /api/conversations
- */
 export const create = async (req, res) => {
     try {
-        // Get user ID from authenticated request
         const userId = await getUserIdFromRequest(req);
         if (!userId) {
             res.status(401).json({
@@ -27,9 +19,7 @@ export const create = async (req, res) => {
             });
             return;
         }
-        // Extract conversation data from request body
         const { title, model, context_window, tags, project_id } = req.body;
-        // Validate required fields
         if (!title || title.trim().length === 0) {
             res.status(400).json({
                 success: false,
@@ -37,7 +27,6 @@ export const create = async (req, res) => {
             });
             return;
         }
-        // Validate tags if provided
         let validatedTags = undefined;
         if (tags !== undefined) {
             const tagValidation = validateAndNormalizeTags(tags);
@@ -51,21 +40,17 @@ export const create = async (req, res) => {
             }
             validatedTags = tagValidation.normalizedTags;
         }
-        // Create conversation
         const conversationData = {
             user_id: userId,
             title: title.trim(),
             model: model || "gpt-5-nano",
             context_window: context_window || 10,
             tags: validatedTags || [],
-            ...(project_id && { project_id }), // Assign to project if provided
+            ...(project_id && { project_id }),
         };
         const conversation = await createConversation(conversationData);
-        // Broadcast conversation created event to user via WebSocket
-        // Exclude the sender's socket to prevent duplicate
         const socketId = req.headers["x-socket-id"];
         broadcastToUser(userId, "conversation:created", conversation, socketId);
-        // Send success response
         res.status(201).json({
             success: true,
             message: "Conversation created successfully",
@@ -73,7 +58,6 @@ export const create = async (req, res) => {
         });
     }
     catch (error) {
-        // Handle errors
         const errorMessage = error instanceof Error ? error.message : "Failed to create conversation";
         res.status(500).json({
             success: false,
@@ -82,14 +66,8 @@ export const create = async (req, res) => {
         });
     }
 };
-/**
- * Get all conversations for authenticated user
- * GET /api/conversations
- * Query params: page, limit, search
- */
 export const getAll = async (req, res) => {
     try {
-        // Get user ID from authenticated request
         const userId = await getUserIdFromRequest(req);
         if (!userId) {
             res.status(401).json({
@@ -98,17 +76,13 @@ export const getAll = async (req, res) => {
             });
             return;
         }
-        // Extract pagination params and search query
         let page = parseInt(req.query.page) || 1;
         let limit = parseInt(req.query.limit) || 20;
         const search = req.query.search;
-        // Validate and sanitize pagination parameters
-        page = Math.max(1, page); // Minimum page 1
-        limit = Math.max(1, Math.min(100, limit)); // Between 1-100
-        // Extract standalone filter (for filtering by project_id)
+        page = Math.max(1, page);
+        limit = Math.max(1, Math.min(100, limit));
         const standaloneParam = req.query.standalone;
         const standalone = standaloneParam === "true" ? true : standaloneParam === "false" ? false : undefined;
-        // Extract tag filtering params
         const tagsParam = req.query.tags;
         const tagMode = req.query.tagMode || "any";
         const tags = tagsParam
@@ -117,7 +91,6 @@ export const getAll = async (req, res) => {
                 .map((t) => t.trim())
                 .filter(Boolean)
             : undefined;
-        // Validate tag mode
         if (tagMode !== "any" && tagMode !== "all") {
             res.status(400).json({
                 success: false,
@@ -125,9 +98,7 @@ export const getAll = async (req, res) => {
             });
             return;
         }
-        // Get conversations with optional search and tag filtering
         const result = await getUserConversations(userId, page, limit, search, tags, tagMode, standalone);
-        // Send success response
         res.status(200).json({
             success: true,
             message: "Conversations retrieved successfully",
@@ -136,7 +107,6 @@ export const getAll = async (req, res) => {
         });
     }
     catch (error) {
-        // Handle errors
         const errorMessage = error instanceof Error ? error.message : "Failed to get conversations";
         res.status(500).json({
             success: false,
@@ -145,13 +115,8 @@ export const getAll = async (req, res) => {
         });
     }
 };
-/**
- * Get a specific conversation by ID
- * GET /api/conversations/:id
- */
 export const getOne = async (req, res) => {
     try {
-        // Get user ID from authenticated request
         const userId = await getUserIdFromRequest(req);
         if (!userId) {
             res.status(401).json({
@@ -160,7 +125,6 @@ export const getOne = async (req, res) => {
             });
             return;
         }
-        // Extract conversation ID from params
         const conversationId = req.params.id;
         if (!conversationId) {
             res.status(400).json({
@@ -169,9 +133,7 @@ export const getOne = async (req, res) => {
             });
             return;
         }
-        // Get conversation
         const conversation = await getConversationById(conversationId, userId);
-        // Send success response
         res.status(200).json({
             success: true,
             message: "Conversation retrieved successfully",
@@ -179,9 +141,7 @@ export const getOne = async (req, res) => {
         });
     }
     catch (error) {
-        // Handle errors
         const errorMessage = error instanceof Error ? error.message : "Failed to get conversation";
-        // Check for specific error types
         if (errorMessage.includes("not found")) {
             res.status(404).json({
                 success: false,
@@ -203,13 +163,8 @@ export const getOne = async (req, res) => {
         });
     }
 };
-/**
- * Update a conversation
- * PATCH /api/conversations/:id
- */
 export const update = async (req, res) => {
     try {
-        // Get user ID from authenticated request
         const userId = await getUserIdFromRequest(req);
         if (!userId) {
             res.status(401).json({
@@ -218,7 +173,6 @@ export const update = async (req, res) => {
             });
             return;
         }
-        // Extract conversation ID from params
         const conversationId = req.params.id;
         if (!conversationId) {
             res.status(400).json({
@@ -227,9 +181,7 @@ export const update = async (req, res) => {
             });
             return;
         }
-        // Extract update data from request body
         const { title, model, context_window, tags } = req.body;
-        // Validate at least one field to update
         if (title === undefined &&
             model === undefined &&
             context_window === undefined &&
@@ -240,7 +192,6 @@ export const update = async (req, res) => {
             });
             return;
         }
-        // Validate tags if provided
         let validatedTags = undefined;
         if (tags !== undefined) {
             const tagValidation = validateAndNormalizeTags(tags);
@@ -254,7 +205,6 @@ export const update = async (req, res) => {
             }
             validatedTags = tagValidation.normalizedTags;
         }
-        // Update conversation
         const updateData = {};
         if (title !== undefined)
             updateData.title = title.trim();
@@ -265,13 +215,11 @@ export const update = async (req, res) => {
         if (validatedTags !== undefined)
             updateData.tags = validatedTags;
         const conversation = await updateConversation(conversationId, userId, updateData);
-        // Broadcast conversation updated event to user via WebSocket, excluding sender
         const socketId = req.headers["x-socket-id"];
         broadcastToUser(userId, "conversation:updated", {
             conversationId,
             conversation,
         }, socketId);
-        // Send success response
         res.status(200).json({
             success: true,
             message: "Conversation updated successfully",
@@ -279,9 +227,7 @@ export const update = async (req, res) => {
         });
     }
     catch (error) {
-        // Handle errors
         const errorMessage = error instanceof Error ? error.message : "Failed to update conversation";
-        // Check for specific error types
         if (errorMessage.includes("not found")) {
             res.status(404).json({
                 success: false,
@@ -303,13 +249,8 @@ export const update = async (req, res) => {
         });
     }
 };
-/**
- * Delete a conversation (soft delete)
- * DELETE /api/conversations/:id
- */
 export const remove = async (req, res) => {
     try {
-        // Get user ID from authenticated request
         const userId = await getUserIdFromRequest(req);
         if (!userId) {
             res.status(401).json({
@@ -318,7 +259,6 @@ export const remove = async (req, res) => {
             });
             return;
         }
-        // Extract conversation ID from params
         const conversationId = req.params.id;
         if (!conversationId) {
             res.status(400).json({
@@ -327,24 +267,16 @@ export const remove = async (req, res) => {
             });
             return;
         }
-        // Delete conversation
         const result = await deleteConversation(conversationId, userId);
-        // Broadcast conversation deleted event to user via WebSocket
-        // Exclude the sender's socket to prevent duplicate
         const socketId = req.headers["x-socket-id"];
         broadcastToUser(userId, "conversation:deleted", {
             conversationId,
         }, socketId);
-        // After deletion, fetch refreshed conversation list for the user.
-        // Use page/limit from query params if provided so the client can
-        // control which page is returned after delete; default to 1/20.
         let page = parseInt(req.query.page) || 1;
         let limit = parseInt(req.query.limit) || 20;
-        // Validate and sanitize pagination parameters
-        page = Math.max(1, page); // Minimum page 1
-        limit = Math.max(1, Math.min(100, limit)); // Between 1-100
+        page = Math.max(1, page);
+        limit = Math.max(1, Math.min(100, limit));
         const conversationsResult = await getUserConversations(userId, page, limit);
-        // Send success response with refreshed list
         res.status(200).json({
             success: true,
             message: result.message,
@@ -353,9 +285,7 @@ export const remove = async (req, res) => {
         });
     }
     catch (error) {
-        // Handle errors
         const errorMessage = error instanceof Error ? error.message : "Failed to delete conversation";
-        // Check for specific error types
         if (errorMessage.includes("not found")) {
             res.status(404).json({
                 success: false,
@@ -377,13 +307,8 @@ export const remove = async (req, res) => {
         });
     }
 };
-/**
- * Generate a smart title for a conversation based on message content
- * POST /api/conversations/generate-title
- */
 export const generateTitle = async (req, res) => {
     try {
-        // Get user ID from authenticated request
         const userId = await getUserIdFromRequest(req);
         if (!userId) {
             res.status(401).json({
@@ -392,7 +317,6 @@ export const generateTitle = async (req, res) => {
             });
             return;
         }
-        // Extract message content from request body
         const { content } = req.body;
         if (!content || typeof content !== "string" || content.trim().length === 0) {
             res.status(400).json({
@@ -401,9 +325,7 @@ export const generateTitle = async (req, res) => {
             });
             return;
         }
-        // Generate title using the service
         const title = await generateConversationTitle(content.trim(), "");
-        // Send success response
         res.status(200).json({
             success: true,
             message: "Title generated successfully",
@@ -411,7 +333,6 @@ export const generateTitle = async (req, res) => {
         });
     }
     catch (error) {
-        // Handle errors
         const errorMessage = error instanceof Error ? error.message : "Failed to generate title";
         res.status(500).json({
             success: false,
@@ -420,13 +341,8 @@ export const generateTitle = async (req, res) => {
         });
     }
 };
-/**
- * Get popular tags for authenticated user
- * GET /api/conversations/tags/popular
- */
 export const getPopularTagsController = async (req, res) => {
     try {
-        // Get user ID from authenticated request
         const userId = await getUserIdFromRequest(req);
         if (!userId) {
             res.status(401).json({
@@ -435,9 +351,7 @@ export const getPopularTagsController = async (req, res) => {
             });
             return;
         }
-        // Get popular tags
         const tags = await getPopularTags(userId);
-        // Send success response
         res.status(200).json({
             success: true,
             message: "Popular tags retrieved successfully",
@@ -445,7 +359,6 @@ export const getPopularTagsController = async (req, res) => {
         });
     }
     catch (error) {
-        // Handle errors
         const errorMessage = error instanceof Error ? error.message : "Failed to get popular tags";
         res.status(500).json({
             success: false,

@@ -1,12 +1,9 @@
 import validator from "validator";
-// Small helper regexes and limits
 const NAME_REGEX = /^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂẠẢẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂưăạảấầẩẫậắằẳẵặẹẻẽềềểỄỆỈỊỌỎỐỒỔỖỘỚỜỞỠỢỤỦỨỪễệỉịọỏốồổỗộớờởỡợụủứừỬỮỰỲỴÝỶỸửữựỳỵýỷỹ\s]+$/;
 const PASSWORD_MIN = 6;
 const PASSWORD_MAX = 100;
 const EMAIL_MAX = 100;
-// Return normalized and validated register input or throw Error
 export function validateRegister(name, email, password) {
-    // name
     if (!name || typeof name !== "string")
         throw new Error("Name is required");
     const normalizedName = name.trim().replace(/\s+/g, " ");
@@ -16,7 +13,6 @@ export function validateRegister(name, email, password) {
         throw new Error("Name must not exceed 50 characters");
     if (!NAME_REGEX.test(normalizedName))
         throw new Error("Name can only contain letters and spaces");
-    // email
     if (!email || typeof email !== "string")
         throw new Error("Email is required");
     const normalizedEmail = email.toLowerCase().trim();
@@ -24,7 +20,6 @@ export function validateRegister(name, email, password) {
         throw new Error("Invalid email format");
     if (normalizedEmail.length > EMAIL_MAX)
         throw new Error(`Email must not exceed ${EMAIL_MAX} characters`);
-    // password
     if (!password || typeof password !== "string")
         throw new Error("Password is required");
     if (password.length < PASSWORD_MIN)

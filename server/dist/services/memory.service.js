@@ -1,35 +1,14 @@
-/**
- * Long Term Memory (LTM) Service
- *
- * This service handles all Long Term Memory operations including:
- * - Redis operations for user profiles (fast facts storage)
- * - PostgreSQL operations for memory events and conversation summaries
- * - Memory extraction using Meta-LLM
- * - Context building for enhanced prompts
- * - Smart suggestion generation
- *
- * Architecture:
- * - Redis: Stores UserProfile (facts) with 7-day TTL
- * - PostgreSQL: Stores MemoryEvents and ConversationSummary for long-term context
- * - Background processing: Memory analysis runs after sending response (non-blocking)
- */
 import redisClient from "../config/redis.config.js";
 import sequelize from "../db/database.config.js";
 import { getChatCompletion } from "./openai.service.js";
 import { generateEmbedding } from "./embedding.service.js";
-// ==================== CONFIGURATION ====================
 const LTM_CONFIG = {
-    REDIS_TTL: parseInt(process.env.LTM_REDIS_TTL || "604800"), // 7 days
+    REDIS_TTL: parseInt(process.env.LTM_REDIS_TTL || "604800"),
     META_MODEL: process.env.LTM_META_MODEL || "gpt-4o-mini",
     MAX_EVENTS: parseInt(process.env.LTM_MAX_EVENTS || "100"),
     BACKGROUND_DELAY: parseInt(process.env.LTM_BACKGROUND_DELAY || "2000"),
-    ENABLED: process.env.LTM_ENABLED !== "false", // Enabled by default
+    ENABLED: process.env.LTM_ENABLED !== "false",
 };
-// ==================== REDIS OPERATIONS (USER PROFILE) ====================
-/**
- * Get user profile from Redis
- * Returns null if profile doesn't exist
- */
 export async function getUserProfile(userId) {
     try {
         if (!LTM_CONFIG.ENABLED)
@@ -45,15 +24,10 @@ export async function getUserProfile(userId) {
         return null;
     }
 }
-/**
- * Update user profile in Redis
- * Merges new facts with existing profile (deep merge)
- */
 export async function updateUserProfile(userId, facts) {
     try {
         if (!LTM_CONFIG.ENABLED)
             return;
-        // Get current profile or create new one
         const current = (await getUserProfile(userId)) || {
             user_id: userId,
             facts: {
@@ -64,7 +38,6 @@ export async function updateUserProfile(userId, facts) {
             updated_at: new Date().toISOString(),
             version: 0,
         };
-        // Deep merge facts
         current.facts = {
             personal: {
                 ...current.facts.personal,
@@ -73,7 +46,6 @@ export async function updateUserProfile(userId, facts) {
             preferences: {
                 ...current.facts.preferences,
                 ...facts.preferences,
-                // Merge array fields (deduplicate)
                 languages: mergeTags(current.facts.preferences?.languages, facts.preferences?.languages),
                 topics: mergeTags(current.facts.preferences?.topics, facts.preferences?.topics),
                 frameworks: mergeTags(current.facts.preferences?.frameworks, facts.preferences?.frameworks),
@@ -81,28 +53,21 @@ export async function updateUserProfile(userId, facts) {
             technical_context: {
                 ...current.facts.technical_context,
                 ...facts.technical_context,
-                // Merge array fields (deduplicate)
                 current_projects: mergeTags(current.facts.technical_context?.current_projects, facts.technical_context?.current_projects),
                 frameworks: mergeTags(current.facts.technical_context?.frameworks, facts.technical_context?.frameworks),
                 challenges: mergeTags(current.facts.technical_context?.challenges, facts.technical_context?.challenges),
                 goals: mergeTags(current.facts.technical_context?.goals, facts.technical_context?.goals),
-                recent_technologies: mergeTags(current.facts.technical_context?.recent_technologies, facts.technical_context?.recent_technologies, { maxLength: 10 } // Keep only 10 most recent
-                ),
+                recent_technologies: mergeTags(current.facts.technical_context?.recent_technologies, facts.technical_context?.recent_technologies, { maxLength: 10 }),
             },
         };
-        // Update metadata
         current.updated_at = new Date().toISOString();
         current.version += 1;
-        // Save to Redis with TTL
         await redisClient.set(`user:${userId}:profile`, JSON.stringify(current), "EX", LTM_CONFIG.REDIS_TTL);
     }
     catch (error) {
         throw error;
     }
 }
-/**
- * Clear user profile from Redis
- */
 export async function clearUserProfile(userId) {
     try {
         await redisClient.del(`user:${userId}:profile`);
@@ -111,24 +76,17 @@ export async function clearUserProfile(userId) {
         throw error;
     }
 }
-// ==================== POSTGRESQL OPERATIONS (MEMORY EVENTS) ====================
-/**
- * Create a new memory event
- */
 export async function createUserEvent(userId, conversationId, event) {
     try {
         if (!LTM_CONFIG.ENABLED)
             return;
-        // Generate embedding for semantic search
         let embeddingStr = null;
         try {
             const embeddingVector = await generateEmbedding(event.summary);
             embeddingStr = JSON.stringify(embeddingVector);
         }
         catch (err) {
-            // Embedding generation failed, continue without it
         }
-        // Insert event into database
         await sequelize.query(`
       INSERT INTO user_memory_events (
         user_id, conversation_id, event_type, summary, 
@@ -155,15 +113,10 @@ export async function createUserEvent(userId, conversationId, event) {
         throw error;
     }
 }
-/**
- * Get relevant events for current context
- * Uses semantic search if embeddings available, otherwise falls back to keyword search
- */
 export async function getRelevantEvents(userId, currentMessage, limit = 5) {
     try {
         if (!LTM_CONFIG.ENABLED)
             return [];
-        // Try semantic search first
         try {
             const embedding = await generateEmbedding(currentMessage);
             const embeddingStr = JSON.stringify(embedding);
@@ -182,7 +135,6 @@ export async function getRelevantEvents(userId, currentMessage, limit = 5) {
       `, {
                 replacements: { userId, embedding: embeddingStr, limit },
             });
-            // Update access tracking
             const eventIds = events.map((e) => e.id);
             if (eventIds.length > 0) {
                 await sequelize.query(`
@@ -196,7 +148,6 @@ export async function getRelevantEvents(userId, currentMessage, limit = 5) {
             return events;
         }
         catch (embeddingError) {
-            // Fallback to keyword search
             const keywords = extractKeywords(currentMessage);
             const [events] = await sequelize.query(`
         SELECT 
@@ -217,14 +168,10 @@ export async function getRelevantEvents(userId, currentMessage, limit = 5) {
         return [];
     }
 }
-/**
- * Get all events for a user (paginated)
- */
 export async function getUserEvents(userId, limit = 50, offset = 0) {
     try {
         if (!LTM_CONFIG.ENABLED)
             return { events: [], total: 0 };
-        // Get total count
         const [countResult] = await sequelize.query(`
       SELECT COUNT(*) as total
       FROM user_memory_events
@@ -233,7 +180,6 @@ export async function getUserEvents(userId, limit = 50, offset = 0) {
             replacements: { userId },
         });
         const total = countResult[0].total;
-        // Get events
         const [events] = await sequelize.query(`
       SELECT 
         id, user_id, conversation_id, event_type, summary, content, 
@@ -251,9 +197,6 @@ export async function getUserEvents(userId, limit = 50, offset = 0) {
         return { events: [], total: 0 };
     }
 }
-/**
- * Delete old events to maintain limit
- */
 export async function pruneUserEvents(userId) {
     try {
         if (!LTM_CONFIG.ENABLED)
@@ -276,15 +219,10 @@ export async function pruneUserEvents(userId) {
         return 0;
     }
 }
-// ==================== POSTGRESQL OPERATIONS (CONVERSATION SUMMARY) ====================
-/**
- * Update or create conversation summary
- */
 export async function updateConversationSummary(conversationId, summary) {
     try {
         if (!LTM_CONFIG.ENABLED)
             return;
-        // Get conversation and user_id
         const [conversations] = await sequelize.query(`
       SELECT user_id FROM conversations WHERE id = :conversationId
     `, {
@@ -294,14 +232,12 @@ export async function updateConversationSummary(conversationId, summary) {
             throw new Error(`Conversation ${conversationId} not found`);
         }
         const userId = conversations[0].user_id;
-        // Get message count
         const [messageCount] = await sequelize.query(`
       SELECT COUNT(*) as count FROM messages WHERE conversation_id = :conversationId
     `, {
             replacements: { conversationId },
         });
         const count = messageCount[0].count;
-        // Upsert summary
         await sequelize.query(`
       INSERT INTO user_conversation_summary (
         user_id, conversation_id, title, summary, 
@@ -338,9 +274,6 @@ export async function updateConversationSummary(conversationId, summary) {
         throw error;
     }
 }
-/**
- * Get recent conversation summaries for a user
- */
 export async function getRecentConversationSummaries(userId, limit = 5) {
     try {
         if (!LTM_CONFIG.ENABLED)
@@ -366,10 +299,6 @@ export async function getRecentConversationSummaries(userId, limit = 5) {
         return [];
     }
 }
-// ==================== HELPER FUNCTIONS ====================
-/**
- * Merge tag arrays (unique values, case-insensitive)
- */
 function mergeTags(existing, newTags, options = {}) {
     const { maxLength = 50, deduplicate = true, caseSensitive = false } = options;
     if (!newTags || newTags.length === 0)
@@ -382,7 +311,6 @@ function mergeTags(existing, newTags, options = {}) {
             combined = Array.from(new Set(combined));
         }
         else {
-            // Case-insensitive deduplication
             const seen = new Set();
             combined = combined.filter((item) => {
                 const lower = item.toLowerCase();
@@ -395,19 +323,13 @@ function mergeTags(existing, newTags, options = {}) {
     }
     return combined.slice(0, maxLength);
 }
-/**
- * Extract keywords from text
- * Simple implementation - can be improved with NLP
- */
 export function extractKeywords(text) {
     if (!text)
         return [];
-    // Convert to lowercase and split by non-word characters
     const words = text
         .toLowerCase()
         .split(/\W+/)
         .filter((word) => word.length > 3);
-    // Common stop words to exclude
     const stopWords = new Set([
         "this",
         "that",
@@ -427,39 +349,22 @@ export function extractKeywords(text) {
         "these",
         "those",
     ]);
-    // Filter and deduplicate
     const keywords = Array.from(new Set(words.filter((word) => !stopWords.has(word)))).slice(0, 10);
     return keywords;
 }
-/**
- * Check if LTM is enabled
- */
 export function isLTMEnabled() {
     return LTM_CONFIG.ENABLED;
 }
-/**
- * Get LTM configuration
- */
 export function getLTMConfig() {
     return { ...LTM_CONFIG };
 }
-// ==================== META-LLM MEMORY EXTRACTION ====================
-/**
- * Extract memory from conversation using Meta-LLM
- * This function analyzes user-assistant message pairs to extract:
- * - Facts about the user
- * - Important events
- * - Conversation summary
- */
 export async function extractMemoryFromConversation(params) {
-    const { userId, conversationId, userMessage, assistantMessage, currentProfile } = params;
+    const { userMessage, assistantMessage, currentProfile } = params;
     try {
         if (!LTM_CONFIG.ENABLED) {
             return { facts: {}, events: [], conversation_summary: null };
         }
-        // Build Meta-LLM prompt
         const metaPrompt = buildMemoryExtractionPrompt(userMessage, assistantMessage, currentProfile);
-        // Call OpenAI to analyze
         const response = await getChatCompletion({
             messages: [
                 { role: "system", content: metaPrompt },
@@ -469,13 +374,11 @@ export async function extractMemoryFromConversation(params) {
                 },
             ],
             model: LTM_CONFIG.META_MODEL,
-            temperature: 0.3, // Low temperature for consistent extraction
+            temperature: 0.3,
             max_completion_tokens: 1500,
         });
-        // Parse JSON response
         let analysis;
         try {
-            // Try to extract JSON from markdown code blocks if present
             let content = response.content.trim();
             if (content.startsWith("```json")) {
                 content = content.replace(/```json\n?/g, "").replace(/```\n?/g, "");
@@ -494,10 +397,7 @@ export async function extractMemoryFromConversation(params) {
         return { facts: {}, events: [], conversation_summary: null };
     }
 }
-/**
- * Build Meta-LLM prompt for memory extraction
- */
-function buildMemoryExtractionPrompt(userMessage, assistantMessage, currentProfile) {
+function buildMemoryExtractionPrompt(_userMessage, _assistantMessage, currentProfile) {
     const existingFacts = currentProfile?.facts || {};
     return `You are a Memory Extraction AI. Analyze conversations and extract:
 1. **Facts** - Stable information about the user (name, location, occupation, preferences)
@@ -620,30 +520,22 @@ Output:
 
 Analyze the conversation and output JSON:`;
 }
-// ==================== CONTEXT BUILDING ====================
-/**
- * Build memory-enhanced system prompt
- * Injects user profile and relevant events into system prompt
- */
 export async function buildMemoryEnhancedPrompt(userId, currentMessage, baseSystemPrompt, options = {}) {
     try {
         if (!LTM_CONFIG.ENABLED)
             return baseSystemPrompt;
         const { includeProfile = true, includeEvents = true, maxEvents = 5, minImportanceScore = 3, } = options;
         let enhancedPrompt = baseSystemPrompt + "\n\n";
-        // Get memory context
         const context = await getMemoryContext(userId, currentMessage, {
             includeProfile,
             includeEvents,
             maxEvents,
             minImportanceScore,
         });
-        // Add user profile section
         if (includeProfile && context.profile && context.profile.facts) {
             const facts = context.profile.facts;
             let hasPersonalInfo = false;
             enhancedPrompt += "## About the User:\n";
-            // Personal information
             if (facts.personal) {
                 const personal = facts.personal;
                 if (personal.name) {
@@ -663,7 +555,6 @@ export async function buildMemoryEnhancedPrompt(userId, currentMessage, baseSyst
                     hasPersonalInfo = true;
                 }
             }
-            // Preferences
             if (facts.preferences) {
                 const prefs = facts.preferences;
                 if (prefs.languages && prefs.languages.length > 0) {
@@ -679,7 +570,6 @@ export async function buildMemoryEnhancedPrompt(userId, currentMessage, baseSyst
                     hasPersonalInfo = true;
                 }
             }
-            // Technical context
             if (facts.technical_context) {
                 const tech = facts.technical_context;
                 if (tech.current_projects && tech.current_projects.length > 0) {
@@ -696,14 +586,12 @@ export async function buildMemoryEnhancedPrompt(userId, currentMessage, baseSyst
                 }
             }
             if (!hasPersonalInfo) {
-                // Remove the "About the User" section if no info
                 enhancedPrompt = enhancedPrompt.replace("## About the User:\n", "");
             }
             else {
                 enhancedPrompt += "\n";
             }
         }
-        // Add relevant past events
         if (includeEvents && context.relevantEvents && context.relevantEvents.length > 0) {
             enhancedPrompt += "## Relevant Past Interactions:\n";
             context.relevantEvents.forEach((event, idx) => {
@@ -714,7 +602,6 @@ export async function buildMemoryEnhancedPrompt(userId, currentMessage, baseSyst
             });
             enhancedPrompt += "\n";
         }
-        // Add instructions
         enhancedPrompt += "## Instructions:\n";
         enhancedPrompt += "- Use the user context above to personalize your responses\n";
         enhancedPrompt += "- Reference past interactions when relevant\n";
@@ -724,12 +611,9 @@ export async function buildMemoryEnhancedPrompt(userId, currentMessage, baseSyst
         return enhancedPrompt;
     }
     catch (error) {
-        return baseSystemPrompt; // Fallback to base prompt
+        return baseSystemPrompt;
     }
 }
-/**
- * Get memory context (profile + events)
- */
 export async function getMemoryContext(userId, currentMessage, options = {}) {
     const { includeProfile = true, includeEvents = true, maxEvents = 5, minImportanceScore = 3, } = options;
     const context = {
@@ -738,14 +622,11 @@ export async function getMemoryContext(userId, currentMessage, options = {}) {
         conversationSummaries: [],
     };
     try {
-        // Get user profile
         if (includeProfile) {
             context.profile = await getUserProfile(userId);
         }
-        // Get relevant events
         if (includeEvents) {
             const allEvents = await getRelevantEvents(userId, currentMessage, maxEvents * 2);
-            // Filter by importance score
             context.relevantEvents = allEvents
                 .filter((e) => e.importance_score >= minImportanceScore)
                 .slice(0, maxEvents);
@@ -756,20 +637,14 @@ export async function getMemoryContext(userId, currentMessage, options = {}) {
         return context;
     }
 }
-// ==================== SUGGESTION GENERATION ====================
-/**
- * Generate smart chat suggestions based on user history
- */
 export async function generateChatSuggestions(userId) {
     try {
         if (!LTM_CONFIG.ENABLED)
             return [];
-        // Get recent conversation summaries
         const summaries = await getRecentConversationSummaries(userId, 5);
         if (!summaries || summaries.length === 0) {
             return [];
         }
-        // Build prompt for suggestion generation
         const suggestionsPrompt = `Based on the user's recent conversations, suggest 3 relevant follow-up questions or topics.
 
 Recent conversations:
@@ -795,7 +670,6 @@ Output as JSON array only (no markdown):
             temperature: 0.7,
             max_completion_tokens: 300,
         });
-        // Parse JSON response
         let content = response.content.trim();
         if (content.startsWith("```json")) {
             content = content.replace(/```json\n?/g, "").replace(/```\n?/g, "");
@@ -810,22 +684,14 @@ Output as JSON array only (no markdown):
         return [];
     }
 }
-// ==================== BACKGROUND PROCESSING ====================
-/**
- * Analyze and update memory (background process)
- * This should be called AFTER sending response to user (non-blocking)
- */
 export async function analyzeAndUpdateMemory(userId, conversationId, userMessage, assistantMessage) {
     try {
         if (!LTM_CONFIG.ENABLED)
             return;
-        // Optional delay before processing
         if (LTM_CONFIG.BACKGROUND_DELAY > 0) {
             await new Promise((resolve) => setTimeout(resolve, LTM_CONFIG.BACKGROUND_DELAY));
         }
-        // Get current profile
         const currentProfile = await getUserProfile(userId);
-        // Extract memory using Meta-LLM
         const analysis = await extractMemoryFromConversation({
             userId,
             conversationId,
@@ -833,7 +699,6 @@ export async function analyzeAndUpdateMemory(userId, conversationId, userMessage
             assistantMessage,
             currentProfile,
         });
-        // Update profile if new facts
         if (analysis.facts && Object.keys(analysis.facts).length > 0) {
             const hasFactsToUpdate = (analysis.facts.personal && Object.keys(analysis.facts.personal).length > 0) ||
                 (analysis.facts.preferences && Object.keys(analysis.facts.preferences).length > 0) ||
@@ -843,23 +708,19 @@ export async function analyzeAndUpdateMemory(userId, conversationId, userMessage
                 await updateUserProfile(userId, analysis.facts);
             }
         }
-        // Create events
         if (analysis.events && analysis.events.length > 0) {
             for (const event of analysis.events) {
                 await createUserEvent(userId, conversationId, event);
             }
         }
-        // Update conversation summary
         if (analysis.conversation_summary) {
             await updateConversationSummary(conversationId, {
                 conversation_id: conversationId,
                 ...analysis.conversation_summary,
             });
         }
-        // Prune old events if needed
         await pruneUserEvents(userId);
     }
     catch (error) {
-        // Don't throw - this is background processing
     }
 }

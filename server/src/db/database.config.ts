@@ -17,10 +17,20 @@ const sequelize = new Sequelize(DB_URL, {
   logging: false, // Disable SQL query logging (set to console.log to see queries)
   pool: {
     // Connection pool configuration for production
-    max: 5, // Maximum number of connections
-    min: 0, // Minimum number of connections
+    max: 20, // Maximum number of connections (increased from 5)
+    min: 5, // Minimum number of connections (increased from 0)
     acquire: 30000, // Maximum time (ms) to try getting connection
     idle: 10000, // Maximum time (ms) a connection can be idle before being released
+  },
+  dialectOptions: {
+    // SSL/TLS configuration for cloud databases (required for Render, Heroku, AWS RDS, etc.)
+    ssl:
+      process.env.DB_SSL === "true"
+        ? {
+            require: true,
+            rejectUnauthorized: false,
+          }
+        : false,
   },
 });
 

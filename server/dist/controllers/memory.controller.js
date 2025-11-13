@@ -1,23 +1,7 @@
-/**
- * Memory Controller
- * Handles API endpoints for Long Term Memory operations
- *
- * Endpoints:
- * - GET /api/memory/profile - Get user profile
- * - GET /api/memory/events - Get memory events
- * - GET /api/memory/suggestions - Get chat suggestions
- * - DELETE /api/memory/clear - Clear user memory
- * - GET /api/memory/stats - Get memory statistics
- */
 import { getUserProfile, getUserEvents, generateChatSuggestions, getRecentConversationSummaries, clearUserProfile, isLTMEnabled, getLTMConfig, } from "../services/memory.service.js";
 import sequelize from "../db/database.config.js";
-/**
- * GET /api/memory/profile
- * Get user profile with facts
- */
 export const getProfile = async (req, res) => {
     try {
-        // Check if LTM is enabled
         if (!isLTMEnabled()) {
             res.status(200).json({
                 success: true,
@@ -26,7 +10,6 @@ export const getProfile = async (req, res) => {
             });
             return;
         }
-        // Extract user ID from JWT payload (set by auth middleware)
         const user = req.user;
         const userId = user?.id;
         if (!userId) {
@@ -37,11 +20,8 @@ export const getProfile = async (req, res) => {
             return;
         }
         const profile = await getUserProfile(userId);
-        // Transform profile data to match client expectations
         if (profile) {
-            // Build factsByCategory from the profile facts structure
             const factsByCategory = {};
-            // Personal facts
             if (profile.facts.personal) {
                 const personalFacts = [];
                 const p = profile.facts.personal;
@@ -61,7 +41,6 @@ export const getProfile = async (req, res) => {
                     factsByCategory["Personal"] = personalFacts;
                 }
             }
-            // Preferences facts
             if (profile.facts.preferences) {
                 const prefFacts = [];
                 const pref = profile.facts.preferences;
@@ -84,7 +63,6 @@ export const getProfile = async (req, res) => {
                     factsByCategory["Preferences"] = prefFacts;
                 }
             }
-            // Technical context facts
             if (profile.facts.technical_context) {
                 const techFacts = [];
                 const tech = profile.facts.technical_context;
@@ -107,7 +85,6 @@ export const getProfile = async (req, res) => {
                     factsByCategory["Technical Context"] = techFacts;
                 }
             }
-            // Get recent topics from recent conversations
             const recentConversations = await getRecentConversationSummaries(userId, 5);
             const recentTopics = new Set();
             recentConversations.forEach((conv) => {
@@ -118,7 +95,6 @@ export const getProfile = async (req, res) => {
                     conv.technical_topics.forEach((topic) => recentTopics.add(topic));
                 }
             });
-            // Return transformed data
             res.status(200).json({
                 success: true,
                 data: {
@@ -129,7 +105,6 @@ export const getProfile = async (req, res) => {
             });
         }
         else {
-            // No profile found
             res.status(200).json({
                 success: true,
                 data: null,
@@ -143,14 +118,8 @@ export const getProfile = async (req, res) => {
         });
     }
 };
-/**
- * GET /api/memory/events
- * Get memory events with pagination
- * Query params: page (default: 1), limit (default: 50)
- */
 export const getEvents = async (req, res) => {
     try {
-        // Check if LTM is enabled
         if (!isLTMEnabled()) {
             res.status(200).json({
                 success: true,
@@ -162,7 +131,6 @@ export const getEvents = async (req, res) => {
             });
             return;
         }
-        // Extract user ID from JWT payload (set by auth middleware)
         const user = req.user;
         const userId = user?.id;
         if (!userId) {
@@ -173,7 +141,7 @@ export const getEvents = async (req, res) => {
             return;
         }
         const page = parseInt(req.query.page) || 1;
-        const limit = Math.min(parseInt(req.query.limit) || 50, 100); // Max 100
+        const limit = Math.min(parseInt(req.query.limit) || 50, 100);
         const offset = (page - 1) * limit;
         const { events, total } = await getUserEvents(userId, limit, offset);
         res.status(200).json({
@@ -193,13 +161,8 @@ export const getEvents = async (req, res) => {
         });
     }
 };
-/**
- * GET /api/memory/suggestions
- * Get smart chat suggestions based on user history
- */
 export const getSuggestions = async (req, res) => {
     try {
-        // Check if LTM is enabled
         if (!isLTMEnabled()) {
             res.status(200).json({
                 success: true,
@@ -212,7 +175,6 @@ export const getSuggestions = async (req, res) => {
             });
             return;
         }
-        // Extract user ID from JWT payload (set by auth middleware)
         const user = req.user;
         const userId = user?.id;
         if (!userId) {
@@ -222,12 +184,10 @@ export const getSuggestions = async (req, res) => {
             });
             return;
         }
-        // Get suggestions and recent conversations in parallel
         const [suggestions, recentConversations] = await Promise.all([
             generateChatSuggestions(userId),
             getRecentConversationSummaries(userId, 5),
         ]);
-        // Extract recent topics
         const recentTopics = new Set();
         recentConversations.forEach((conv) => {
             if (conv.key_topics) {
@@ -258,13 +218,8 @@ export const getSuggestions = async (req, res) => {
         });
     }
 };
-/**
- * DELETE /api/memory/clear
- * Clear all user memory (profile, events, summaries)
- */
 export const clearMemory = async (req, res) => {
     try {
-        // Extract user ID from JWT payload (set by auth middleware)
         const user = req.user;
         const userId = user?.id;
         if (!userId) {
@@ -274,18 +229,14 @@ export const clearMemory = async (req, res) => {
             });
             return;
         }
-        // Delete in parallel
         const [eventsResult, summariesResult] = await Promise.all([
-            // Delete events
             sequelize.query(`DELETE FROM user_memory_events WHERE user_id = :userId`, {
                 replacements: { userId },
             }),
-            // Delete summaries
             sequelize.query(`DELETE FROM user_conversation_summary WHERE user_id = :userId`, {
                 replacements: { userId },
             }),
         ]);
-        // Clear Redis profile
         await clearUserProfile(userId);
         const eventsDeleted = eventsResult[0].rowCount || 0;
         const summariesDeleted = summariesResult[0].rowCount || 0;
@@ -306,10 +257,6 @@ export const clearMemory = async (req, res) => {
         });
     }
 };
-/**
- * GET /api/memory/stats
- * Get memory statistics for the user
- */
 export const getStats = async (req, res) => {
     try {
         if (!isLTMEnabled()) {
@@ -320,7 +267,6 @@ export const getStats = async (req, res) => {
             });
             return;
         }
-        // Extract user ID from JWT payload (set by auth middleware)
         const user = req.user;
         const userId = user?.id;
         if (!userId) {
@@ -330,7 +276,6 @@ export const getStats = async (req, res) => {
             });
             return;
         }
-        // Get statistics
         const [profile, eventsStats, summariesStats, topicStats, eventTypeStats] = await Promise.all([
             getUserProfile(userId),
             sequelize.query(`
@@ -365,15 +310,12 @@ export const getStats = async (req, res) => {
         const summariesData = summariesStats[0][0];
         const topicsData = topicStats[0];
         const eventTypesData = eventTypeStats[0];
-        // Count total facts from profile
         let totalFacts = 0;
         if (profile?.facts) {
             const { personal, preferences, technical_context } = profile.facts;
-            // Count personal facts
             if (personal) {
                 totalFacts += Object.values(personal).filter((v) => v !== undefined && v !== null).length;
             }
-            // Count preference facts
             if (preferences) {
                 const prefArrays = [preferences.languages, preferences.topics, preferences.frameworks];
                 totalFacts += prefArrays.reduce((sum, arr) => sum + (arr?.length || 0), 0);
@@ -382,7 +324,6 @@ export const getStats = async (req, res) => {
                 if (preferences.learning_style)
                     totalFacts++;
             }
-            // Count technical context facts
             if (technical_context) {
                 const techArrays = [
                     technical_context.current_projects,
@@ -415,10 +356,6 @@ export const getStats = async (req, res) => {
         });
     }
 };
-/**
- * GET /api/memory/config
- * Get LTM configuration (for debugging)
- */
 export const getConfig = async (req, res) => {
     try {
         const config = getLTMConfig();

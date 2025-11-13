@@ -1,18 +1,11 @@
-/**
- * User Profile Service
- * Handles profile management: get, update, avatar upload, password change
- */
 import User from "../models/user.model.js";
 import bcrypt from "bcrypt";
 import { uploadAvatar, deleteAvatar } from "./cloudinary.service.js";
 import { deleteCache } from "./cache.service.js";
 import { userByIdKey, userByEmailKey } from "../utils/cache-key.util.js";
-/**
- * Get user profile by ID
- */
 export const getUserProfile = async (userId) => {
     const user = await User.findByPk(userId, {
-        attributes: { exclude: ["password"] }, // Never expose password
+        attributes: { exclude: ["password"] },
     });
     if (!user) {
         throw new Error("User not found");
@@ -28,28 +21,21 @@ export const getUserProfile = async (userId) => {
         updatedAt: user.updatedAt,
     };
 };
-/**
- * Update user profile (username, bio)
- */
 export const updateUserProfile = async (userId, updates) => {
     const user = await User.findByPk(userId);
     if (!user) {
         throw new Error("User not found");
     }
-    // Validate username uniqueness if changing
     if (updates.username && updates.username !== user.username) {
         const existingUser = await User.findByUsername(updates.username);
         if (existingUser && existingUser.id !== userId) {
             throw new Error("Username already taken");
         }
     }
-    // Sanitize bio (strip HTML, trim whitespace)
     if (updates.bio !== undefined) {
         updates.bio = sanitizeBio(updates.bio);
     }
-    // Update user
     await user.update(updates);
-    // Invalidate cache to ensure fresh data on next login
     await deleteCache(userByIdKey(user.id));
     await deleteCache(userByEmailKey(user.email));
     return {
@@ -63,35 +49,24 @@ export const updateUserProfile = async (userId, updates) => {
         updatedAt: user.updatedAt,
     };
 };
-/**
- * Upload user avatar to Cloudinary
- */
 export const updateUserAvatar = async (userId, fileBuffer) => {
     const user = await User.findByPk(userId);
     if (!user) {
         throw new Error("User not found");
     }
-    // Delete old avatar from Cloudinary if exists
     if (user.avatar_url) {
         try {
             await deleteAvatar(user.avatar_url);
         }
         catch (error) {
-            // Log but don't fail (old avatar might already be deleted)
         }
     }
-    // Upload new avatar to Cloudinary
     const avatarUrl = await uploadAvatar(fileBuffer, userId);
-    // Update user record
     await user.update({ avatar_url: avatarUrl });
-    // Invalidate cache to ensure fresh data on next login
     await deleteCache(userByIdKey(user.id));
     await deleteCache(userByEmailKey(user.email));
     return { avatar_url: avatarUrl };
 };
-/**
- * Remove user avatar
- */
 export const removeUserAvatar = async (userId) => {
     const user = await User.findByPk(userId);
     if (!user) {
@@ -100,50 +75,34 @@ export const removeUserAvatar = async (userId) => {
     if (!user.avatar_url) {
         throw new Error("No avatar to remove");
     }
-    // Delete from Cloudinary
     try {
         await deleteAvatar(user.avatar_url);
     }
     catch (error) {
-        // Log but continue (avatar might already be deleted)
     }
-    // Update user record
     await user.update({ avatar_url: null });
-    // Invalidate cache to ensure fresh data on next login
     await deleteCache(userByIdKey(user.id));
     await deleteCache(userByEmailKey(user.email));
 };
-/**
- * Change user password
- */
 export const changeUserPassword = async (userId, data) => {
     const user = await User.findByPk(userId);
     if (!user) {
         throw new Error("User not found");
     }
-    // Verify current password
     const isCurrentPasswordValid = await bcrypt.compare(data.currentPassword, user.password);
     if (!isCurrentPasswordValid) {
         throw new Error("Current password is incorrect");
     }
-    // Validate new password strength
     validatePasswordStrength(data.newPassword);
-    // Check if new password is same as current
     const isSameAsCurrentPassword = await bcrypt.compare(data.newPassword, user.password);
     if (isSameAsCurrentPassword) {
         throw new Error("New password must be different from current password");
     }
-    // Hash new password
     const hashedPassword = await bcrypt.hash(data.newPassword, 10);
-    // Update password
     await user.update({ password: hashedPassword });
-    // Invalidate cache to ensure fresh password hash on next login
     await deleteCache(userByIdKey(user.id));
     await deleteCache(userByEmailKey(user.email));
 };
-/**
- * Validate password strength
- */
 const validatePasswordStrength = (password) => {
     const minLength = 8;
     const hasUpperCase = /[A-Z]/.test(password);
@@ -162,17 +121,11 @@ const validatePasswordStrength = (password) => {
         throw new Error("Password must contain at least one number");
     }
 };
-/**
- * Sanitize bio text
- */
 const sanitizeBio = (bio) => {
     if (!bio)
         return null;
-    // Strip HTML tags
     let sanitized = bio.replace(/<[^>]*>/g, "");
-    // Trim whitespace
     sanitized = sanitized.trim();
-    // Return null if empty after sanitization
     return sanitized || null;
 };
 export default {

@@ -11,7 +11,6 @@ const ACCESS_EXPIRATION = process.env.JWT_ACCESS_EXPIRATION
 const REFRESH_EXPIRATION = process.env.JWT_REFRESH_EXPIRATION
     ? process.env.JWT_REFRESH_EXPIRATION.toString()
     : "7d";
-// Generate Access Token
 const generateAccessToken = (payload) => {
     const tokenPayload = {
         id: payload.id,
@@ -21,7 +20,6 @@ const generateAccessToken = (payload) => {
     };
     return jwt.sign(tokenPayload, ACCESS_SECRET, { expiresIn: ACCESS_EXPIRATION });
 };
-// Generate Refresh Token
 const generateRefreshToken = (payload) => {
     const tokenPayload = {
         id: payload.id,
@@ -31,11 +29,9 @@ const generateRefreshToken = (payload) => {
     };
     return jwt.sign(tokenPayload, REFRESH_SECRET, { expiresIn: REFRESH_EXPIRATION });
 };
-// Verify Access Token
 const verifyAccessToken = (token) => {
     try {
         const decoded = jwt.verify(token, ACCESS_SECRET);
-        // Basic safety: ensure token type claim matches expected
         if (typeof decoded === "object" &&
             decoded.type &&
             decoded.type !== "access") {
@@ -48,11 +44,9 @@ const verifyAccessToken = (token) => {
         return { valid: false, error: message };
     }
 };
-// Verify Refresh Token
 const verifyRefreshToken = (token) => {
     try {
         const decoded = jwt.verify(token, REFRESH_SECRET);
-        // Ensure token type claim is refresh
         if (typeof decoded === "object" &&
             decoded.type &&
             decoded.type !== "refresh") {

@@ -6,6 +6,10 @@
   "author": "Nguyen Vu Thanh",
   "type": "module",
   "main": "index.ts",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
   "scripts": {
     "dev": "nodemon --watch src --exec \"tsx --no-warnings\" ./src/index.ts",
     "build": "tsc",
@@ -22,11 +26,14 @@
   "dependencies": {
     "@sentry/node": "^10.22.0",
     "@sentry/profiling-node": "^10.22.0",
+    "@socket.io/redis-adapter": "^8.3.0",
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.7.0",
+    "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "helmet": "^8.1.0",
     "ioredis": "^5.8.1",
     "jsonwebtoken": "^9.0.2",
     "mammoth": "^1.11.0",
@@ -38,10 +45,12 @@
     "pg-hstore": "^2.3.4",
     "sequelize": "^6.37.7",
     "socket.io": "^4.8.1",
-    "swagger-ui-express": "^4.6.3"
+    "swagger-ui-express": "^4.6.3",
+    "winston": "^3.18.3"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
+    "@types/compression": "^1.8.1",
     "@types/cookie-parser": "^1.4.9",
     "@types/express": "^5.0.3",
     "@types/ioredis": "^4.28.10",

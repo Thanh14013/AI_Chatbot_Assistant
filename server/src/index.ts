@@ -7,6 +7,8 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import bodyParser from "body-parser";
+import compression from "compression";
+import helmet from "helmet";
 import dotenv from "dotenv";
 import { createServer } from "http";
 import swaggerUi from "swagger-ui-express";
@@ -18,6 +20,7 @@ import { nodeProfilingIntegration } from "@sentry/profiling-node";
 // Import configurations
 import { PORT as PORT_CONFIG, TIMEOUTS, RATE_LIMITING } from "./config/constants.js";
 import { isRedisConnected } from "./config/redis.config.js";
+import { logInfo, logError, logWarn } from "./utils/logger.util.js";
 
 // Import core services
 import connectToDatabase from "./db/database.connection.js";
@@ -29,6 +32,11 @@ import models from "./models/index.js";
 // Load environment variables
 dotenv.config();
 
+// ==================== Environment Validation ====================
+// Validate required environment variables before starting server
+import { validateAndExit } from "./utils/env-validation.util.js";
+validateAndExit();
+
 // ==================== Sentry Initialization ====================
 // Initialize error tracking (must be done before other code)
 if (process.env.SENTRY_DSN) {
@@ -39,7 +47,7 @@ if (process.env.SENTRY_DSN) {
     profilesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
     environment: process.env.NODE_ENV || "development",
   });
-  console.log("✅ Sentry initialized");
+  logInfo("Sentry initialized");
 }
 
 // ==================== Swagger Documentation Setup ====================
@@ -60,6 +68,17 @@ app.use(
     credentials: true,
   })
 );
+
+// Security headers (must be before other middleware)
+app.use(
+  helmet({
+    contentSecurityPolicy: process.env.NODE_ENV === "production" ? undefined : false,
+    crossOriginEmbedderPolicy: false,
+  })
+);
+
+// Compression middleware (reduces response size by 70-80%)
+app.use(compression());
 
 // Parse cookies from requests
 app.use(cookieParser());
@@ -90,12 +109,12 @@ connectToDatabase();
     }
 
     if (isRedisConnected()) {
-      console.log("✓ Redis cache is available");
+      logInfo("Redis cache is available");
     } else {
-      console.warn("⚠ Redis cache is not available - falling back to DB only");
+      logWarn("Redis cache is not available - falling back to DB only");
     }
   } catch (error) {
-    console.warn("⚠ Redis cache is not available - falling back to DB only");
+    logWarn("Redis cache is not available - falling back to DB only");
   }
 })();
 
@@ -107,7 +126,7 @@ if (process.env.DB_SYNC === "true") {
       await models.syncDatabase(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn("Failed to sync database models:", msg);
+      logWarn("Failed to sync database models", { error: msg });
     }
   })();
 }
@@ -134,14 +153,14 @@ app.use("/api", routes);
 
 // ==================== Error Handling ====================
 // Global error handler with Sentry integration
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   // Capture error in Sentry if configured
   if (process.env.SENTRY_DSN) {
     Sentry.captureException(err);
   }
 
-  // Log error to console
-  console.error("Unhandled error:", err);
+  // Log error
+  logError("Unhandled error", err);
 
   // Send error response
   res.status(err.statusCode || 500).json({
@@ -176,29 +195,91 @@ const MAX_PORT_ATTEMPTS = PORT_CONFIG.MAX_PORT_ATTEMPTS;
 function tryListen(port: number, attemptsLeft: number) {
   httpServer.once("error", (err: any) => {
     if (err && err.code === "EADDRINUSE") {
-      console.warn(`⚠ Port ${port} is already in use.`);
+      logWarn(`Port ${port} is already in use`);
 
       if (attemptsLeft > 0) {
         const nextPort = port + 1;
-        console.log(`Trying port ${nextPort}...`);
+        logInfo(`Trying port ${nextPort}...`);
         tryListen(nextPort, attemptsLeft - 1);
       } else {
-        console.error(
-          `❌ All port retry attempts failed. Please free port ${port} or set PORT environment variable.`
+        logError(
+          `All port retry attempts failed. Please free port ${port} or set PORT environment variable.`
         );
         process.exit(1);
       }
     } else {
-      console.error(`❌ Server failed to start: ${err?.message ?? "Unknown error"}`);
+      logError(`Server failed to start: ${err?.message ?? "Unknown error"}`);
       process.exit(1);
     }
   });
 
   httpServer.listen(port, () => {
-    console.log(`✅ Server listening on port ${port}`);
-    console.log(`📚 API Documentation: http://localhost:${port}/docs`);
+    logInfo(`Server listening on port ${port}`);
+    logInfo(`API Documentation: http://localhost:${port}/docs`);
   });
 }
 
 // Start the server
 tryListen(START_PORT, MAX_PORT_ATTEMPTS);
+
+// ==================== Graceful Shutdown ====================
+// Handle graceful shutdown for production deployments
+const gracefulShutdown = async (signal: string) => {
+  logWarn(`${signal} received. Starting graceful shutdown...`);
+
+  // Stop accepting new connections
+  httpServer.close(async () => {
+    logInfo("HTTP server closed");
+
+    try {
+      // Close Socket.IO connections
+      io.close(() => {
+        logInfo("Socket.IO connections closed");
+      });
+
+      // Disconnect Redis
+      const { disconnectRedis } = await import("./config/redis.config.js");
+      await disconnectRedis();
+      logInfo("Redis disconnected");
+
+      // Close database connections
+      const sequelize = (await import("./db/database.config.js")).default;
+      await sequelize.close();
+      logInfo("Database connections closed");
+
+      logInfo("Graceful shutdown completed");
+      process.exit(0);
+    } catch (error) {
+      logError("Error during graceful shutdown", error);
+      process.exit(1);
+    }
+  });
+
+  // Force shutdown after 30 seconds
+  setTimeout(() => {
+    logError("Forced shutdown after timeout");
+    process.exit(1);
+  }, 30000);
+};
+
+// Listen for termination signals
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+
+// Handle uncaught exceptions
+process.on("uncaughtException", (error: Error) => {
+  logError("Uncaught Exception", error);
+  if (process.env.SENTRY_DSN) {
+    Sentry.captureException(error);
+  }
+  gracefulShutdown("UNCAUGHT_EXCEPTION");
+});
+
+// Handle unhandled promise rejections
+process.on("unhandledRejection", (reason: any, promise: Promise<any>) => {
+  logError("Unhandled Rejection", reason, { promise });
+  if (process.env.SENTRY_DSN) {
+    Sentry.captureException(reason);
+  }
+  gracefulShutdown("UNHANDLED_REJECTION");
+});

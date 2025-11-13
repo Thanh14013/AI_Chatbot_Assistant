@@ -1,21 +1,8 @@
-/**
- * Authentication Controller
- * Handles user registration, login, logout, token refresh, and user profile retrieval
- */
 import { registerUser, loginUser, refreshAccessToken, logoutUser, } from "../services/auth.service.js";
 import User from "../models/user.model.js";
-/**
- * Register a new user
- * POST /api/auth/register
- * @body {string} name - User's full name
- * @body {string} email - User's email address
- * @body {string} password - User's password (min 6 characters)
- * @body {string} confirmPassword - Password confirmation (optional)
- */
 export const register = async (req, res) => {
     try {
         const { name, email, password, confirmPassword } = req.body;
-        // Validate required fields
         if (!name || !email || !password) {
             res.status(400).json({
                 success: false,
@@ -23,7 +10,6 @@ export const register = async (req, res) => {
             });
             return;
         }
-        // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
             res.status(400).json({
@@ -32,7 +18,6 @@ export const register = async (req, res) => {
             });
             return;
         }
-        // Validate password length
         if (password.length < 6) {
             res.status(400).json({
                 success: false,
@@ -40,7 +25,6 @@ export const register = async (req, res) => {
             });
             return;
         }
-        // Validate password confirmation if provided
         if (confirmPassword && password !== confirmPassword) {
             res.status(400).json({
                 success: false,
@@ -48,7 +32,6 @@ export const register = async (req, res) => {
             });
             return;
         }
-        // Register user
         await registerUser({ name, email, password });
         res.status(201).json({
             success: true,
@@ -57,7 +40,6 @@ export const register = async (req, res) => {
     }
     catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Registration failed";
-        // Handle duplicate email error
         if (errorMessage.includes("Email already registered")) {
             res.status(409).json({ success: false, message: errorMessage });
             return;
@@ -65,29 +47,20 @@ export const register = async (req, res) => {
         res.status(500).json({ success: false, message: "Internal server error", error: errorMessage });
     }
 };
-/**
- * Login user
- * POST /api/auth/login
- * @body {string} email - User's email address
- * @body {string} password - User's password
- */
 export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
-        // Validate required fields
         if (!email || !password) {
             res.status(400).json({ success: false, message: "Email and password are required" });
             return;
         }
-        // Authenticate user
         const result = await loginUser({ email, password });
-        // Set refresh token cookie
         const cookieOptions = {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "lax",
             path: "/",
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+            maxAge: 7 * 24 * 60 * 60 * 1000,
         };
         res.cookie("refreshToken", result.refreshToken, cookieOptions);
         res.status(200).json({
@@ -101,7 +74,6 @@ export const login = async (req, res) => {
     }
     catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Login failed";
-        // Handle authentication errors
         if (errorMessage.includes("Account or password is incorrect")) {
             res.status(401).json({ success: false, message: "Account or password is incorrect" });
             return;
@@ -109,21 +81,13 @@ export const login = async (req, res) => {
         res.status(500).json({ success: false, message: "Internal server error", error: errorMessage });
     }
 };
-/**
- * Refresh access token
- * POST /api/auth/refresh
- * @cookie {string} refreshToken - Refresh token from cookie
- * @body {string} refreshToken - Refresh token from body (fallback)
- */
 export const refresh = async (req, res) => {
     try {
-        // Accept token from cookie or body
         const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
         if (!refreshToken) {
             res.status(400).json({ success: false, message: "Refresh token is required" });
             return;
         }
-        // Generate new access token
         const result = await refreshAccessToken(refreshToken);
         res.status(200).json({
             success: true,
@@ -133,7 +97,6 @@ export const refresh = async (req, res) => {
     }
     catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Token refresh failed";
-        // Handle token validation errors
         if (errorMessage.includes("Invalid") ||
             errorMessage.includes("expired") ||
             errorMessage.includes("revoked") ||
@@ -144,17 +107,9 @@ export const refresh = async (req, res) => {
         res.status(500).json({ success: false, message: "Internal server error", error: errorMessage });
     }
 };
-/**
- * Logout user
- * POST /api/auth/logout
- * @cookie {string} refreshToken - Refresh token from cookie
- * @body {string} refreshToken - Refresh token from body (fallback)
- */
 export const logout = async (req, res) => {
     try {
-        // Accept token from cookie or body
         const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
-        // Clear cookie even if no token present (idempotent operation)
         const cookieOptions = {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
@@ -166,14 +121,11 @@ export const logout = async (req, res) => {
             res.status(200).json({ success: true, message: "Logout successful" });
             return;
         }
-        // Revoke the token in database
         await logoutUser(refreshToken);
-        // Clear cookie and respond
         res.clearCookie("refreshToken", cookieOptions);
         res.status(200).json({ success: true, message: "Logout successful" });
     }
     catch (error) {
-        // Clear cookie even on error (idempotent operation)
         res.clearCookie("refreshToken", {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
@@ -184,17 +136,10 @@ export const logout = async (req, res) => {
         res.status(500).json({ success: false, message: errorMessage });
     }
 };
-/**
- * Get current user information
- * GET /api/auth/me
- * Requires authentication via JWT token
- */
 export const getCurrentUser = async (req, res) => {
     try {
-        // Extract user from JWT token (set by auth middleware)
         const decoded = req.user || req.body?.user;
         let userRecord = null;
-        // Find user by ID or email
         if (decoded?.id) {
             userRecord = await User.findByPk(decoded.id);
         }
@@ -209,7 +154,6 @@ export const getCurrentUser = async (req, res) => {
             res.status(404).json({ success: false, message: "User not found" });
             return;
         }
-        // Return user information (excluding password)
         res.status(200).json({
             success: true,
             data: {

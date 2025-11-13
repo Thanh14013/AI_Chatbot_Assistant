@@ -14,6 +14,8 @@ const redisConfig = {
   port: parseInt(process.env.REDIS_PORT || "6379"),
   password: process.env.REDIS_PASSWORD ? process.env.REDIS_PASSWORD : undefined,
   db: parseInt(process.env.REDIS_DB || "0"),
+  // TLS/SSL configuration for cloud Redis (required for Render, Heroku, AWS ElastiCache, etc.)
+  tls: process.env.REDIS_TLS === "true" ? {} : undefined,
   retryStrategy: (times: number) => {
     // Stop retrying after 10 attempts to prevent infinite loop
     if (times > 10) {
@@ -38,7 +40,9 @@ redisClient.on("connect", () => {});
 
 redisClient.on("ready", () => {});
 
-redisClient.on("error", (error: Error) => {});
+redisClient.on("error", () => {
+  // Error handled by connection status checks
+});
 
 redisClient.on("close", () => {
   // Redis connection closed

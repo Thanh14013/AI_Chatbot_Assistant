@@ -1,12 +1,4 @@
-/**
- * User Profile Controller
- * Handles HTTP requests for user profile management
- */
 import { getUserProfile, updateUserProfile, updateUserAvatar, removeUserAvatar, changeUserPassword, } from "../services/user-profile.service.js";
-/**
- * GET /api/users/profile
- * Get current user's profile
- */
 export const getProfile = async (req, res) => {
     try {
         const userId = req.user?.id;
@@ -30,10 +22,6 @@ export const getProfile = async (req, res) => {
         });
     }
 };
-/**
- * PUT /api/users/profile
- * Update profile (username, bio)
- */
 export const updateProfile = async (req, res) => {
     try {
         const userId = req.user?.id;
@@ -45,7 +33,6 @@ export const updateProfile = async (req, res) => {
             return;
         }
         const updates = req.body;
-        // Validate username length if provided
         if (updates.username !== undefined && updates.username !== null) {
             if (updates.username.length < 3 || updates.username.length > 50) {
                 res.status(400).json({
@@ -55,7 +42,6 @@ export const updateProfile = async (req, res) => {
                 return;
             }
         }
-        // Validate bio length if provided
         if (updates.bio !== undefined && updates.bio !== null && updates.bio.length > 200) {
             res.status(400).json({
                 success: false,
@@ -84,10 +70,6 @@ export const updateProfile = async (req, res) => {
         });
     }
 };
-/**
- * POST /api/users/avatar
- * Upload avatar
- */
 export const uploadAvatarHandler = async (req, res) => {
     try {
         const userId = req.user?.id;
@@ -119,10 +101,6 @@ export const uploadAvatarHandler = async (req, res) => {
         });
     }
 };
-/**
- * DELETE /api/users/avatar
- * Remove avatar
- */
 export const removeAvatarHandler = async (req, res) => {
     try {
         const userId = req.user?.id;
@@ -153,10 +131,6 @@ export const removeAvatarHandler = async (req, res) => {
         });
     }
 };
-/**
- * PUT /api/users/change-password
- * Change password
- */
 export const changePassword = async (req, res) => {
     try {
         const userId = req.user?.id;
@@ -168,7 +142,6 @@ export const changePassword = async (req, res) => {
             return;
         }
         const { currentPassword, newPassword, confirmNewPassword, } = req.body;
-        // Validate required fields
         if (!currentPassword || !newPassword) {
             res.status(400).json({
                 success: false,
@@ -176,7 +149,6 @@ export const changePassword = async (req, res) => {
             });
             return;
         }
-        // Validate password confirmation
         if (confirmNewPassword && newPassword !== confirmNewPassword) {
             res.status(400).json({
                 success: false,

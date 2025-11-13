@@ -1,12 +1,5 @@
-/**
- * FileUpload Model
- * Handles database operations for file uploads
- */
 import pool from "../db/pool.js";
 export class FileUploadModel {
-    /**
-     * Create new file upload record
-     */
     static async create(data) {
         const query = `
       INSERT INTO files_upload (
@@ -40,54 +33,35 @@ export class FileUploadModel {
         const result = await pool.query(query, values);
         return result.rows[0];
     }
-    /**
-     * Get file upload by ID
-     */
     static async findById(id) {
         const query = "SELECT * FROM files_upload WHERE id = $1";
         const result = await pool.query(query, [id]);
         return result.rows[0] || null;
     }
-    /**
-     * Get file upload by public_id
-     */
     static async findByPublicId(publicId) {
         const query = "SELECT * FROM files_upload WHERE public_id = $1";
         const result = await pool.query(query, [publicId]);
         return result.rows[0] || null;
     }
-    /**
-     * Get file upload by openai_file_id
-     */
     static async findByOpenAIFileId(openaiFileId) {
         const query = "SELECT * FROM files_upload WHERE openai_file_id = $1";
         const result = await pool.query(query, [openaiFileId]);
         return result.rows[0] || null;
     }
-    /**
-     * Get all files for a message
-     */
     static async findByMessageId(messageId) {
         const query = "SELECT * FROM files_upload WHERE message_id = $1 ORDER BY created_at ASC";
         const result = await pool.query(query, [messageId]);
         return result.rows;
     }
-    /**
-     * Get all files for a conversation
-     */
     static async findByConversationId(conversationId) {
         const query = "SELECT * FROM files_upload WHERE conversation_id = $1 ORDER BY created_at DESC";
         const result = await pool.query(query, [conversationId]);
         return result.rows;
     }
-    /**
-     * Update file upload
-     */
     static async update(id, data) {
         const fields = [];
         const values = [];
         let paramCount = 1;
-        // Build dynamic update query
         Object.entries(data).forEach(([key, value]) => {
             if (key !== "id" && key !== "created_at" && key !== "updated_at" && value !== undefined) {
                 fields.push(`${key} = $${paramCount}`);
@@ -108,9 +82,6 @@ export class FileUploadModel {
         const result = await pool.query(query, values);
         return result.rows[0] || null;
     }
-    /**
-     * Update message_id for file uploads
-     */
     static async updateMessageId(publicIds, messageId) {
         const query = `
       UPDATE files_upload
@@ -119,24 +90,15 @@ export class FileUploadModel {
     `;
         await pool.query(query, [messageId, publicIds]);
     }
-    /**
-     * Delete file upload
-     */
     static async delete(id) {
         const query = "DELETE FROM files_upload WHERE id = $1";
         const result = await pool.query(query, [id]);
         return result.rowCount !== null && result.rowCount > 0;
     }
-    /**
-     * Delete files by message ID
-     */
     static async deleteByMessageId(messageId) {
         const query = "DELETE FROM files_upload WHERE message_id = $1";
         await pool.query(query, [messageId]);
     }
-    /**
-     * Get user's upload statistics
-     */
     static async getUserStats(userId) {
         const query = `
       SELECT 

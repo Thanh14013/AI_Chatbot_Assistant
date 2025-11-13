@@ -4,18 +4,8 @@ import Message from "../models/message.model.js";
 import Conversation from "../models/conversation.model.js";
 import { generateEmbedding } from "./embedding.service.js";
 import User from "../models/user.model.js";
-/**
- * Search across all user's conversations
- * Groups results by conversation and returns top conversations
- *
- * @param userId - User ID to search within
- * @param searchParams - Search parameters
- * @returns Promise with grouped search results
- */
 export async function searchAllConversations(userIdOrEmail, searchParams) {
-    const { query, tags, limit = 10, messagesPerConversation = 3, similarity_threshold = 0.37, // Lowered default to 0.4 for better recall on short Vietnamese queries
-     } = searchParams;
-    // Resolve user id if an email was passed
+    const { query, tags, limit = 10, messagesPerConversation = 3, similarity_threshold = 0.37, } = searchParams;
     let userId = userIdOrEmail;
     if (userIdOrEmail && userIdOrEmail.includes && userIdOrEmail.includes("@")) {
         const userRecord = await User.findOne({ where: { email: userIdOrEmail } });
@@ -24,21 +14,13 @@ export async function searchAllConversations(userIdOrEmail, searchParams) {
         }
         userId = userRecord.id;
     }
-    // Validate input
     if (!query || query.trim().length === 0) {
         throw new Error("Search query cannot be empty");
     }
-    // Generate embedding for search query
     const queryEmbedding = await generateEmbedding(query.trim());
     const vectorString = `[${queryEmbedding.join(",")}]`;
-    // Step 1: Find all matching messages across user's conversations
-    // Group by conversation and get top messages per conversation
-    // If tags are provided, only search in conversations that have at least one of the tags
     let results;
-    // Debug logging removed in production build
     if (tags && tags.length > 0) {
-        // Tag filtering enabled - search limited to conversations with specified tags
-        // DEBUG: Show ALL user's conversations with their tags
         const allUserConversations = await sequelize.query(`
       SELECT id, title, tags 
       FROM conversations 
@@ -51,8 +33,6 @@ export async function searchAllConversations(userIdOrEmail, searchParams) {
             bind: [userId],
             type: QueryTypes.SELECT,
         });
-        // Debug: removed detailed user conversations log
-        // CRITICAL: First, verify which conversations have the specified tags
         const tagFilterCheck = await sequelize.query(`
       SELECT id, title, tags 
       FROM conversations 
@@ -64,18 +44,13 @@ export async function searchAllConversations(userIdOrEmail, searchParams) {
             bind: [userId, tags],
             type: QueryTypes.SELECT,
         });
-        // Debug: removed conversations with matching tags log
-        // If NO conversations have the specified tags, return empty result immediately
-        // DO NOT fallback to searching all conversations
         if (tagFilterCheck.length === 0) {
-            // No conversations found with specified tags - returning empty result
             return {
                 query: query.trim(),
                 results: [],
                 totalConversations: 0,
             };
         }
-        // Filter by tags - conversation must have at least one of the specified tags
         results = await sequelize.query(`
       WITH user_conversations AS (
         SELECT id FROM conversations 
@@ -112,8 +87,6 @@ export async function searchAllConversations(userIdOrEmail, searchParams) {
         });
     }
     else {
-        // No tag filter - searching all conversations
-        // No tag filter - search all conversations
         results = await sequelize.query(`
       WITH user_conversations AS (
         SELECT id FROM conversations 
@@ -146,7 +119,6 @@ export async function searchAllConversations(userIdOrEmail, searchParams) {
             type: QueryTypes.SELECT,
         });
     }
-    // Raw query results logging removed
     if (results.length === 0) {
         return {
             query: query.trim(),
@@ -154,7 +126,6 @@ export async function searchAllConversations(userIdOrEmail, searchParams) {
             totalConversations: 0,
         };
     }
-    // Step 2: Group results by conversation
     const conversationMap = new Map();
     for (const row of results) {
         const conversationId = row.conversation_id;
@@ -178,16 +149,13 @@ export async function searchAllConversations(userIdOrEmail, searchParams) {
         convData.messages.push(message);
         convData.maxSimilarity = Math.max(convData.maxSimilarity, message.similarity);
     }
-    // Step 3: Get conversation details and sort by max similarity
     const conversationIds = Array.from(conversationMap.keys());
-    // Found conversations logging removed
     const conversations = await Conversation.findAll({
         where: {
             id: conversationIds,
         },
         attributes: ["id", "title", "updatedAt", "tags"],
     });
-    // Conversation details logging removed
     const conversationResults = conversations.map((conv) => {
         const data = conversationMap.get(conv.id);
         return {
@@ -199,29 +167,16 @@ export async function searchAllConversations(userIdOrEmail, searchParams) {
             updated_at: conv.updatedAt,
         };
     });
-    // Sort by max similarity (highest first)
     conversationResults.sort((a, b) => b.max_similarity - a.max_similarity);
-    // Limit results
     const limitedResults = conversationResults.slice(0, limit);
-    // Final results logging removed
     return {
         query: query.trim(),
         results: limitedResults,
         totalConversations: conversationResults.length,
     };
 }
-/**
- * Search within a specific conversation with surrounding context
- * Returns the best match plus context messages before and after
- *
- * @param conversationId - Conversation ID to search within
- * @param userId - User ID for authorization
- * @param searchParams - Search parameters
- * @returns Promise with search results including context
- */
 export async function searchWithinConversation(conversationId, userIdOrEmail, searchParams) {
-    const { query, limit = 5, contextMessages = 2, similarity_threshold = 0.37 } = searchParams; // Lowered from 0.7 to 0.5
-    // Resolve user id if an email was passed
+    const { query, limit = 5, contextMessages = 2, similarity_threshold = 0.37 } = searchParams;
     let userId = userIdOrEmail;
     if (userIdOrEmail && userIdOrEmail.includes && userIdOrEmail.includes("@")) {
         const userRecord = await User.findOne({ where: { email: userIdOrEmail } });
@@ -230,7 +185,6 @@ export async function searchWithinConversation(conversationId, userIdOrEmail, se
         }
         userId = userRecord.id;
     }
-    // Verify conversation exists and user has access
     const conversation = await Conversation.findOne({
         where: {
             id: conversationId,
@@ -243,10 +197,8 @@ export async function searchWithinConversation(conversationId, userIdOrEmail, se
     if (conversation.user_id !== userId) {
         throw new Error("Unauthorized access to conversation");
     }
-    // Generate embedding for search query
     const queryEmbedding = await generateEmbedding(query.trim());
     const vectorString = `[${queryEmbedding.join(",")}]`;
-    // First, check how many messages exist in this conversation and how many have embeddings
     const statsQuery = await sequelize.query(`
     SELECT 
       COUNT(DISTINCT m.id) as total_messages,
@@ -258,7 +210,6 @@ export async function searchWithinConversation(conversationId, userIdOrEmail, se
         bind: [conversationId],
         type: QueryTypes.SELECT,
     });
-    // Find matching messages
     const results = await sequelize.query(`
     SELECT 
       m.id as message_id,
@@ -279,7 +230,6 @@ export async function searchWithinConversation(conversationId, userIdOrEmail, se
         bind: [vectorString, conversationId, similarity_threshold, limit],
         type: QueryTypes.SELECT,
     });
-    // If no results found but there are messages with embeddings, try without threshold to see top matches
     if (results.length === 0 &&
         statsQuery[0] &&
         statsQuery[0].messages_with_embeddings > 0) {
@@ -298,7 +248,6 @@ export async function searchWithinConversation(conversationId, userIdOrEmail, se
             type: QueryTypes.SELECT,
         });
     }
-    // If still no semantic results, try a plain text fallback (case-insensitive substring match)
     if (results.length === 0) {
         const textQuery = `%${query.trim()}%`;
         const textMatches = await sequelize.query(`
@@ -321,13 +270,10 @@ export async function searchWithinConversation(conversationId, userIdOrEmail, se
             type: QueryTypes.SELECT,
         });
         if (textMatches.length > 0) {
-            // Prepare results in same shape as semantic query results (similarity set to 0)
             const prepared = textMatches.map((r) => ({
                 ...r,
                 similarity: 0,
             }));
-            // Use these as the results so the rest of the function builds context as usual
-            // @ts-ignore - assign to results variable from earlier
             results.splice(0, results.length, ...prepared);
         }
     }
@@ -348,17 +294,13 @@ export async function searchWithinConversation(conversationId, userIdOrEmail, se
         model: row.model || "unknown",
         createdAt: row.createdAt || new Date(),
     }));
-    // Get all messages in conversation for context
     const allMessages = await Message.findAll({
         where: { conversation_id: conversationId },
         order: [["createdAt", "ASC"]],
         attributes: ["id", "role", "content", "tokens_used", "model", "createdAt", "conversation_id"],
     });
-    // Build results with context
     const resultsWithContext = matches.map((match) => {
-        // Find index of this message in all messages
         const messageIndex = allMessages.findIndex((m) => m.id === match.message_id);
-        // Get context before
         const contextBefore = [];
         for (let i = Math.max(0, messageIndex - contextMessages); i < messageIndex; i++) {
             const msg = allMessages[i];
@@ -367,13 +309,12 @@ export async function searchWithinConversation(conversationId, userIdOrEmail, se
                 conversation_id: msg.conversation_id,
                 role: msg.role,
                 content: msg.content,
-                similarity: 0, // Context messages don't have similarity scores
+                similarity: 0,
                 tokens_used: msg.tokens_used,
                 model: msg.model,
                 createdAt: msg.createdAt,
             });
         }
-        // Get context after
         const contextAfter = [];
         for (let i = messageIndex + 1; i < Math.min(allMessages.length, messageIndex + contextMessages + 1); i++) {
             const msg = allMessages[i];

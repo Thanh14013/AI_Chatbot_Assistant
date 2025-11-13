@@ -1,83 +1,62 @@
 import { Server as SocketIOServer } from "socket.io";
+import { createAdapter } from "@socket.io/redis-adapter";
 import { verifyAccessToken } from "../utils/generateToken.js";
-// Store user socket mappings for room management
-const userSockets = new Map(); // userId -> Set<socketId>
-const socketUsers = new Map(); // socketId -> userId
-// Store conversation view state for unread tracking (multi-tab)
-const socketViewingConversation = new Map(); // socketId -> conversationId | null
-const socketUnreadConversations = new Map(); // socketId -> Set<conversationId>
-// Message debouncer with auto-cleanup
+import redisClient, { isRedisConnected } from "../config/redis.config.js";
+import { logInfo, logWarn } from "../utils/logger.util.js";
+const userSockets = new Map();
+const socketUsers = new Map();
+const socketViewingConversation = new Map();
+const socketUnreadConversations = new Map();
 const messageCompleteDebouncer = new Map();
-// Auto-cleanup timer for debouncer (prevent memory leak)
 setInterval(() => {
     const now = Date.now();
-    const threshold = 5 * 60 * 1000; // 5 minutes
+    const threshold = 5 * 60 * 1000;
     for (const [key, timestamp] of messageCompleteDebouncer.entries()) {
         if (now - timestamp > threshold) {
             messageCompleteDebouncer.delete(key);
         }
     }
-}, 60000); // Cleanup every minute
-/**
- * Socket.io Authentication Middleware
- * Verifies JWT token and attaches user info to socket
- */
+}, 60000);
 const socketAuthMiddleware = (socket, next) => {
     try {
-        // Get token from auth header or query parameter
         const token = socket.handshake.auth?.token ||
             socket.handshake.headers?.authorization?.replace("Bearer ", "") ||
             socket.handshake.query?.token;
         if (!token) {
             return next(new Error("Authentication token required"));
         }
-        // Verify JWT token
         const result = verifyAccessToken(token);
         if (!result.valid) {
             return next(new Error(`Authentication failed: ${result.error}`));
         }
-        // Attach user info to socket
         socket.user = result.decoded;
-        // Extract user ID from decoded token
         if (typeof result.decoded === "object" && result.decoded.id) {
             socket.userId = result.decoded.id;
         }
         else {
             return next(new Error("Invalid token: missing user ID"));
         }
-        // authentication succeeded; no logging
         next();
     }
     catch (error) {
         const message = error instanceof Error ? error.message : "Authentication error";
-        // authentication failed; no logging
         next(new Error(message));
     }
 };
-/**
- * Handle user connection management
- */
 const handleUserConnection = (socket) => {
     const userId = socket.userId;
-    // Add socket to user's socket set
     if (!userSockets.has(userId)) {
         userSockets.set(userId, new Set());
     }
     userSockets.get(userId).add(socket.id);
     socketUsers.set(socket.id, userId);
-    // Initialize unread tracking for this socket
     if (!socketUnreadConversations.has(socket.id)) {
         socketUnreadConversations.set(socket.id, new Set());
     }
-    // user connection handled
 };
-/**
- * Handle user disconnection cleanup
- */
 const handleUserDisconnection = (socket) => {
     const userId = socket.userId;
     if (userId) {
-        // Remove socket from user's socket set
         const userSocketSet = userSockets.get(userId);
         if (userSocketSet) {
             userSocketSet.delete(socket.id);
@@ -86,54 +65,34 @@ const handleUserDisconnection = (socket) => {
             }
         }
         socketUsers.delete(socket.id);
-        // Cleanup unread tracking
         socketViewingConversation.delete(socket.id);
         socketUnreadConversations.delete(socket.id);
-        // Force leave all rooms to prevent memory leaks
         const rooms = Array.from(socket.rooms);
         rooms.forEach((room) => {
             if (room !== socket.id) {
-                // Don't leave default room
                 socket.leave(room);
             }
         });
-        // user disconnection handled
     }
 };
-/**
- * Get all socket IDs for a user (for broadcasting)
- */
 export const getUserSockets = (userId) => {
     return Array.from(userSockets.get(userId) || []);
 };
-/**
- * Get user ID from socket ID
- */
 export const getUserFromSocket = (socketId) => {
     return socketUsers.get(socketId);
 };
-/**
- * Mark a conversation as read for a specific socket
- */
 export const markConversationAsRead = (socketId, conversationId) => {
-    // Set this socket as viewing this conversation
     socketViewingConversation.set(socketId, conversationId);
-    // Remove from unread set if present
     const unreadSet = socketUnreadConversations.get(socketId);
     if (unreadSet) {
         unreadSet.delete(conversationId);
     }
 };
-/**
- * Mark a conversation as unread for a specific socket
- */
 export const markConversationAsUnread = (socketId, conversationId) => {
-    // Only mark as unread if socket is NOT currently viewing this conversation
     const viewing = socketViewingConversation.get(socketId);
     if (viewing === conversationId) {
-        return; // Socket is viewing this conversation, don't mark as unread
+        return;
     }
-    // Add to unread set
     let unreadSet = socketUnreadConversations.get(socketId);
     if (!unreadSet) {
         unreadSet = new Set();
@@ -141,16 +100,10 @@ export const markConversationAsUnread = (socketId, conversationId) => {
     }
     unreadSet.add(conversationId);
 };
-/**
- * Get unread conversations for a socket
- */
 export const getUnreadConversations = (socketId) => {
     const unreadSet = socketUnreadConversations.get(socketId);
     return unreadSet ? Array.from(unreadSet) : [];
 };
-/**
- * Broadcast unread status for a conversation to all sockets of a user
- */
 export const broadcastUnreadStatus = (userId, conversationId, hasUnread, targetSocketId) => {
     const sockets = getUserSockets(userId);
     sockets.forEach((socketId) => {
@@ -164,23 +117,12 @@ export const broadcastUnreadStatus = (userId, conversationId, hasUnread, targetS
         }
     });
 };
-/**
- * Leave conversation view for a socket
- */
 export const leaveConversationView = (socketId) => {
     socketViewingConversation.set(socketId, null);
 };
-/**
- * Broadcast message to all sockets of a specific user (across all tabs/devices)
- * @param userId - User ID to broadcast to
- * @param event - Event name
- * @param data - Event data
- * @param excludeSocketId - Optional socket ID to exclude (e.g., the sender)
- */
 export const broadcastToUser = (userId, event, data, excludeSocketId) => {
     const sockets = getUserSockets(userId);
     sockets.forEach((socketId) => {
-        // Skip excluded socket (usually the sender)
         if (excludeSocketId && socketId === excludeSocketId) {
             return;
         }
@@ -190,17 +132,11 @@ export const broadcastToUser = (userId, event, data, excludeSocketId) => {
         }
     });
 };
-/**
- * Broadcast message to all users in a conversation
- */
 export const broadcastToConversation = (conversationId, event, data) => {
     if (io) {
         io.to(`conversation:${conversationId}`).emit(event, data);
     }
 };
-/**
- * Get all users currently connected to a conversation
- */
 export const getConversationUsers = (conversationId) => {
     if (!io)
         return [];
@@ -216,23 +152,13 @@ export const getConversationUsers = (conversationId) => {
     });
     return Array.from(users);
 };
-/**
- * Check if a user is currently connected (has any active sockets)
- */
 export const isUserOnline = (userId) => {
     return userSockets.has(userId) && (userSockets.get(userId)?.size || 0) > 0;
 };
-/**
- * Get Socket.io server instance
- */
 export const getSocketIOInstance = () => {
     return io || null;
 };
-// Store io instance for use in event handlers
 let io;
-/**
- * Initialize Socket.io server with authentication and event handlers
- */
 export const initializeSocketIO = (httpServer) => {
     io = new SocketIOServer(httpServer, {
         cors: {
@@ -242,47 +168,57 @@ export const initializeSocketIO = (httpServer) => {
             credentials: true,
             methods: ["GET", "POST"],
         },
-        // Connection options
         pingTimeout: 60000,
         pingInterval: 25000,
         transports: ["websocket", "polling"],
     });
-    // Apply authentication middleware
+    if (isRedisConnected()) {
+        try {
+            const pubClient = redisClient.duplicate();
+            const subClient = redisClient.duplicate();
+            Promise.all([pubClient.connect(), subClient.connect()])
+                .then(() => {
+                io.adapter(createAdapter(pubClient, subClient));
+                logInfo("Socket.IO Redis Adapter initialized - horizontal scaling enabled");
+            })
+                .catch((error) => {
+                logWarn("Failed to initialize Socket.IO Redis Adapter - running in single-server mode", {
+                    error,
+                });
+            });
+        }
+        catch (error) {
+            logWarn("Failed to setup Socket.IO Redis Adapter - running in single-server mode", {
+                error,
+            });
+        }
+    }
+    else {
+        logWarn("Redis not available - Socket.IO running without adapter (single-server only)");
+    }
     io.use(socketAuthMiddleware);
-    // Handle socket connections
     io.on("connection", (socket) => {
-        // connection established
-        // Handle user connection
         handleUserConnection(socket);
-        // Join user to their personal room (for user-specific broadcasts)
-        // Also join a session room using userId as sessionId for multi-tab sync
         if (socket.userId) {
             socket.join(`user:${socket.userId}`);
-            socket.join(`session:${socket.userId}`); // Session room for multi-tab sync
+            socket.join(`session:${socket.userId}`);
         }
-        // Handle joining conversation rooms
         socket.on("join:conversation", (conversationId) => {
             if (!conversationId) {
                 socket.emit("error", { message: "Conversation ID is required" });
                 return;
             }
             socket.join(`conversation:${conversationId}`);
-            // user joined conversation room
-            // Notify user they joined the conversation
             socket.emit("conversation:joined", { conversationId });
         });
-        // Handle leaving conversation rooms
         socket.on("leave:conversation", (conversationId) => {
             if (!conversationId) {
                 socket.emit("error", { message: "Conversation ID is required" });
                 return;
             }
             socket.leave(`conversation:${conversationId}`);
-            // user left conversation room
-            // Notify user they left the conversation
             socket.emit("conversation:left", { conversationId });
         });
-        // Handle message sending with streaming AI response
         socket.on("message:send", async (data) => {
             try {
                 const { conversationId, content, messageId, attachments } = data;
@@ -290,17 +226,13 @@ export const initializeSocketIO = (httpServer) => {
                     socket.emit("error", { message: "Conversation ID and content are required" });
                     return;
                 }
-                // incoming message received
-                // Import services dynamically to avoid circular imports
                 const { sendMessageAndStreamResponse } = await import("./message.service.js");
                 const { buildMemoryEnhancedPrompt, analyzeAndUpdateMemory, isLTMEnabled } = await import("./memory.service.js");
-                // CRITICAL FIX: Fetch attachments from database to get openai_file_id
                 let enrichedAttachments;
                 if (attachments && attachments.length > 0) {
                     try {
                         const FileUploadModel = (await import("../models/fileUpload.model.js")).default;
                         const publicIds = attachments.map((att) => att.public_id);
-                        // Fetch full file metadata including openai_file_id from database
                         enrichedAttachments = [];
                         for (const publicId of publicIds) {
                             const fileData = await FileUploadModel.findByPublicId(publicId);
@@ -311,21 +243,17 @@ export const initializeSocketIO = (httpServer) => {
                                     resource_type: fileData.resource_type,
                                     format: fileData.format,
                                     extracted_text: fileData.extracted_text,
-                                    openai_file_id: fileData.openai_file_id, // NOW INCLUDES FILE_ID!
+                                    openai_file_id: fileData.openai_file_id,
                                 });
                             }
                         }
                     }
                     catch (err) {
-                        // Fallback to client attachments if DB fetch fails
                         enrichedAttachments = attachments;
                     }
                 }
-                // Stream AI response and broadcast user message early via onUserMessageCreated
                 let assistantContent = "";
                 try {
-                    // STEP 1: Build memory-enhanced context (if LTM enabled)
-                    // This happens BEFORE sending to OpenAI
                     let enhancedSystemPrompt;
                     if (isLTMEnabled()) {
                         try {
@@ -333,43 +261,29 @@ export const initializeSocketIO = (httpServer) => {
                             enhancedSystemPrompt = await buildMemoryEnhancedPrompt(socket.userId, content, basePrompt);
                         }
                         catch (memError) {
-                            enhancedSystemPrompt = undefined; // Fall back to default in message service
+                            enhancedSystemPrompt = undefined;
                         }
                     }
-                    // STEP 2: Send message with enhanced context
-                    const result = await sendMessageAndStreamResponse(conversationId, socket.userId, content, 
-                    // onChunk callback - stream to client
-                    (chunk) => {
+                    const result = await sendMessageAndStreamResponse(conversationId, socket.userId, content, (chunk) => {
                         assistantContent += chunk;
-                        // chunk received and will be broadcast
-                        // Broadcast chunks to ALL sockets in conversation room (including sender)
-                        // Sender NEEDS chunks to display streaming AI response
                         io.to(`conversation:${conversationId}`).emit("message:chunk", {
                             conversationId,
                             chunk,
-                            content: assistantContent, // send accumulated content
+                            content: assistantContent,
                             messageId,
                         });
-                    }, 
-                    // onUserMessageCreated - broadcast the persisted user message immediately so other tabs see it
-                    (userMessage) => {
+                    }, (userMessage) => {
                         try {
-                            // Broadcast user message to other participants in the conversation (exclude sender socket)
                             socket.to(`conversation:${conversationId}`).emit("message:new", {
                                 conversationId,
                                 message: userMessage,
                                 messageId,
                             });
-                            // Also notify other sockets of the same user that are NOT in the conversation room.
-                            // This avoids sending the same message twice to sockets that are already in the conversation room
-                            // (those sockets have already received the event above).
                             try {
                                 const room = io.sockets.adapter.rooms.get(`conversation:${conversationId}`);
                                 const roomSockets = room ? new Set(Array.from(room)) : new Set();
-                                // getUserSockets is available in this module and returns all socket ids for the user
                                 const userSocketIds = getUserSockets(socket.userId);
                                 for (const sid of userSocketIds) {
-                                    // skip sender socket and any sockets already in the conversation room
                                     if (sid === socket.id) {
                                         continue;
                                     }
@@ -386,27 +300,19 @@ export const initializeSocketIO = (httpServer) => {
                                 }
                             }
                             catch (e) {
-                                // ignore per-socket notify failures
                             }
-                            // After other clients have been notified about the user's message, start AI typing
-                            // for everyone in the conversation room (including the sender) so the typing indicator
-                            // appears after the user message in other tabs.
                             io.to(`conversation:${conversationId}`).emit("ai:typing:start", {
                                 conversationId,
                                 messageId,
                             });
-                            // Mark conversation as unread for sockets of this user that are NOT viewing it
                             if (socket.userId) {
                                 const userSocketIds = getUserSockets(socket.userId);
                                 userSocketIds.forEach((sid) => {
-                                    // Skip if socket is currently viewing this conversation
                                     const viewingConv = socketViewingConversation.get(sid);
                                     if (viewingConv === conversationId) {
                                         return;
                                     }
-                                    // Mark as unread for this socket
                                     markConversationAsUnread(sid, conversationId);
-                                    // Emit unread status to this socket
                                     const targetSocket = io.sockets.sockets.get(sid);
                                     if (targetSocket) {
                                         targetSocket.emit("conversation:unread_status", {
@@ -419,52 +325,32 @@ export const initializeSocketIO = (httpServer) => {
                             }
                         }
                         catch (err) {
-                            // ignore
                         }
-                    }, enrichedAttachments, // Pass ENRICHED attachments with openai_file_id
-                    undefined, // metadata (resend/edit) - not used here
-                    enhancedSystemPrompt // Pass enhanced system prompt if LTM enabled
-                    );
-                    // STEP 3: Background memory analysis (non-blocking)
-                    // Run AFTER sending response to user
+                    }, enrichedAttachments, undefined, enhancedSystemPrompt);
                     if (isLTMEnabled() && result.assistantMessage) {
-                        // Don't await - let it run in background
                         analyzeAndUpdateMemory(socket.userId, conversationId, content, result.assistantMessage.content).catch((err) => {
-                            // Background memory analysis failed
                         });
                     }
-                    // CRITICAL FIX: Broadcast complete messages with different content for sender vs others
-                    // - Others (non-sender): Get both userMessage and assistantMessage
-                    // - Sender: Get assistantMessage + userMessage (need userMessage to replace optimistic temp_id)
-                    // 1. Broadcast to conversation room EXCLUDING sender
                     socket.to(`conversation:${conversationId}`).emit("message:complete", {
                         userMessage: result.userMessage,
                         assistantMessage: result.assistantMessage,
                         conversation: result.conversation,
                         messageId,
                     });
-                    // 2. Send to sender socket with BOTH messages
-                    // IMPORTANT: Sender NEEDS userMessage to replace optimistic message (temp_id)
                     socket.emit("message:complete", {
-                        userMessage: result.userMessage, // Include userMessage for temp_id replacement
+                        userMessage: result.userMessage,
                         assistantMessage: result.assistantMessage,
                         conversation: result.conversation,
                         messageId,
                     });
-                    // 3. Send to sender's OTHER sockets (other tabs of same user)
-                    // IMPORTANT: Only send to sockets that are NOT in the conversation room
-                    // (those in the room already received the broadcast in step 1)
                     try {
                         const room = io.sockets.adapter.rooms.get(`conversation:${conversationId}`);
                         const roomSockets = room ? new Set(Array.from(room)) : new Set();
                         const userSocketIds = getUserSockets(socket.userId);
                         for (const sid of userSocketIds) {
-                            // Skip current sender socket (already handled in step 2)
                             if (sid === socket.id) {
                                 continue;
                             }
-                            // Skip if socket is already in the conversation room
-                            // (it already received the message in step 1)
                             if (roomSockets.has(sid)) {
                                 continue;
                             }
@@ -480,9 +366,7 @@ export const initializeSocketIO = (httpServer) => {
                         }
                     }
                     catch (e) {
-                        // ignore per-socket notify failures
                     }
-                    // Broadcast conversation update to user room for multi-tab conversation list sync
                     if (result.conversation) {
                         broadcastToUser(socket.userId, "conversation:activity", {
                             conversationId,
@@ -493,8 +377,6 @@ export const initializeSocketIO = (httpServer) => {
                     }
                 }
                 catch (streamErr) {
-                    // CRITICAL FIX: Handle streaming errors properly
-                    // Emit error event to client so they can handle it gracefully
                     io.to(`conversation:${conversationId}`).emit("error", {
                         message: streamErr.message || "Streaming failed",
                         conversationId,
@@ -503,8 +385,6 @@ export const initializeSocketIO = (httpServer) => {
                     });
                 }
                 finally {
-                    // CRITICAL FIX: Always stop typing indicator, even if streaming failed
-                    // This ensures client UI doesn't get stuck in "typing" state
                     io.to(`conversation:${conversationId}`).emit("ai:typing:stop", {
                         conversationId,
                         messageId,
@@ -512,20 +392,16 @@ export const initializeSocketIO = (httpServer) => {
                 }
             }
             catch (error) {
-                // Error in typing:start handler
             }
         });
         socket.on("typing:stop", (conversationId) => {
             if (!conversationId)
                 return;
-            // typing stop received
-            // Broadcast typing stop to other users in the conversation
             socket.to(`conversation:${conversationId}`).emit("user:typing:stop", {
                 userId: socket.userId,
                 conversationId,
             });
         });
-        // Handle follow-up suggestions request
         socket.on("request_followups", async (data) => {
             try {
                 const { sessionId, messageId, lastUserMessage, lastBotMessage } = data;
@@ -543,11 +419,8 @@ export const initializeSocketIO = (httpServer) => {
                     });
                     return;
                 }
-                // Import followup service dynamically
                 const { generateFollowupSuggestions } = await import("./followup.service.js");
-                // Generate suggestions with context
                 const suggestions = await generateFollowupSuggestions(lastUserMessage, lastBotMessage);
-                // Broadcast suggestions to all sockets in the same session (multi-tab sync)
                 io.to(`session:${sessionId}`).emit("followups_response", {
                     messageId,
                     suggestions,
@@ -556,7 +429,6 @@ export const initializeSocketIO = (httpServer) => {
             catch (error) {
                 const messageId = data?.messageId || "";
                 const sessionId = data?.sessionId || "";
-                // Broadcast error to all sockets in the same session
                 if (sessionId) {
                     io.to(`session:${sessionId}`).emit("followups_error", {
                         messageId,
@@ -571,7 +443,6 @@ export const initializeSocketIO = (httpServer) => {
                 }
             }
         });
-        // Handle conversation-based follow-up suggestions request (for input lightbulb)
         socket.on("request_conversation_followups", async (data) => {
             try {
                 const { sessionId, conversationId, messages, forceRegenerate } = data;
@@ -582,11 +453,8 @@ export const initializeSocketIO = (httpServer) => {
                     });
                     return;
                 }
-                // Special handling for new chat suggestions (conversationId === "new_chat_suggestions")
                 if (conversationId === "new_chat_suggestions") {
-                    // Import new chat suggestions service
                     const { getNewChatSuggestions } = await import("./new-chat-suggestions.service.js");
-                    // Get cached or generate new suggestions
                     const userId = socket.userId;
                     if (!userId) {
                         socket.emit("conversation_followups_error", {
@@ -596,14 +464,12 @@ export const initializeSocketIO = (httpServer) => {
                         return;
                     }
                     const suggestions = await getNewChatSuggestions(userId, forceRegenerate || false);
-                    // Broadcast suggestions to all sockets in the same session (multi-tab sync)
                     io.to(`session:${sessionId}`).emit("conversation_followups_response", {
                         conversationId,
                         suggestions,
                     });
                     return;
                 }
-                // Regular conversation followups
                 if (!messages || !Array.isArray(messages) || messages.length === 0) {
                     socket.emit("conversation_followups_error", {
                         conversationId,
@@ -611,11 +477,8 @@ export const initializeSocketIO = (httpServer) => {
                     });
                     return;
                 }
-                // Import followup service dynamically
                 const { generateConversationFollowups } = await import("./followup.service.js");
-                // Generate suggestions based on conversation history
                 const suggestions = await generateConversationFollowups(messages);
-                // Broadcast suggestions to all sockets in the same session (multi-tab sync)
                 io.to(`session:${sessionId}`).emit("conversation_followups_response", {
                     conversationId,
                     suggestions,
@@ -624,7 +487,6 @@ export const initializeSocketIO = (httpServer) => {
             catch (error) {
                 const conversationId = data?.conversationId || "";
                 const sessionId = data?.sessionId || "";
-                // Broadcast error to all sockets in the same session
                 if (sessionId) {
                     io.to(`session:${sessionId}`).emit("conversation_followups_error", {
                         conversationId,
@@ -639,25 +501,19 @@ export const initializeSocketIO = (httpServer) => {
                 }
             }
         });
-        // Handle disconnection
         socket.on("disconnect", (reason) => {
-            // socket disconnected
             handleUserDisconnection(socket);
         });
-        // Handle conversation updates (for real-time sync across tabs)
         socket.on("conversation:update", (data) => {
             const { conversationId, update } = data;
             if (!conversationId) {
                 socket.emit("error", { message: "Conversation ID is required" });
                 return;
             }
-            // conversation update received
-            // Broadcast update to other sockets of the same user (excluding sender) via user room for multi-tab sync
             broadcastToUser(socket.userId, "conversation:updated", {
                 conversationId,
                 update,
             }, socket.id);
-            // ALSO broadcast update to all other participants in the conversation room (excluding sender)
             try {
                 socket.broadcast.to(`conversation:${conversationId}`).emit("conversation:updated", {
                     conversationId,
@@ -665,19 +521,14 @@ export const initializeSocketIO = (httpServer) => {
                 });
             }
             catch (e) {
-                // ignore
             }
         });
-        // Handle conversation creation (for real-time sync across tabs)
         socket.on("conversation:create", (conversation) => {
             if (!conversation) {
                 socket.emit("error", { message: "Conversation data is required" });
                 return;
             }
-            // conversation creation received
-            // Broadcast creation to other sockets of the same user (excluding sender) via user room for multi-tab sync
             broadcastToUser(socket.userId, "conversation:created", conversation, socket.id);
-            // ALSO broadcast creation to the conversation room (if any other sockets already joined, excluding sender)
             try {
                 if (conversation?.id) {
                     socket.broadcast
@@ -686,43 +537,30 @@ export const initializeSocketIO = (httpServer) => {
                 }
             }
             catch (error) {
-                // Error broadcasting conversation:created
             }
         });
-        // Handle conversation deletion (for real-time sync across tabs)
         socket.on("conversation:delete", (conversationId) => {
             if (!conversationId) {
                 socket.emit("error", { message: "Conversation ID is required" });
                 return;
             }
-            // conversation deletion requested
-            // Broadcast deletion to other sockets of the same user (excluding sender) via user room for multi-tab sync
             broadcastToUser(socket.userId, "conversation:deleted", { conversationId }, socket.id);
-            // ALSO broadcast deletion to the conversation room (all other participants, excluding sender)
             try {
                 socket.broadcast
                     .to(`conversation:${conversationId}`)
                     .emit("conversation:deleted", { conversationId });
             }
             catch (error) {
-                // Error broadcasting conversation:deleted
             }
-            // Remove all sockets from the conversation room
-            // removing sockets from conversation room
             io.in(`conversation:${conversationId}`).socketsLeave(`conversation:${conversationId}`);
-            // conversation room cleared
         });
-        // Handle conversation view (for unread tracking - multi-tab)
         socket.on("conversation:view", (data) => {
             const { conversationId } = data;
             if (!conversationId) {
                 socket.emit("error", { message: "Conversation ID is required" });
                 return;
             }
-            // Mark conversation as read for this socket
             markConversationAsRead(socket.id, conversationId);
-            // Broadcast to all sockets of this user that this conversation is now read
-            // This allows other tabs to update their UI
             if (socket.userId) {
                 const userSocketIds = getUserSockets(socket.userId);
                 userSocketIds.forEach((sid) => {
@@ -737,23 +575,18 @@ export const initializeSocketIO = (httpServer) => {
                 });
             }
         });
-        // Handle leaving conversation view (for unread tracking - multi-tab)
         socket.on("conversation:leave_view", (data) => {
             const { conversationId } = data;
             if (!conversationId) {
                 socket.emit("error", { message: "Conversation ID is required" });
                 return;
             }
-            // Clear viewing state for this socket
             leaveConversationView(socket.id);
         });
-        // Handle ping/pong for connection health
         socket.on("ping", () => {
             socket.emit("pong");
         });
-        // Handle connection errors
-        socket.on("error", ( /* error */) => {
-            // socket error event
+        socket.on("error", () => {
         });
     });
     return io;

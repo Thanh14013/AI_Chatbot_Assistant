@@ -1,13 +1,6 @@
-/**
- * Authorization Middleware
- * Verify user access to resources
- */
 import Conversation from "../models/conversation.model.js";
 import User from "../models/user.model.js";
 import Project from "../models/project.model.js";
-/**
- * Get user ID from authenticated request
- */
 const getUserIdFromRequest = async (req) => {
     const userEmail = req.user?.email;
     if (!userEmail)
@@ -15,10 +8,6 @@ const getUserIdFromRequest = async (req) => {
     const user = await User.findByEmail(userEmail);
     return user ? user.id : null;
 };
-/**
- * Verify user has access to conversation
- * Middleware to check conversation ownership
- */
 export const verifyConversationAccess = async (req, res, next) => {
     try {
         const conversationId = req.params.id || req.params.conversationId;
@@ -37,7 +26,6 @@ export const verifyConversationAccess = async (req, res, next) => {
             });
             return;
         }
-        // Check if conversation exists and belongs to user
         const conversation = await Conversation.findOne({
             where: {
                 id: conversationId,
@@ -52,7 +40,6 @@ export const verifyConversationAccess = async (req, res, next) => {
             });
             return;
         }
-        // Attach conversation to request for later use
         req.conversation = conversation;
         next();
     }
@@ -63,10 +50,6 @@ export const verifyConversationAccess = async (req, res, next) => {
         });
     }
 };
-/**
- * Verify user has access to project
- * Middleware to check project ownership
- */
 export const verifyProjectAccess = async (req, res, next) => {
     try {
         const projectId = req.params.id || req.params.projectId;
@@ -85,7 +68,6 @@ export const verifyProjectAccess = async (req, res, next) => {
             });
             return;
         }
-        // Check if project exists and belongs to user
         const project = await Project.findOne({
             where: {
                 id: projectId,
@@ -100,7 +82,6 @@ export const verifyProjectAccess = async (req, res, next) => {
             });
             return;
         }
-        // Attach project to request for later use
         req.project = project;
         next();
     }
@@ -111,10 +92,6 @@ export const verifyProjectAccess = async (req, res, next) => {
         });
     }
 };
-/**
- * Verify user has access to file
- * Middleware to check file ownership through conversation
- */
 export const verifyFileAccess = async (req, res, next) => {
     try {
         const fileId = req.params.id || req.params.fileId;
@@ -133,9 +110,7 @@ export const verifyFileAccess = async (req, res, next) => {
             });
             return;
         }
-        // Import FileUploadModel dynamically to avoid circular dependency
         const FileUploadModel = (await import("../models/fileUpload.model.js")).default;
-        // Get file by public_id (files use string IDs, not numbers)
         const file = await FileUploadModel.findByPublicId(fileId);
         if (!file) {
             res.status(404).json({
@@ -144,7 +119,6 @@ export const verifyFileAccess = async (req, res, next) => {
             });
             return;
         }
-        // Check if user owns the file (through conversation ownership)
         if (file.conversation_id) {
             const conversation = await Conversation.findOne({
                 where: {
@@ -161,8 +135,6 @@ export const verifyFileAccess = async (req, res, next) => {
                 return;
             }
         }
-        // Note: Files without conversation_id are allowed (uploaded but not yet attached)
-        // Attach file to request for later use
         req.file = file;
         next();
     }

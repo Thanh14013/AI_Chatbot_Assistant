@@ -1,26 +1,7 @@
 import { searchAllConversations, searchWithinConversation, } from "../services/global-search.service.js";
-/**
- * Global semantic search across all user's conversations
- * POST /api/search/all
- *
- * Search for semantically similar messages across all conversations
- *
- * Request body:
- * - query: string (required) - Search query text
- * - limit: number (optional, default: 10) - Max conversations to return
- * - messagesPerConversation: number (optional, default: 3) - Top messages per conversation
- * - similarity_threshold: number (optional, default: 0.7) - Minimum similarity (0-1)
- *
- * Response:
- * - query: string - Original search query
- * - results: array - Matching conversations with their best messages
- * - totalConversations: number - Total conversations found
- */
 export const globalSearch = async (req, res) => {
     try {
-        // Helper: normalize user extraction (support decoded token with id or email)
         const decoded = req.user || req.body?.user;
-        // Try to obtain user id directly; if only email present, look up id from DB in calling service
         const userId = decoded?.id || decoded?.userId || null;
         if (!userId && !decoded?.email) {
             res.status(401).json({
@@ -29,9 +10,7 @@ export const globalSearch = async (req, res) => {
             });
             return;
         }
-        // Get search parameters from request body
         const { query, tags, limit, messagesPerConversation, similarity_threshold } = req.body;
-        // Validate query
         if (!query || query.trim().length === 0) {
             res.status(400).json({
                 error: "Bad Request",
@@ -39,7 +18,6 @@ export const globalSearch = async (req, res) => {
             });
             return;
         }
-        // Validate limit if provided
         if (limit !== undefined) {
             if (typeof limit !== "number" || limit < 1 || limit > 50) {
                 res.status(400).json({
@@ -49,7 +27,6 @@ export const globalSearch = async (req, res) => {
                 return;
             }
         }
-        // Validate messagesPerConversation if provided
         if (messagesPerConversation !== undefined) {
             if (typeof messagesPerConversation !== "number" ||
                 messagesPerConversation < 1 ||
@@ -61,7 +38,6 @@ export const globalSearch = async (req, res) => {
                 return;
             }
         }
-        // Validate similarity_threshold if provided
         if (similarity_threshold !== undefined) {
             if (typeof similarity_threshold !== "number" ||
                 similarity_threshold < 0 ||
@@ -73,7 +49,6 @@ export const globalSearch = async (req, res) => {
                 return;
             }
         }
-        // Validate tags if provided
         if (tags !== undefined) {
             if (!Array.isArray(tags)) {
                 res.status(400).json({
@@ -82,7 +57,6 @@ export const globalSearch = async (req, res) => {
                 });
                 return;
             }
-            // Validate each tag
             for (const tag of tags) {
                 if (typeof tag !== "string" || tag.trim().length === 0) {
                     res.status(400).json({
@@ -93,10 +67,7 @@ export const globalSearch = async (req, res) => {
                 }
             }
         }
-        // Perform global search
-        // If userId not directly available, pass the decoded.email so the service layer can resolve it
         const searchInputUser = userId || decoded?.email;
-        // Debug logging removed for search parameters
         const searchResult = await searchAllConversations(searchInputUser, {
             query,
             tags,
@@ -104,15 +75,12 @@ export const globalSearch = async (req, res) => {
             messagesPerConversation,
             similarity_threshold,
         });
-        // Search results summary log removed
-        // Return results
         res.status(200).json({
             success: true,
             data: searchResult,
         });
     }
     catch (error) {
-        // Handle specific errors
         if (error.message.includes("API key") || error.message.includes("not configured")) {
             res.status(503).json({
                 error: "Service Unavailable",
@@ -120,29 +88,12 @@ export const globalSearch = async (req, res) => {
             });
             return;
         }
-        // Generic error response
         res.status(500).json({
             error: "Internal Server Error",
             message: error.message || "Failed to perform global search",
         });
     }
 };
-/**
- * Search within a specific conversation and get message context
- * POST /api/search/conversation/:id
- *
- * Similar to existing semantic search but returns full context for highlighting
- *
- * Request body:
- * - query: string (required) - Search query text
- * - limit: number (optional, default: 5) - Max results to return
- * - contextMessages: number (optional, default: 2) - Messages before/after for context
- *
- * Response:
- * - query: string
- * - bestMatch: object - The best matching message
- * - results: array - All matching messages with context
- */
 export const conversationSearchWithContext = async (req, res) => {
     try {
         const conversationId = req.params.id;
@@ -163,8 +114,6 @@ export const conversationSearchWithContext = async (req, res) => {
             });
             return;
         }
-        // Perform search with context
-        // If userId not available, pass email to service and let it resolve
         const searchInputUser = userId || decoded?.email;
         const searchResult = await searchWithinConversation(conversationId, searchInputUser, {
             query,

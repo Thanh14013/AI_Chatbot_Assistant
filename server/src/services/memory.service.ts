@@ -21,9 +21,6 @@ import { generateEmbedding } from "./embedding.service.js";
 import type {
   UserProfile,
   UserFacts,
-  PersonalFacts,
-  PreferenceFacts,
-  TechnicalContextFacts,
   MemoryEvent,
   CreateMemoryEventInput,
   MemoryEventWithSimilarity,
@@ -33,7 +30,6 @@ import type {
   MemoryExtractionParams,
   MemoryContextOptions,
   MemoryContext,
-  ImportanceScore,
   MergeOptions,
 } from "../types/memory.type.js";
 
@@ -574,7 +570,7 @@ export function getLTMConfig() {
 export async function extractMemoryFromConversation(
   params: MemoryExtractionParams
 ): Promise<MemoryAnalysis> {
-  const { userId, conversationId, userMessage, assistantMessage, currentProfile } = params;
+  const { userMessage, assistantMessage, currentProfile } = params;
 
   try {
     if (!LTM_CONFIG.ENABLED) {
@@ -624,8 +620,8 @@ export async function extractMemoryFromConversation(
  * Build Meta-LLM prompt for memory extraction
  */
 function buildMemoryExtractionPrompt(
-  userMessage: string,
-  assistantMessage: string,
+  _userMessage: string,
+  _assistantMessage: string,
   currentProfile: UserProfile | null
 ): string {
   const existingFacts = currentProfile?.facts || {};

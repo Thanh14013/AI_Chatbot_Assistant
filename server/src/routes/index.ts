@@ -6,10 +6,12 @@ import userRoutes from "./user.route.js";
 import fileUploadRoutes from "./fileUpload.routes.js";
 import projectRoutes from "./project.routes.js";
 import memoryRoutes from "./memory.route.js";
-import { getChatCompletion } from "../services/openai.service.js";
-import openai from "../services/openai.service.js";
+import healthRoutes from "./health.routes.js";
 
 const router = Router();
+
+// Health check routes (no authentication required)
+router.use("/", healthRoutes);
 
 // Authentication routes
 router.use("/auth", authRoutes);
@@ -31,14 +33,5 @@ router.use("/files", fileUploadRoutes);
 
 // Memory routes (Long Term Memory)
 router.use("/memory", memoryRoutes);
-
-// Health check route
-router.get("/health", (req, res) => {
-  res.json({
-    success: true,
-    message: "API is running",
-    timestamp: new Date().toISOString(),
-  });
-});
 
 export default router;

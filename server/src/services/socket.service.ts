@@ -1,8 +1,11 @@
 import { Server as SocketIOServer } from "socket.io";
+import { createAdapter } from "@socket.io/redis-adapter";
 import type { Server as HTTPServer } from "http";
 import type { Socket } from "socket.io";
 import { verifyAccessToken } from "../utils/generateToken.js";
 import type { JwtPayload } from "jsonwebtoken";
+import redisClient, { isRedisConnected } from "../config/redis.config.js";
+import { logInfo, logWarn, logError } from "../utils/logger.util.js";
 import type {
   ServerToClientEvents,
   ClientToServerEvents,
@@ -325,6 +328,32 @@ export const initializeSocketIO = (
     pingInterval: 25000,
     transports: ["websocket", "polling"],
   });
+
+  // Setup Redis Adapter for horizontal scaling (if Redis is available)
+  if (isRedisConnected()) {
+    try {
+      const pubClient = redisClient.duplicate();
+      const subClient = redisClient.duplicate();
+
+      // Connect Redis clients for adapter (fire and forget - non-blocking)
+      Promise.all([pubClient.connect(), subClient.connect()])
+        .then(() => {
+          io.adapter(createAdapter(pubClient, subClient));
+          logInfo("Socket.IO Redis Adapter initialized - horizontal scaling enabled");
+        })
+        .catch((error) => {
+          logWarn("Failed to initialize Socket.IO Redis Adapter - running in single-server mode", {
+            error,
+          });
+        });
+    } catch (error) {
+      logWarn("Failed to setup Socket.IO Redis Adapter - running in single-server mode", {
+        error,
+      });
+    }
+  } else {
+    logWarn("Redis not available - Socket.IO running without adapter (single-server only)");
+  }
 
   // Apply authentication middleware
   io.use(socketAuthMiddleware);

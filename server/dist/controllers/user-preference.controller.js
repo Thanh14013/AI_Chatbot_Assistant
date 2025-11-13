@@ -1,11 +1,6 @@
 import { getUserPreferences, updateUserPreferences } from "../services/user-preference.service.js";
-/**
- * Get user preferences
- * GET /api/users/preferences
- */
 export const getPreferences = async (req, res) => {
     try {
-        // Get user ID from authenticated user
         const userId = req.user?.id;
         if (!userId) {
             res.status(401).json({
@@ -28,13 +23,8 @@ export const getPreferences = async (req, res) => {
         });
     }
 };
-/**
- * Update user preferences
- * PUT /api/users/preferences
- */
 export const updatePreferences = async (req, res) => {
     try {
-        // Get user ID from authenticated user
         const userId = req.user?.id;
         if (!userId) {
             res.status(401).json({
@@ -44,7 +34,6 @@ export const updatePreferences = async (req, res) => {
             return;
         }
         const updates = req.body;
-        // Validate that at least one field is provided
         if (!updates.language && !updates.response_style && updates.custom_instructions === undefined) {
             res.status(400).json({
                 success: false,
@@ -61,7 +50,6 @@ export const updatePreferences = async (req, res) => {
     }
     catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Failed to update preferences";
-        // Return 400 for validation errors
         if (errorMessage.includes("Invalid") ||
             errorMessage.includes("exceed") ||
             errorMessage.includes("Supported")) {

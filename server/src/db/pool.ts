@@ -13,10 +13,16 @@ const pool = new Pool({
   max: 20, // Maximum pool size
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
+  ssl:
+    process.env.DB_SSL === "true"
+      ? {
+          rejectUnauthorized: false,
+        }
+      : undefined,
 });
 
 // Handle pool errors
-pool.on("error", (err) => {
+pool.on("error", (_err) => {
   process.exit(-1);
 });
 

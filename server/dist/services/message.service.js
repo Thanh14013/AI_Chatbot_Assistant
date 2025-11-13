@@ -7,25 +7,15 @@ import { buildSystemPromptWithPreferences } from "./user-preference.service.js";
 import { Op } from "sequelize";
 import { cacheAside, CACHE_TTL, invalidateCachePattern } from "./cache.service.js";
 import { messageHistoryKey, messageHistoryPattern, contextPattern, conversationListPattern, } from "../utils/cache-key.util.js";
-/**
- * Create a new message
- *
- * @param data - Message creation data
- * @returns Created message
- */
 export const createMessage = async (data) => {
-    // Validate required fields
     if (!data.conversation_id || !data.content || !data.role) {
         throw new Error("Conversation ID, content, and role are required");
     }
-    // Get conversation to retrieve model
     const conversation = await Conversation.findByPk(data.conversation_id);
     if (!conversation) {
         throw new Error("Conversation not found");
     }
-    // Estimate tokens if not provided
     const tokens_used = data.tokens_used || estimateTokenCount(data.content);
-    // Create message
     const message = await Message.create({
         conversation_id: data.conversation_id,
         role: data.role,
@@ -33,22 +23,15 @@ export const createMessage = async (data) => {
         tokens_used,
         model: data.model || conversation.model,
     });
-    // Update conversation totals to include this message's tokens and count
     conversation.total_tokens_used += tokens_used;
     conversation.message_count += 1;
-    // Explicitly update updatedAt
     conversation.set("updatedAt", new Date());
     await conversation.save();
-    // Invalidate related caches
     await invalidateCachePattern(messageHistoryPattern(data.conversation_id));
     await invalidateCachePattern(contextPattern(data.conversation_id));
     await invalidateCachePattern(conversationListPattern(conversation.user_id));
-    // Generate and store embedding asynchronously (don't wait for it)
-    // This runs in the background and doesn't block the response
     generateAndStoreEmbedding(message.id, message.content).catch(() => {
-        // logging removed: background embedding generation failed for message
     });
-    // Return message response
     return {
         id: message.id,
         conversation_id: message.conversation_id,
@@ -60,20 +43,9 @@ export const createMessage = async (data) => {
         createdAt: message.createdAt,
     };
 };
-/**
- * Get all messages for a conversation with pagination
- *
- * @param conversationId - Conversation ID
- * @param userId - User ID (for authorization check)
- * @param page - Page number (default: 1)
- * @param limit - Messages per page (default: 30)
- * @returns Array of messages with pagination info
- */
 export const getConversationMessages = async (conversationId, userId, page = 1, limit = 30, before) => {
-    // Use cache for message history
     const cacheKey = messageHistoryKey(conversationId, page, limit, before);
     const fetchMessages = async () => {
-        // Verify conversation exists and user has access
         const conversation = await Conversation.findOne({
             where: {
                 id: conversationId,
@@ -86,12 +58,10 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
         if (conversation.user_id !== userId) {
             throw new Error("Unauthorized access to conversation");
         }
-        // Get total message count (useful for full pagination)
         const total = await Message.count({
             where: { conversation_id: conversationId },
         });
         const totalPages = Math.ceil(total / limit);
-        // If `before` provided, fetch messages older than the given message id
         if (before) {
             const beforeMsg = await Message.findByPk(before);
             if (!beforeMsg || beforeMsg.conversation_id !== conversationId) {
@@ -99,8 +69,6 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
             }
             const beforeDate = beforeMsg.createdAt;
             const beforeId = beforeMsg.id;
-            // Find messages strictly older than the before message. If createdAt is equal,
-            // use id comparison to have deterministic ordering.
             const olderMessages = await Message.findAll({
                 where: {
                     conversation_id: conversationId,
@@ -115,7 +83,6 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
                 ],
                 limit,
             });
-            // Map to response
             const messageResponses = olderMessages.map((msg) => ({
                 id: msg.id,
                 conversation_id: msg.conversation_id,
@@ -126,7 +93,6 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
                 pinned: msg.pinned,
                 createdAt: msg.createdAt,
             }));
-            // Fetch attachments for all messages
             const { default: fileUploadModel } = await import("../models/fileUpload.model.js");
             for (const msgResponse of messageResponses) {
                 try {
@@ -144,15 +110,13 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
                             height: att.height,
                             thumbnail_url: att.thumbnail_url,
                             extracted_text: att.extracted_text,
-                            openai_file_id: att.openai_file_id, // Include OpenAI file_id
+                            openai_file_id: att.openai_file_id,
                         }));
                     }
                 }
                 catch (err) {
-                    // Don't fail if attachments fetch fails
                 }
             }
-            // Determine if there are more messages older than the first returned
             let hasMore = false;
             if (messageResponses.length > 0) {
                 const first = messageResponses[0];
@@ -181,8 +145,6 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
                 },
             };
         }
-        // Default behavior: page-based pagination from the end (latest messages)
-        // Get messages in chronological order (oldest first)
         const allMessages = await Message.findAll({
             where: { conversation_id: conversationId },
             order: [
@@ -190,7 +152,6 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
                 ["id", "ASC"],
             ],
         });
-        // Page 1 shows the last `limit` messages, page 2 shows the previous `limit`, etc.
         const startIndex = Math.max(0, total - page * limit);
         const endIndex = total - (page - 1) * limit;
         const paginatedMessages = allMessages.slice(startIndex, endIndex);
@@ -204,13 +165,11 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
             pinned: msg.pinned,
             createdAt: msg.createdAt,
         }));
-        // Fetch attachments for all messages (batch query to avoid N+1)
         const messageIds = messageResponses.map((m) => m.id);
         if (messageIds.length > 0) {
             try {
                 const { default: pool } = await import("../db/pool.js");
                 const attachmentsResult = await pool.query(`SELECT * FROM files_upload WHERE message_id = ANY($1) ORDER BY created_at ASC`, [messageIds]);
-                // Group attachments by message_id
                 const attachmentsByMessage = new Map();
                 for (const att of attachmentsResult.rows) {
                     if (!attachmentsByMessage.has(att.message_id)) {
@@ -230,13 +189,11 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
                         extracted_text: att.extracted_text,
                     });
                 }
-                // Attach to messages
                 for (const msgResponse of messageResponses) {
                     msgResponse.attachments = attachmentsByMessage.get(msgResponse.id) || [];
                 }
             }
             catch (err) {
-                // Don't fail if attachments fetch fails
             }
         }
         return {
@@ -252,45 +209,10 @@ export const getConversationMessages = async (conversationId, userId, page = 1, 
     };
     return await cacheAside(cacheKey, fetchMessages, CACHE_TTL.MESSAGE_HISTORY);
 };
-/**
- * Send a user message and get AI response
- * This function:
- * 1. Saves the user message to database
- * 2. Builds context from conversation history
- * 3. Calls OpenAI API to get response
- * 4. Saves AI response to database
- * 5. Updates conversation stats
- * 6. Returns both messages
- *
- * @param conversationId - Conversation ID
- * @param userId - User ID (for authorization check)
- * @param content - User message content
- * @returns User message and AI response
- */
-// non-streaming sendMessageAndGetResponse removed in favor of streaming API
-/**
- * Send a user message and stream AI response via onChunk callback.
- * Persists the user message immediately and persists assistant response once complete.
- *
- * @param conversationId
- * @param userId
- * @param content
- * @param onChunk - callback invoked with each partial text chunk
- * @returns assistant message record
- */
-export const sendMessageAndStreamResponse = async (conversationId, userId, content, onChunk, 
-// optional callback invoked immediately after the user message is persisted
-onUserMessageCreated, 
-// optional attachments array
-attachments, 
-// optional metadata for resend/edit operations
-metadata, 
-// optional enhanced system prompt (from LTM)
-enhancedSystemPrompt) => {
+export const sendMessageAndStreamResponse = async (conversationId, userId, content, onChunk, onUserMessageCreated, attachments, metadata, enhancedSystemPrompt) => {
     if (!content || content.trim().length === 0) {
         throw new Error("Message content cannot be empty");
     }
-    // Verify conversation and access
     const conversation = await Conversation.findOne({
         where: { id: conversationId, deleted_at: null },
     });
@@ -298,7 +220,6 @@ enhancedSystemPrompt) => {
         throw new Error("Conversation not found");
     if (conversation.user_id !== userId)
         throw new Error("Unauthorized access to conversation");
-    // Step 1: persist user message FIRST
     const userTokens = estimateTokenCount(content);
     const userMessage = await Message.create({
         conversation_id: conversationId,
@@ -307,7 +228,6 @@ enhancedSystemPrompt) => {
         tokens_used: userTokens,
         model: conversation.model,
     });
-    // Link attachments to this message if present
     if (attachments && attachments.length > 0) {
         try {
             const { default: fileUploadModel } = await import("../models/fileUpload.model.js");
@@ -315,16 +235,12 @@ enhancedSystemPrompt) => {
             await fileUploadModel.updateMessageId(publicIds, userMessage.id);
         }
         catch (err) {
-            // Don't fail the entire request if linking fails
         }
     }
-    // Invalidate message-related caches BEFORE broadcasting to prevent stale reads
     await invalidateCachePattern(messageHistoryPattern(conversationId));
     await invalidateCachePattern(contextPattern(conversationId));
-    // Invoke callback so callers (socket server) can broadcast the persisted user message
     try {
         if (onUserMessageCreated) {
-            // Fetch attachments for this message to include in broadcast
             let messageAttachments;
             if (attachments && attachments.length > 0) {
                 try {
@@ -343,12 +259,11 @@ enhancedSystemPrompt) => {
                             height: att.height,
                             thumbnail_url: att.thumbnail_url,
                             extracted_text: att.extracted_text,
-                            openai_file_id: att.openai_file_id, // Include OpenAI file_id
+                            openai_file_id: att.openai_file_id,
                         }));
                     }
                 }
                 catch (err) {
-                    // Don't fail the entire request if linking fails
                 }
             }
             await onUserMessageCreated({
@@ -364,40 +279,30 @@ enhancedSystemPrompt) => {
         }
     }
     catch (err) {
-        // ignore errors from user callback to avoid breaking streaming
     }
-    // ⚡ CRITICAL: Update conversation metadata immediately
     conversation.total_tokens_used += userTokens;
     conversation.message_count += 1;
-    // Explicitly mark updatedAt as changed to ensure Sequelize updates it
     conversation.set("updatedAt", new Date());
     await conversation.save();
-    // Invalidate conversation list cache AFTER updating totals
     await invalidateCachePattern(conversationListPattern(conversation.user_id));
-    // Generate and store embedding for user message (async, non-blocking)
     generateAndStoreEmbedding(userMessage.id, userMessage.content).catch(() => {
-        // logging removed: background embedding generation failed for user message
     });
-    // Build context with user preferences
     const baseSystemPrompt = "You are a helpful AI assistant. Provide clear, accurate, and helpful responses. IMPORTANT: When providing code in your responses, ALWAYS wrap it in markdown code blocks with triple backticks (```) and the language identifier (e.g., ```cpp for C++, ```python for Python, ```javascript for JavaScript). Never provide raw code without proper markdown formatting.";
-    // Use enhanced system prompt if provided (from LTM), otherwise get with user preferences
     const systemPrompt = enhancedSystemPrompt || (await buildSystemPromptWithPreferences(userId, baseSystemPrompt));
     const disableContext = String(process.env.DISABLE_CONTEXT || "false").toLowerCase() === "true";
     const useSemanticContext = String(process.env.USE_SEMANTIC_CONTEXT || "false").toLowerCase() === "true";
     let contextMessages;
     if (disableContext) {
-        // Only include system prompt and the current user message
         contextMessages = [
             { role: "system", content: systemPrompt },
             { role: "user", content: content.trim() },
         ];
     }
     else if (useSemanticContext) {
-        // Use enhanced context builder with semantic search
         try {
             const enhancedContext = await buildEnhancedContext(conversationId, content.trim(), {
-                recentLimit: Math.min(conversation.context_window, 15), // Last 15 messages max
-                semanticLimit: 5, // Top 5 semantically relevant messages
+                recentLimit: Math.min(conversation.context_window, 15),
+                semanticLimit: 5,
                 maxTokens: 4000,
                 systemPrompt,
                 useSemanticSearch: true,
@@ -405,9 +310,6 @@ enhancedSystemPrompt) => {
             contextMessages = enhancedContext;
         }
         catch {
-            // If semantic context fails, fall back to simple recent messages
-            // logging removed: semantic context failed, using recent messages
-            // Fall through to simple context below
             const recentMessages = await Message.findAll({
                 where: { conversation_id: conversationId },
                 order: [["createdAt", "DESC"]],
@@ -425,38 +327,29 @@ enhancedSystemPrompt) => {
         }
     }
     else {
-        // Fetch the N most recent messages from the conversation (including the user message we just created)
-        // This gives us the complete conversation context up to this point
         const recentMessages = await Message.findAll({
             where: { conversation_id: conversationId },
-            order: [["createdAt", "DESC"]], // newest-first for limiting
-            limit: conversation.context_window, // Use the conversation's context window setting
+            order: [["createdAt", "DESC"]],
+            limit: conversation.context_window,
         });
-        // Reverse to chronological order (oldest -> newest)
         const recentMessagesChron = recentMessages.reverse();
-        // Build context array: system prompt + N most recent messages (including current user message)
         contextMessages = [];
         if (systemPrompt) {
             contextMessages.push({ role: "system", content: systemPrompt });
         }
-        // Add all N recent messages in chronological order
-        // This includes the user message we just created, so no need to append it separately
         contextMessages.push(...recentMessagesChron.map((m) => ({
             role: m.role,
             content: m.content,
         })));
     }
-    // Handle resend/edit metadata - build context prompt
     if (metadata && (metadata.resendMessageId || metadata.editMessageId)) {
         try {
             const targetMessageId = metadata.resendMessageId || metadata.editMessageId;
-            // Find the target message to get its timestamp
             const targetMessage = await Message.findOne({
                 where: { id: targetMessageId, conversation_id: conversationId },
             });
             if (targetMessage) {
                 const targetTime = new Date(targetMessage.createdAt).getTime();
-                // Find all AI messages in this conversation
                 const aiMessages = await Message.findAll({
                     where: {
                         conversation_id: conversationId,
@@ -464,13 +357,10 @@ enhancedSystemPrompt) => {
                     },
                     order: [["createdAt", "ASC"]],
                 });
-                // Find AI message before target message
                 const aiBefore = aiMessages
                     .filter((msg) => new Date(msg.createdAt).getTime() < targetTime)
                     .pop();
-                // Find AI message after target message
                 const aiAfter = aiMessages.find((msg) => new Date(msg.createdAt).getTime() > targetTime);
-                // Build context prompt
                 let contextPrompt = "";
                 if (metadata.resendMessageId) {
                     contextPrompt =
@@ -498,7 +388,6 @@ enhancedSystemPrompt) => {
                 else {
                     contextPrompt += `Please provide a response to the user's edited message.`;
                 }
-                // Replace the last user message with the context prompt
                 if (contextMessages.length > 0) {
                     const lastMessage = contextMessages[contextMessages.length - 1];
                     if (lastMessage.role === "user") {
@@ -508,21 +397,13 @@ enhancedSystemPrompt) => {
             }
         }
         catch (err) {
-            // If context building fails, continue with normal message
-            // logging removed: failed to build resend/edit context
         }
     }
-    // Process attachments if present
-    // Determine model to use - if attachments present, always use GPT-4o for multimodal support
     let modelToUse = conversation.model;
     if (attachments && attachments.length > 0) {
-        // Import OpenAI service helpers
         const { buildMessageContentWithAttachments } = await import("./openai.service.js");
-        // Force GPT-4o when attachments present (images, PDFs, CSVs, etc.)
         modelToUse = "gpt-4o";
-        // Build enhanced content for the last user message with attachments
         const enhancedContent = buildMessageContentWithAttachments(content.trim(), attachments);
-        // Replace the last message (current user message) with enhanced version
         if (contextMessages.length > 0) {
             const lastMessage = contextMessages[contextMessages.length - 1];
             if (lastMessage.role === "user") {
@@ -530,18 +411,15 @@ enhancedSystemPrompt) => {
             }
         }
     }
-    // Prepare payload for streaming
     const payload = {
-        model: modelToUse, // Use determined model (gpt-4o if attachments, otherwise conversation model)
+        model: modelToUse,
         messages: contextMessages,
         stream: true,
         max_completion_tokens: 2000,
     };
-    // Only include temperature if supported by model
     if (!["gpt-5-nano"].includes(conversation.model)) {
         payload.temperature = 0.7;
     }
-    // Call OpenAI streaming
     const openai = (await import("./openai.service.js")).default;
     let stream;
     try {
@@ -552,9 +430,7 @@ enhancedSystemPrompt) => {
     }
     let fullContent = "";
     try {
-        // streaming start
-        // Buffer incoming deltas and emit grouped chunks of words (e.g. 1-2 words)
-        const groupSize = 2; // emit every N words (tuneable)
+        const groupSize = 2;
         let buffer = "";
         let chunkCount = 0;
         for await (const chunk of stream) {
@@ -563,39 +439,29 @@ enhancedSystemPrompt) => {
             if (delta?.content) {
                 const text = delta.content;
                 fullContent += text;
-                // Append to buffer and try to extract groups of words
                 buffer += text;
-                // Build a regex to capture the first `groupSize` words including leading whitespace
                 const groupRegex = new RegExp(`^(\\s*\\S+(?:\\s+\\S+){${groupSize - 1}})`);
                 let match = buffer.match(groupRegex);
-                // Emit as many full groups as possible
                 while (match) {
                     const piece = match[1];
-                    // invoke callback with grouped piece
                     try {
                         await onChunk(piece);
                     }
                     catch (e) {
-                        // ignore onChunk errors to keep streaming
                     }
-                    // remove emitted piece from buffer
                     buffer = buffer.slice(match[0].length);
                     match = buffer.match(groupRegex);
                 }
             }
         }
-        // After stream finishes, flush any remaining buffer (may contain partial words)
         if (buffer.length > 0) {
             try {
                 await onChunk(buffer);
             }
             catch (e) {
-                // ignore
             }
             buffer = "";
         }
-        // streaming complete
-        // Estimate tokens
         const estimated_completion_tokens = estimateTokenCount(fullContent);
         const assistantMessage = await Message.create({
             conversation_id: conversationId,
@@ -604,21 +470,15 @@ enhancedSystemPrompt) => {
             tokens_used: estimated_completion_tokens,
             model: conversation.model,
         });
-        // ⚡ CRITICAL: Update conversation metadata immediately after assistant message
         conversation.total_tokens_used += estimated_completion_tokens;
         conversation.message_count += 1;
-        // Explicitly update updatedAt to ensure conversation moves to top of list
         conversation.set("updatedAt", new Date());
         await conversation.save();
-        // Invalidate related caches for assistant message too
         await invalidateCachePattern(messageHistoryPattern(conversationId));
         await invalidateCachePattern(contextPattern(conversationId));
         await invalidateCachePattern(conversationListPattern(conversation.user_id));
-        // Generate and store embedding for assistant message (async, non-blocking)
         generateAndStoreEmbedding(assistantMessage.id, assistantMessage.content).catch((error) => {
-            // Error generating embedding for assistant message
         });
-        // Return userMessage, assistantMessage, and updated conversation for client sync
         return {
             userMessage: {
                 id: userMessage.id,
@@ -649,24 +509,14 @@ enhancedSystemPrompt) => {
         };
     }
     catch (err) {
-        // If stream errors, rethrow
         throw new Error(err?.message || "Streaming failed");
     }
 };
-/**
- * Delete a message
- *
- * @param messageId - Message ID
- * @param userId - User ID (for authorization check)
- * @returns Success message
- */
 export const deleteMessage = async (messageId, userId) => {
-    // Find message
     const message = await Message.findByPk(messageId);
     if (!message) {
         throw new Error("Message not found");
     }
-    // Get conversation to verify user access
     const conversation = await Conversation.findByPk(message.conversation_id);
     if (!conversation) {
         throw new Error("Conversation not found");
@@ -674,12 +524,9 @@ export const deleteMessage = async (messageId, userId) => {
     if (conversation.user_id !== userId) {
         throw new Error("Unauthorized access to message");
     }
-    // Delete message
     await message.destroy();
-    // Update conversation stats
     conversation.message_count = Math.max(0, conversation.message_count - 1);
     conversation.total_tokens_used = Math.max(0, conversation.total_tokens_used - message.tokens_used);
-    // Update timestamp when deleting message
     conversation.set("updatedAt", new Date());
     await conversation.save();
     return {

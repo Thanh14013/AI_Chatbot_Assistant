@@ -1,8 +1,5 @@
 import { getConversationMessages, sendMessageAndStreamResponse, deleteMessage, } from "../services/message.service.js";
 import User from "../models/user.model.js";
-/**
- * Helper function to get user ID from authenticated request
- */
 const getUserIdFromRequest = async (req) => {
     const userEmail = req.body?.user?.email;
     if (!userEmail)
@@ -10,14 +7,8 @@ const getUserIdFromRequest = async (req) => {
     const user = await User.findByEmail(userEmail);
     return user ? user.id : null;
 };
-/**
- * Get all messages for a conversation
- * GET /api/conversations/:id/messages
- * Query params: page, limit
- */
 export const getMessages = async (req, res) => {
     try {
-        // Get user ID from authenticated request
         const userId = await getUserIdFromRequest(req);
         if (!userId) {
             res.status(401).json({
@@ -26,7 +17,6 @@ export const getMessages = async (req, res) => {
             });
             return;
         }
-        // Extract conversation ID from params
         const conversationId = req.params.id;
         if (!conversationId) {
             res.status(400).json({
@@ -35,17 +25,12 @@ export const getMessages = async (req, res) => {
             });
             return;
         }
-        // Extract pagination params
         let page = parseInt(req.query.page) || 1;
         let limit = parseInt(req.query.limit) || 30;
-        // Optional: load messages before a specific message id (infinite scroll)
         const before = req.query.before;
-        // Validate and sanitize pagination parameters
-        page = Math.max(1, page); // Minimum page 1
-        limit = Math.max(1, Math.min(100, limit)); // Between 1-100
-        // Get messages
+        page = Math.max(1, page);
+        limit = Math.max(1, Math.min(100, limit));
         const result = await getConversationMessages(conversationId, userId, page, limit, before);
-        // Send success response
         res.status(200).json({
             success: true,
             message: "Messages retrieved successfully",
@@ -54,9 +39,7 @@ export const getMessages = async (req, res) => {
         });
     }
     catch (error) {
-        // Handle errors
         const errorMessage = error instanceof Error ? error.message : "Failed to get messages";
-        // Check for specific error types
         if (errorMessage.includes("not found")) {
             res.status(404).json({
                 success: false,
@@ -78,23 +61,11 @@ export const getMessages = async (req, res) => {
         });
     }
 };
-/**
- * Send a user message and receive AI response
- * POST /api/conversations/:id/messages
- * Body: { content: string }
- */
 export const sendMessage = async (req, res) => {
-    // sendMessage removed: streaming API (sendMessageStream) is used instead
     res
         .status(410)
         .json({ success: false, message: "Deprecated: use streaming endpoint /messages/stream" });
 };
-/**
- * Send message and stream AI response back to client via SSE
-+
- * POST /api/conversations/:id/messages/stream
-+
- */
 export const sendMessageStream = async (req, res) => {
     try {
         const userId = await getUserIdFromRequest(req);
@@ -112,24 +83,19 @@ export const sendMessageStream = async (req, res) => {
             res.status(400).json({ success: false, message: "Message content is required" });
             return;
         }
-        // Log received attachments
-        // Validate attachments if provided
         if (attachments && !Array.isArray(attachments)) {
             res.status(400).json({ success: false, message: "Attachments must be an array" });
             return;
         }
-        // Set headers for SSE
         res.setHeader("Content-Type", "text/event-stream");
         res.setHeader("Cache-Control", "no-cache");
         res.setHeader("Connection", "keep-alive");
         res.flushHeaders?.();
-        // CRITICAL FIX: Fetch attachments from database to get openai_file_id
         let enrichedAttachments;
         if (attachments && attachments.length > 0) {
             try {
                 const FileUploadModel = (await import("../models/fileUpload.model.js")).default;
                 const publicIds = attachments.map((att) => att.public_id);
-                // Fetch full file metadata including openai_file_id from database
                 enrichedAttachments = [];
                 for (const publicId of publicIds) {
                     const fileData = await FileUploadModel.findByPublicId(publicId);
@@ -140,30 +106,21 @@ export const sendMessageStream = async (req, res) => {
                             resource_type: fileData.resource_type,
                             format: fileData.format,
                             extracted_text: fileData.extracted_text,
-                            openai_file_id: fileData.openai_file_id, // NOW INCLUDES FILE_ID!
+                            openai_file_id: fileData.openai_file_id,
                         });
                     }
                 }
             }
             catch (err) {
-                // Fallback to client attachments if DB fetch fails
                 enrichedAttachments = attachments;
             }
         }
-        // Call service to stream; service will invoke onChunk for each partial piece
-        // Pass ENRICHED attachments with openai_file_id to the service
         await sendMessageAndStreamResponse(conversationId, userId, content, async (chunk) => {
-            // Send SSE data event with chunk
             res.write(`data: ${JSON.stringify({ type: "chunk", text: chunk })}\n\n`);
-        }, undefined, // onUserMessageCreated callback (not needed in REST API)
-        enrichedAttachments, // Pass enriched attachments with openai_file_id
-        metadata // Pass metadata for resend/edit handling
-        )
+        }, undefined, enrichedAttachments, metadata)
             .then((result) => {
-            // Send final event with complete result (userMessage, assistantMessage, conversation)
             const doneEvent = { type: "done", ...result };
             res.write(`data: ${JSON.stringify(doneEvent)}\n\n`);
-            // Close the stream
             res.end();
         })
             .catch((err) => {
@@ -176,13 +133,8 @@ export const sendMessageStream = async (req, res) => {
         res.status(500).json({ success: false, message });
     }
 };
-/**
- * Delete a message
- * DELETE /api/messages/:messageId
- */
 export const remove = async (req, res) => {
     try {
-        // Get user ID from authenticated request
         const userId = await getUserIdFromRequest(req);
         if (!userId) {
             res.status(401).json({
@@ -191,7 +143,6 @@ export const remove = async (req, res) => {
             });
             return;
         }
-        // Extract message ID from params
         const messageId = req.params.messageId;
         if (!messageId) {
             res.status(400).json({
@@ -200,18 +151,14 @@ export const remove = async (req, res) => {
             });
             return;
         }
-        // Delete message
         const result = await deleteMessage(messageId, userId);
-        // Send success response
         res.status(200).json({
             success: true,
             message: result.message,
         });
     }
     catch (error) {
-        // Handle errors
         const errorMessage = error instanceof Error ? error.message : "Failed to delete message";
-        // Check for specific error types
         if (errorMessage.includes("not found")) {
             res.status(404).json({
                 success: false,
