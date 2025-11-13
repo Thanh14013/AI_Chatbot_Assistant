@@ -120,7 +120,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const isPinned = !isPendingMessage(message) && (message.pinned || false);
 
   /**
-   * Handle pin/unpin toggle
+   * Handle pin/unpin toggle with OPTIMISTIC UPDATE
    */
   const handlePinToggle = async () => {
     if (isPendingMessage(message) || isPinning) return;
@@ -135,44 +135,58 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     const currentPinned =
       !isPendingMessage(message) && (message.pinned || false);
 
+    const newPinnedStatus = !currentPinned;
+
+    // 🚀 OPTIMISTIC UPDATE - Update UI immediately BEFORE API call
+    if (onPinToggle) {
+      onPinToggle(message.id, newPinnedStatus);
+    }
+
+    // Dispatch custom event immediately for instant UI feedback
+    window.dispatchEvent(
+      new CustomEvent(newPinnedStatus ? "message:pinned" : "message:unpinned", {
+        detail: {
+          conversationId: message.conversation_id,
+          messageId: message.id,
+          message: newPinnedStatus ? message : undefined,
+        },
+      })
+    );
+
+    // Show instant feedback
+    antMessage.success(
+      newPinnedStatus ? "Message pinned" : "Message unpinned",
+      0.5
+    );
+
     setIsPinning(true);
     try {
+      // Now make the API call in background
       if (currentPinned) {
         await unpinMessage(message.id);
-
-        // Dispatch custom event to update other components
-        window.dispatchEvent(
-          new CustomEvent("message:unpinned", {
-            detail: {
-              conversationId: message.conversation_id,
-              messageId: message.id,
-            },
-          })
-        );
-
-        antMessage.success("Message unpinned");
       } else {
         await pinMessage(message.id);
-
-        // Dispatch custom event to update other components
-        window.dispatchEvent(
-          new CustomEvent("message:pinned", {
-            detail: {
-              conversationId: message.conversation_id,
-              messageId: message.id,
-              message: message,
-            },
-          })
-        );
-
-        antMessage.success("Message pinned");
       }
 
-      // Notify parent component
-      if (onPinToggle) {
-        onPinToggle(message.id, !currentPinned);
-      }
+      // API call succeeded - no need to update UI again (already optimistic)
     } catch (error: unknown) {
+      // ❌ API call failed - ROLLBACK optimistic update
+      if (onPinToggle) {
+        onPinToggle(message.id, currentPinned); // Revert to original state
+      }
+
+      // Dispatch rollback event
+      window.dispatchEvent(
+        new CustomEvent(currentPinned ? "message:pinned" : "message:unpinned", {
+          detail: {
+            conversationId: message.conversation_id,
+            messageId: message.id,
+            message: currentPinned ? message : undefined,
+          },
+        })
+      );
+
+      // Show error message
       if (error instanceof Error) {
         antMessage.error(
           error.message ||

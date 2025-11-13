@@ -52,7 +52,7 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
   const fetchingRef = useRef(false);
 
   /**
-   * Load conversations from server
+   * Load conversations from server with cache support
    * @param reset - If true, resets to page 1 and replaces list
    */
   const loadConversations = useCallback(
@@ -62,6 +62,30 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
 
       const targetPage = reset ? 1 : page;
 
+      // 🚀 PERFORMANCE: Check cache first (skip if force refresh)
+      if (!force) {
+        const { default: conversationCache } = await import(
+          "../services/conversation-cache.service"
+        );
+        const cached = conversationCache.get(targetPage, searchQuery);
+
+        if (cached) {
+          // Use cached data immediately - instant load!
+          if (reset) {
+            setConversations(cached.conversations);
+            setPage(1);
+          } else {
+            setConversations((prev) => [...prev, ...cached.conversations]);
+            setPage(targetPage);
+          }
+          setHasMore(cached.pagination.page < cached.pagination.totalPages);
+
+          // No loading indicator needed for cached data
+          return;
+        }
+      }
+
+      // Cache miss or force - fetch from server
       if (reset) {
         setIsLoading(true);
       } else {
@@ -77,6 +101,17 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
           limit,
           search: searchQuery.trim() || undefined,
         });
+
+        // 🚀 PERFORMANCE: Store in cache for future use
+        const { default: conversationCache } = await import(
+          "../services/conversation-cache.service"
+        );
+        conversationCache.set(
+          targetPage,
+          result.conversations,
+          result.pagination,
+          searchQuery
+        );
 
         if (reset) {
           setConversations(result.conversations);
@@ -128,17 +163,23 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
   }, [hasMore, isLoadingMore, page, limit, searchQuery]);
 
   /**
-   * Optimistically update a conversation in the list
+   * Optimistically update a conversation in the list with cache sync
    * Updates UI immediately, then fetch from server in background
    */
   const updateConversationOptimistic = useCallback(
-    (conversationId: string, updates: Partial<ConversationListItem>) => {
+    async (conversationId: string, updates: Partial<ConversationListItem>) => {
       // Immediate UI update
       setConversations((prev) =>
         prev.map((conv) =>
           conv.id === conversationId ? { ...conv, ...updates } : conv
         )
       );
+
+      // 🚀 PERFORMANCE: Update cache immediately
+      const { default: conversationCache } = await import(
+        "../services/conversation-cache.service"
+      );
+      conversationCache.updateConversation(conversationId, updates);
 
       // Background fetch to sync with server (don't await to keep UI responsive)
       loadConversations(true).catch(() => {});
@@ -147,10 +188,10 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
   );
 
   /**
-   * Move a conversation to the top of the list (used after sending a message)
+   * Move a conversation to the top of the list with cache sync
    * Optimistic update with smooth animation
    */
-  const moveConversationToTop = useCallback((conversationId: string) => {
+  const moveConversationToTop = useCallback(async (conversationId: string) => {
     setConversations((prev) => {
       const index = prev.findIndex((c) => c.id === conversationId);
       if (index === -1 || index === 0) return prev; // Already at top or not found
@@ -169,13 +210,25 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
 
       return newList;
     });
+
+    // 🚀 PERFORMANCE: Invalidate cache since order changed
+    const { default: conversationCache } = await import(
+      "../services/conversation-cache.service"
+    );
+    conversationCache.clear(); // Clear all since order changed
   }, []);
 
   /**
-   * Remove a conversation from the list (after delete)
+   * Remove a conversation from the list with cache sync
    */
-  const removeConversation = useCallback((conversationId: string) => {
+  const removeConversation = useCallback(async (conversationId: string) => {
     setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+
+    // 🚀 PERFORMANCE: Remove from cache
+    const { default: conversationCache } = await import(
+      "../services/conversation-cache.service"
+    );
+    conversationCache.removeConversation(conversationId);
   }, []);
 
   /**

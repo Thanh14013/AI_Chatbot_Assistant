@@ -217,10 +217,40 @@ const ChatPage: React.FC = () => {
 
   // Load messages for a conversation from server
   const loadMessages = async (conversationId: string, page = 1) => {
+    // 🚀 PERFORMANCE: Check cache first
+    const { default: messageCache } = await import(
+      "../services/message-cache.service"
+    );
+    const cached = messageCache.get(conversationId, page);
+
+    if (cached) {
+      // Use cached data immediately - instant load!
+      if (page === 1) {
+        setMessages(cached.messages);
+      } else {
+        setMessages((prev) => [...cached.messages, ...prev]);
+      }
+      setMessagesPage(cached.pagination.page);
+      setMessagesHasMore(cached.pagination.hasMore);
+
+      // No loading indicator needed for cached data
+      return;
+    }
+
+    // Cache miss - fetch from server
     setIsLoadingMessages(true);
     try {
       const svc = await import("../services/chat.service");
       const result = await svc.getMessages(conversationId, page, 20);
+
+      // Store in cache for future use
+      messageCache.set(
+        conversationId,
+        page,
+        result.messages,
+        result.pagination
+      );
+
       if (page === 1) {
         // initial load: replace messages with the most recent page
         setMessages(result.messages);
@@ -886,6 +916,15 @@ const ChatPage: React.FC = () => {
               }
             : prev
         );
+
+        // 🚀 PERFORMANCE: Invalidate cache for this conversation (new messages added)
+        (async () => {
+          const { default: messageCache } = await import(
+            "../services/message-cache.service"
+          );
+          messageCache.invalidate(currentConversation.id);
+        })();
+
         // Ensure the conversation list reflects the recent activity
         try {
           moveConversationToTop(currentConversation.id);
@@ -1017,8 +1056,15 @@ const ChatPage: React.FC = () => {
       });
     };
 
-    const handleConversationDeleted = (event: CustomEvent) => {
+    const handleConversationDeleted = async (event: CustomEvent) => {
       const { conversationId } = event.detail;
+
+      // 🚀 PERFORMANCE: Invalidate cache for deleted conversation
+      const { default: messageCache } = await import(
+        "../services/message-cache.service"
+      );
+      messageCache.invalidate(conversationId);
+
       // If current conversation is deleted, redirect to home
       if (conversationId === currentConversation?.id) {
         navigate("/", { replace: true });
@@ -2672,9 +2718,9 @@ const ChatPage: React.FC = () => {
   }, [currentConversation?.id, antdMessage]);
 
   /**
-   * Handle pin toggle from MessageBubble
+   * Handle pin toggle from MessageBubble with cache update
    */
-  const handlePinToggle = (messageId: string, isPinned: boolean) => {
+  const handlePinToggle = async (messageId: string, isPinned: boolean) => {
     // Update local state
     setMessages((prev) =>
       prev.map((msg) =>
@@ -2682,13 +2728,23 @@ const ChatPage: React.FC = () => {
       )
     );
 
+    // 🚀 PERFORMANCE: Update cache immediately
+    if (currentConversation?.id) {
+      const { default: messageCache } = await import(
+        "../services/message-cache.service"
+      );
+      messageCache.updateMessage(currentConversation.id, messageId, {
+        pinned: isPinned,
+      });
+    }
+
     // Trigger dropdown refresh
     setPinnedRefreshTrigger((prev) => prev + 1);
   };
 
   // Listen for pin/unpin events from websocket (real-time sync)
   useEffect(() => {
-    const handleMessagePinned = (event: CustomEvent) => {
+    const handleMessagePinned = async (event: CustomEvent) => {
       const { conversationId: eventConvId, messageId, message } = event.detail;
 
       // Only update if it's for the current conversation
@@ -2711,12 +2767,18 @@ const ChatPage: React.FC = () => {
           }
         });
 
+        // 🚀 PERFORMANCE: Update cache
+        const { default: messageCache } = await import(
+          "../services/message-cache.service"
+        );
+        messageCache.updateMessage(eventConvId, messageId, { pinned: true });
+
         // Trigger dropdown refresh
         setPinnedRefreshTrigger((prev) => prev + 1);
       }
     };
 
-    const handleMessageUnpinned = (event: CustomEvent) => {
+    const handleMessageUnpinned = async (event: CustomEvent) => {
       const { conversationId: eventConvId, messageId } = event.detail;
 
       // Only update if it's for the current conversation
@@ -2726,6 +2788,12 @@ const ChatPage: React.FC = () => {
             msg.id === messageId ? { ...msg, pinned: false } : msg
           )
         );
+
+        // 🚀 PERFORMANCE: Update cache
+        const { default: messageCache } = await import(
+          "../services/message-cache.service"
+        );
+        messageCache.updateMessage(eventConvId, messageId, { pinned: false });
 
         // Trigger dropdown refresh
         setPinnedRefreshTrigger((prev) => prev + 1);

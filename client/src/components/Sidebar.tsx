@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Layout, App } from "antd";
-import { useAuth } from "../hooks";
+import { useAuth, useDebounce } from "../hooks";
 import { getConversations } from "../services/chat.service";
 import { moveConversationToProject } from "../services/project.service";
 import type { ConversationListItem } from "../types/chat.type";
@@ -48,7 +48,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [filteredConversations, setFilteredConversations] = useState<
     ConversationListItem[]
   >([]);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchInput, setSearchInput] = useState(""); // Immediate input value
+  const [searchQuery, setSearchQuery] = useState(""); // Debounced value
+  const debouncedSearch = useDebounce(searchInput, 300); // 🚀 PERFORMANCE: Debounce search
+
   // semantic search results returned from header (optional)
   const [semanticResults, setSemanticResults] = useState<
     import("../services/searchService").ConversationSearchResult[] | null
@@ -59,6 +62,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 🚀 PERFORMANCE: Update searchQuery only when debounced value changes
+  useEffect(() => {
+    setSearchQuery(debouncedSearch);
+  }, [debouncedSearch]);
 
   // Drag and drop state
   const [dragDropState, setDragDropState] = useState<DragDropState>({
@@ -168,7 +176,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   }, [conversations, semanticResults, unreadConversations]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
+    setSearchInput(e.target.value); // 🚀 PERFORMANCE: Update input immediately for responsive UI
   };
 
   const handleNewConversation = () => {
@@ -431,7 +439,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div className={styles.headerSection}>
         <SidebarHeader
           onNewConversation={handleNewConversation}
-          searchQuery={searchQuery}
+          searchQuery={searchInput} // 🚀 PERFORMANCE: Pass immediate value for responsive input
           onSearchChange={handleSearchChange}
           collapsed={collapsed}
           onToggle={() => setCollapsed((c) => !c)}
