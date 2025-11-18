@@ -86,7 +86,7 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
   const loadingProjectsRef = useRef(false);
   const projectsLoadedRef = useRef(false);
 
-  // Load projects
+  // Load projects (lazy load conversations only when expanded)
   const loadProjects = async () => {
     // Guard: Don't fetch if already loading or already loaded (unless forced refresh)
     if (loadingProjectsRef.current) return;
@@ -99,32 +99,6 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
 
       // 🚀 UPDATE CENTRALIZED STORE
       sidebarStore.setProjects(data);
-
-      // 🔥 LOAD ALL PROJECT CONVERSATIONS for accurate badge counts
-      // This ensures the centralized store has complete data
-      const conversationPromises = data.map((project) =>
-        getProjectConversations(project.id)
-          .then((convs) => ({ projectId: project.id, conversations: convs }))
-          .catch(() => ({ projectId: project.id, conversations: [] }))
-      );
-
-      const results = await Promise.all(conversationPromises);
-
-      // Update local state
-      const conversationsMap: Record<string, ConversationListItem[]> = {};
-      const allConversations: ConversationListItem[] = [];
-
-      results.forEach(({ projectId, conversations }) => {
-        conversationsMap[projectId] = conversations;
-        allConversations.push(...conversations);
-      });
-
-      setProjectConversations(conversationsMap);
-
-      // 🔥 Merge all project conversations into store
-      if (allConversations.length > 0) {
-        sidebarStore.addConversations(allConversations);
-      }
 
       projectsLoadedRef.current = true;
     } catch (error: any) {
@@ -260,7 +234,7 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
         newProjectId: string | null;
       };
 
-      // Remove from old project
+      // 🔥 FIX: Remove from old project LOCAL STATE (for immediate UI update)
       if (data.oldProjectId && typeof data.oldProjectId === "string") {
         setProjectConversations((prev) => {
           const updated = { ...prev };
@@ -273,7 +247,7 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
         });
       }
 
-      // 🔥 OPTIMIZED: Only reload specific project conversations instead of ALL projects
+      // 🔥 FIX: Load new project conversations AND add to local state
       if (data.newProjectId) {
         loadProjectConversations(data.newProjectId);
 
@@ -285,8 +259,7 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
         });
       }
 
-      // 🔥 NO NEED to reload ALL projects - badge counts are now calculated from store
-      // The store already updated via optimistic update, so UI will reflect correct counts
+      // 🔥 Store already updated via optimistic update, badge counts auto-calculated
     };
 
     // Listen to custom window events triggered by websocket service
@@ -497,7 +470,11 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
             <ProjectCard
               key={project.id}
               project={project}
-              conversations={sidebarStore.conversationsByProject(project.id)}
+              conversations={
+                expandedProjects.has(project.id)
+                  ? sidebarStore.conversationsByProject(project.id)
+                  : []
+              }
               isExpanded={expandedProjects.has(project.id)}
               onToggle={() => handleToggleProject(project.id)}
               onEdit={() => handleEditProject(project)}
