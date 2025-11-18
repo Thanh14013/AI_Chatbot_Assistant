@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuthContext } from "./useAuthContext";
 import type { LoginRequest, RegisterRequest } from "../types";
 import * as authService from "../services/auth.service";
+import { tokenRefreshService } from "../services/token-refresh.service";
 
 /**
  * Custom hook for authentication operations
@@ -35,6 +36,10 @@ export const useAuth = () => {
         if (response.success && response.data) {
           setUser(response.data.user);
           setAuthenticated(true);
+
+          // 🔥 CRITICAL FIX: Start token refresh monitor on login
+          tokenRefreshService.start();
+
           navigate("/"); // Redirect to home after login
         }
 
@@ -81,12 +86,16 @@ export const useAuth = () => {
   const logout = useCallback(async () => {
     setLoading(true);
     try {
+      // 🔥 CRITICAL FIX: Stop token refresh monitor on logout
+      tokenRefreshService.stop();
+
       await authService.logout();
       setUser(null);
       setAuthenticated(false);
       navigate("/login");
     } catch {
       // Even if API call fails, clear local state
+      tokenRefreshService.stop();
       setUser(null);
       setAuthenticated(false);
       navigate("/login");

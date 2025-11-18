@@ -13,6 +13,7 @@ import {
 } from "../services/auth.service";
 import { getAccessToken } from "../utils/token.util";
 import { clearTokens } from "../utils/token.util";
+import { tokenRefreshService } from "../services/token-refresh.service";
 
 interface AuthContextType {
   user: User | null;
@@ -72,6 +73,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
           if (response.success && response.data) {
             setUser(response.data);
+
+            // 🔥 CRITICAL FIX: Start automatic token refresh monitor
+            // Prevents UI freeze after 30 minutes of inactivity
+            tokenRefreshService.start();
+            console.log("[AuthProvider] Token refresh monitor started");
           } else {
             setUser(null);
           }
@@ -91,6 +97,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setAuthenticated(false);
             setUser(null);
             clearTokens();
+            tokenRefreshService.stop();
           } else {
             setUser(null);
           }
@@ -99,6 +106,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log("[AuthProvider] Fatal:", error);
         setAuthenticated(false);
         setUser(null);
+        tokenRefreshService.stop();
       } finally {
         console.log("[AuthProvider] Done");
         setLoading(false);
@@ -106,6 +114,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     initializeAuth();
+
+    // 🔥 CRITICAL FIX: Stop token refresh on unmount (logout)
+    return () => {
+      tokenRefreshService.stop();
+    };
   }, []);
 
   const value: AuthContextType = {
