@@ -36,11 +36,7 @@ Chỉ trả về danh sách 3 câu hỏi, mỗi câu 1 dòng, không cần số 
 3 câu hỏi này là 3 câu với vai trò là người dùng, danh xưng là tôi, hỏi trợ lý ảo.`;
 
     const response = await openai.chat.completions.create({
-<<<<<<< HEAD
       model: "gpt-4.1-mini",
-=======
-      model: "gpt-4o-mini",
->>>>>>> b5a25b404b0fd5beee8e603d5df07ab1ee134af5
       messages: [
         {
           role: "system",
