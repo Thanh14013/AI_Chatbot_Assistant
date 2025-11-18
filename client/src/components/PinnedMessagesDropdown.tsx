@@ -19,6 +19,8 @@ interface PinnedMessagesDropdownProps {
   onMessageUnpinned?: (messageId: string) => void;
   // External trigger to refresh the list
   refreshTrigger?: number;
+  // 🚀 OPTIMISTIC UI: Client-side pinned message IDs for instant sync
+  pinnedMessageIds?: Set<string>;
 }
 
 /**
@@ -30,6 +32,7 @@ const PinnedMessagesDropdown: React.FC<PinnedMessagesDropdownProps> = ({
   onMessageClick,
   onMessageUnpinned,
   refreshTrigger = 0,
+  pinnedMessageIds,
 }) => {
   const { message: antMessage } = App.useApp();
   const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
@@ -124,9 +127,14 @@ const PinnedMessagesDropdown: React.FC<PinnedMessagesDropdownProps> = ({
 
   /**
    * Build dropdown menu items
+   * 🚀 OPTIMISTIC UI: Use pinnedMessageIds if provided for instant sync
    */
+  const displayMessages = pinnedMessageIds
+    ? pinnedMessages.filter((msg) => pinnedMessageIds.has(msg.id))
+    : pinnedMessages;
+
   const menuItems: MenuProps["items"] =
-    pinnedMessages.length === 0
+    displayMessages.length === 0
       ? [
           {
             key: "empty",
@@ -141,7 +149,7 @@ const PinnedMessagesDropdown: React.FC<PinnedMessagesDropdownProps> = ({
             disabled: true,
           },
         ]
-      : pinnedMessages.map((msg) => ({
+      : displayMessages.map((msg) => ({
           key: msg.id,
           label: (
             <div
@@ -247,13 +255,13 @@ const PinnedMessagesDropdown: React.FC<PinnedMessagesDropdownProps> = ({
       placement="bottomRight"
       overlayClassName={styles.pinnedMessagesDropdown}
     >
-      <Badge count={pinnedMessages.length} offset={[-5, 5]} showZero={false}>
+      <Badge count={displayMessages.length} offset={[-5, 5]} showZero={false}>
         <Button
           type="text"
           icon={<PushpinFilled />}
           loading={loading}
           className={styles.pinnedMessagesButton}
-          title={`Pinned messages (${pinnedMessages.length})`}
+          title={`Pinned messages (${displayMessages.length})`}
         >
           Pinned
         </Button>

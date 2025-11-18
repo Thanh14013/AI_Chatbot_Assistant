@@ -98,6 +98,23 @@ export const pinMessage = async (req: Request, res: Response): Promise<void> => 
     // Pin the message
     const updatedMessage = await Message.pinMessage(messageId);
 
+    // 🚀 Update cache with pinned status
+    try {
+      const { updateMessageInCache } = await import("../services/message-cache.service.js");
+      await updateMessageInCache(message.conversation_id, {
+        id: updatedMessage.id,
+        conversation_id: updatedMessage.conversation_id,
+        role: updatedMessage.role,
+        content: updatedMessage.content,
+        tokens_used: updatedMessage.tokens_used,
+        model: updatedMessage.model,
+        pinned: true,
+        createdAt: updatedMessage.createdAt,
+      });
+    } catch (cacheError) {
+      // Don't fail the request if cache update fails
+    }
+
     // Invalidate message history cache to ensure fresh data
     try {
       await invalidateCachePattern(messageHistoryPattern(message.conversation_id));
@@ -261,6 +278,23 @@ export const unpinMessage = async (req: Request, res: Response): Promise<void> =
 
     // Unpin the message
     const updatedMessage = await Message.unpinMessage(messageId);
+
+    // 🚀 Update cache with unpinned status
+    try {
+      const { updateMessageInCache } = await import("../services/message-cache.service.js");
+      await updateMessageInCache(message.conversation_id, {
+        id: updatedMessage.id,
+        conversation_id: updatedMessage.conversation_id,
+        role: updatedMessage.role,
+        content: updatedMessage.content,
+        tokens_used: updatedMessage.tokens_used,
+        model: updatedMessage.model,
+        pinned: false,
+        createdAt: updatedMessage.createdAt,
+      });
+    } catch (cacheError) {
+      // Don't fail the request if cache update fails
+    }
 
     // Invalidate message history cache to ensure fresh data
     try {

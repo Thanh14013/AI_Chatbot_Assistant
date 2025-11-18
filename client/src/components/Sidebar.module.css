@@ -52,6 +52,15 @@
   will-change: opacity, transform;
 }
 
+/* 🚀 OPTIMIZATION: Hide projects section without unmounting */
+.projectsContainer {
+  display: block;
+}
+
+.projectsContainer.hidden {
+  display: none;
+}
+
 .collapsed .middleSection > * {
   opacity: 0;
   transform: translateX(-10px);

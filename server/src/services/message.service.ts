@@ -14,6 +14,12 @@ import {
   recentMessagesKey,
   conversationListPattern,
 } from "../utils/cache-key.util.js";
+import {
+  getCachedRecentMessages,
+  cacheRecentMessages,
+  addMessageToCache,
+  invalidateMessageCache,
+} from "./message-cache.service.js";
 
 /**
  * Create a new message
@@ -56,6 +62,20 @@ export const createMessage = async (data: CreateMessageInput): Promise<MessageRe
   await invalidateCachePattern(contextPattern(data.conversation_id));
   await invalidateCachePattern(conversationListPattern(conversation.user_id));
 
+  // 🚀 CACHE WARMING: Add new message to Redis Sorted Set cache
+  await addMessageToCache(data.conversation_id, {
+    id: message.id,
+    conversation_id: message.conversation_id,
+    role: message.role,
+    content: message.content,
+    tokens_used: message.tokens_used,
+    model: message.model || conversation.model,
+    pinned: message.pinned,
+    createdAt: message.createdAt,
+  }).catch(() => {
+    // Silent fail - caching is not critical
+  });
+
   // Generate and store embedding asynchronously (don't wait for it)
   // This runs in the background and doesn't block the response
   generateAndStoreEmbedding(message.id, message.content).catch(() => {
@@ -76,19 +96,82 @@ export const createMessage = async (data: CreateMessageInput): Promise<MessageRe
 };
 
 /**
- * Get all messages for a conversation with pagination
+ * 🚀 HELPER: Attach attachments data to messages (batch query to avoid N+1)
+ * @param messages - Array of Message models
+ * @returns Array of MessageResponse with attachments
+ */
+const attachMessagesData = async (messages: Message[]): Promise<MessageResponse[]> => {
+  const messageResponses: MessageResponse[] = messages.map((msg) => ({
+    id: msg.id,
+    conversation_id: msg.conversation_id,
+    role: msg.role,
+    content: msg.content,
+    tokens_used: msg.tokens_used,
+    model: msg.model,
+    pinned: msg.pinned,
+    createdAt: msg.createdAt,
+  }));
+
+  // Batch fetch attachments for all messages
+  const messageIds = messageResponses.map((m) => m.id);
+  if (messageIds.length > 0) {
+    try {
+      const { default: pool } = await import("../db/pool.js");
+      const attachmentsResult = await pool.query(
+        `SELECT * FROM files_upload WHERE message_id = ANY($1) ORDER BY created_at ASC`,
+        [messageIds]
+      );
+
+      // Group attachments by message_id
+      const attachmentsByMessage = new Map<string, any[]>();
+      for (const att of attachmentsResult.rows) {
+        if (!attachmentsByMessage.has(att.message_id)) {
+          attachmentsByMessage.set(att.message_id, []);
+        }
+        attachmentsByMessage.get(att.message_id)!.push({
+          id: att.id,
+          public_id: att.public_id,
+          secure_url: att.secure_url,
+          resource_type: att.resource_type,
+          format: att.format,
+          original_filename: att.original_filename,
+          size_bytes: att.size_bytes,
+          width: att.width,
+          height: att.height,
+          thumbnail_url: att.thumbnail_url,
+          extracted_text: att.extracted_text,
+          openai_file_id: att.openai_file_id,
+        });
+      }
+
+      // Attach to messages
+      for (const msgResponse of messageResponses) {
+        msgResponse.attachments = attachmentsByMessage.get(msgResponse.id) || [];
+      }
+    } catch (err) {
+      // Don't fail if attachments fetch fails - just leave empty
+    }
+  }
+
+  return messageResponses;
+};
+
+/**
+ * Get all messages for a conversation with OPTIMIZED KEYSET PAGINATION
+ * 🚀 PERFORMANCE: Uses Redis Sorted Set cache + Keyset pagination for O(log n) queries
  *
  * @param conversationId - Conversation ID
  * @param userId - User ID (for authorization check)
  * @param page - Page number (default: 1)
- * @param limit - Messages per page (default: 30)
+ * @param limit - Messages per page (default: 50, optimized)
+ * @param before - Message ID to fetch messages before (keyset pagination)
  * @returns Array of messages with pagination info
  */
 export const getConversationMessages = async (
   conversationId: string,
   userId: string,
   page: number = 1,
-  limit: number = 30,
+  limit: number = 50,
   before?: string
 ): Promise<{
   messages: MessageResponse[];
@@ -100,207 +183,143 @@ export const getConversationMessages = async (
     hasMore: boolean;
   };
 }> => {
-  // Use cache for message history
-  const cacheKey = messageHistoryKey(conversationId, page, limit, before);
-  const fetchMessages = async () => {
-    // Verify conversation exists and user has access
-    const conversation = await Conversation.findOne({
-      where: {
-        id: conversationId,
-        deleted_at: null,
-      },
-    });
+  // Verify conversation exists and user has access
+  const conversation = await Conversation.findOne({
+    where: {
+      id: conversationId,
+      deleted_at: null,
+    },
+  });
 
-    if (!conversation) {
-      throw new Error("Conversation not found");
-    }
+  if (!conversation) {
+    throw new Error("Conversation not found");
+  }
 
-    if (conversation.user_id !== userId) {
-      throw new Error("Unauthorized access to conversation");
-    }
+  if (conversation.user_id !== userId) {
+    throw new Error("Unauthorized access to conversation");
+  }
 
-    // Get total message count (useful for full pagination)
-    const total = await Message.count({
-      where: { conversation_id: conversationId },
-    });
-
-    const totalPages = Math.ceil(total / limit);
-
-    // If `before` provided, fetch messages older than the given message id
-    if (before) {
-      const beforeMsg = await Message.findByPk(before);
-      if (!beforeMsg || beforeMsg.conversation_id !== conversationId) {
-        throw new Error("Invalid 'before' message id");
-      }
-
-      const beforeDate = beforeMsg.createdAt;
-      const beforeId = beforeMsg.id;
-
-      // Find messages strictly older than the before message. If createdAt is equal,
-      // use id comparison to have deterministic ordering.
-      const olderMessages = await Message.findAll({
-        where: {
-          conversation_id: conversationId,
-          [Op.or]: [
-            { createdAt: { [Op.lt]: beforeDate } },
-            { createdAt: beforeDate, id: { [Op.lt]: beforeId } },
-          ],
-        },
-        order: [
-          ["createdAt", "ASC"],
-          ["id", "ASC"],
-        ],
-        limit,
+  // 🚀 OPTIMIZATION 1: Try Redis cache for recent messages (page 1 only)
+  if (page === 1 && !before) {
+    const cachedMessages = await getCachedRecentMessages(conversationId, limit);
+    if (cachedMessages && cachedMessages.length > 0) {
+      const total = await Message.count({
+        where: { conversation_id: conversationId },
       });
 
-      // Map to response
-      const messageResponses: MessageResponse[] = olderMessages.map((msg) => ({
-        id: msg.id,
-        conversation_id: msg.conversation_id,
-        role: msg.role,
-        content: msg.content,
-        tokens_used: msg.tokens_used,
-        model: msg.model,
-        pinned: msg.pinned,
-        createdAt: msg.createdAt,
-      }));
-
-      // Fetch attachments for all messages
-      const { default: fileUploadModel } = await import("../models/fileUpload.model.js");
-      for (const msgResponse of messageResponses) {
-        try {
-          const attachments = await fileUploadModel.findByMessageId(msgResponse.id);
-          if (attachments && attachments.length > 0) {
-            msgResponse.attachments = attachments.map((att: any) => ({
-              id: att.id,
-              public_id: att.public_id,
-              secure_url: att.secure_url,
-              resource_type: att.resource_type,
-              format: att.format,
-              original_filename: att.original_filename,
-              size_bytes: att.size_bytes,
-              width: att.width,
-              height: att.height,
-              thumbnail_url: att.thumbnail_url,
-              extracted_text: att.extracted_text,
-              openai_file_id: att.openai_file_id, // Include OpenAI file_id
-            }));
-          }
-        } catch (err) {
-          // Don't fail if attachments fetch fails
-        }
-      }
-
-      // Determine if there are more messages older than the first returned
-      let hasMore = false;
-      if (messageResponses.length > 0) {
-        const first = messageResponses[0];
-        const firstMsg = await Message.findByPk(first.id);
-        if (firstMsg) {
-          const olderCount = await Message.count({
-            where: {
-              conversation_id: conversationId,
-              [Op.or]: [
-                { createdAt: { [Op.lt]: firstMsg.createdAt } },
-                { createdAt: firstMsg.createdAt, id: { [Op.lt]: firstMsg.id } },
-              ],
-            },
-          });
-          hasMore = olderCount > 0;
-        }
-      }
-
       return {
-        messages: messageResponses,
+        messages: cachedMessages,
         pagination: {
           page: 1,
           limit,
           total,
-          totalPages,
-          hasMore,
+          totalPages: Math.ceil(total / limit),
+          hasMore: cachedMessages.length >= limit,
         },
       };
     }
+  }
 
-    // Default behavior: page-based pagination from the end (latest messages)
-    // Get messages in chronological order (oldest first)
-    const allMessages = await Message.findAll({
-      where: { conversation_id: conversationId },
+  // Get total message count (using covering index)
+  const total = await Message.count({
+    where: { conversation_id: conversationId },
+  });
+
+  const totalPages = Math.ceil(total / limit);
+
+  // 🚀 OPTIMIZATION 2: Keyset Pagination (better than OFFSET)
+  if (before) {
+    const beforeMsg = await Message.findByPk(before);
+    if (!beforeMsg || beforeMsg.conversation_id !== conversationId) {
+      throw new Error("Invalid 'before' message id");
+    }
+
+    // Use composite index (conversation_id, createdAt DESC, id DESC)
+    const olderMessages = await Message.findAll({
+      where: {
+        conversation_id: conversationId,
+        [Op.or]: [
+          { createdAt: { [Op.lt]: beforeMsg.createdAt } },
+          {
+            createdAt: beforeMsg.createdAt,
+            id: { [Op.lt]: beforeMsg.id },
+          },
+        ],
+      },
       order: [
         ["createdAt", "ASC"],
         ["id", "ASC"],
       ],
+      limit,
     });
 
-    // Page 1 shows the last `limit` messages, page 2 shows the previous `limit`, etc.
-    const startIndex = Math.max(0, total - page * limit);
-    const endIndex = total - (page - 1) * limit;
-    const paginatedMessages = allMessages.slice(startIndex, endIndex);
+    const messageResponses = await attachMessagesData(olderMessages);
 
-    const messageResponses: MessageResponse[] = paginatedMessages.map((msg) => ({
-      id: msg.id,
-      conversation_id: msg.conversation_id,
-      role: msg.role,
-      content: msg.content,
-      tokens_used: msg.tokens_used,
-      model: msg.model,
-      pinned: msg.pinned,
-      createdAt: msg.createdAt,
-    }));
-
-    // Fetch attachments for all messages (batch query to avoid N+1)
-    const messageIds = messageResponses.map((m) => m.id);
-    if (messageIds.length > 0) {
-      try {
-        const { default: pool } = await import("../db/pool.js");
-        const attachmentsResult = await pool.query(
-          `SELECT * FROM files_upload WHERE message_id = ANY($1) ORDER BY created_at ASC`,
-          [messageIds]
-        );
-
-        // Group attachments by message_id
-        const attachmentsByMessage = new Map<string, any[]>();
-        for (const att of attachmentsResult.rows) {
-          if (!attachmentsByMessage.has(att.message_id)) {
-            attachmentsByMessage.set(att.message_id, []);
-          }
-          attachmentsByMessage.get(att.message_id)!.push({
-            id: att.id,
-            public_id: att.public_id,
-            secure_url: att.secure_url,
-            resource_type: att.resource_type,
-            format: att.format,
-            original_filename: att.original_filename,
-            size_bytes: att.size_bytes,
-            width: att.width,
-            height: att.height,
-            thumbnail_url: att.thumbnail_url,
-            extracted_text: att.extracted_text,
-          });
-        }
-
-        // Attach to messages
-        for (const msgResponse of messageResponses) {
-          msgResponse.attachments = attachmentsByMessage.get(msgResponse.id) || [];
-        }
-      } catch (err) {
-        // Don't fail if attachments fetch fails
-      }
+    // Check if there are more older messages
+    let hasMore = false;
+    if (messageResponses.length > 0) {
+      const firstMsg = olderMessages[0];
+      const olderCount = await Message.count({
+        where: {
+          conversation_id: conversationId,
+          [Op.or]: [
+            { createdAt: { [Op.lt]: firstMsg.createdAt } },
+            {
+              createdAt: firstMsg.createdAt,
+              id: { [Op.lt]: firstMsg.id },
+            },
+          ],
+        },
+      });
+      hasMore = olderCount > 0;
     }
 
     return {
       messages: messageResponses,
       pagination: {
-        page,
+        page: 1,
         limit,
         total,
         totalPages,
-        hasMore: startIndex > 0,
+        hasMore,
       },
     };
-  };
+  }
 
-  return await cacheAside(cacheKey, fetchMessages, CACHE_TTL.MESSAGE_HISTORY);
+  // 🚀 OPTIMIZATION 3: Standard page-based pagination (fallback)
+  // Get messages in chronological order (oldest first) for proper pagination
+  const allMessages = await Message.findAll({
+    where: { conversation_id: conversationId },
+    order: [
+      ["createdAt", "ASC"],
+      ["id", "ASC"],
+    ],
+  });
+
+  // Page 1 shows the last `limit` messages, page 2 shows the previous `limit`, etc.
+  const startIndex = Math.max(0, total - page * limit);
+  const endIndex = total - (page - 1) * limit;
+  const paginatedMessages = allMessages.slice(startIndex, endIndex);
+
+  const messageResponses = await attachMessagesData(paginatedMessages);
+
+  // 🚀 CACHE WARMING: Store page 1 in Redis for next time
+  if (page === 1) {
+    await cacheRecentMessages(conversationId, messageResponses).catch(() => {
+      // Silent fail - caching is not critical
+    });
+  }
+
+  return {
+    messages: messageResponses,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+      hasMore: startIndex > 0,
+    },
+  };
 };
 
 /**

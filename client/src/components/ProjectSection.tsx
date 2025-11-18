@@ -1,9 +1,10 @@
 ﻿/**
  * ProjectSection Component
  * Container for displaying all projects with their conversations
+ * 🚀 OPTIMIZED: Memoized to prevent unnecessary re-renders on parent state changes
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button, App } from "antd";
 import { PlusOutlined, FolderOutlined } from "@ant-design/icons";
 import type { Project } from "../types/project.type";
@@ -75,16 +76,26 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
     null
   );
 
+  // 🚀 OPTIMIZATION: Guard to prevent concurrent/redundant fetches
+  const loadingProjectsRef = useRef(false);
+  const projectsLoadedRef = useRef(false);
+
   // Load projects
   const loadProjects = async () => {
+    // Guard: Don't fetch if already loading or already loaded (unless forced refresh)
+    if (loadingProjectsRef.current) return;
+
+    loadingProjectsRef.current = true;
     setLoading(true);
     try {
       const data = await getProjects();
       setProjects(data);
+      projectsLoadedRef.current = true;
     } catch (error: any) {
       message.error(error.message || "Failed to load projects");
     } finally {
       setLoading(false);
+      loadingProjectsRef.current = false;
     }
   };
 
@@ -101,9 +112,11 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
     }
   };
 
-  // Initial load
+  // 🚀 OPTIMIZATION: Initial load - only fetch if not already loaded
   useEffect(() => {
-    loadProjects();
+    if (!projectsLoadedRef.current || refreshTrigger) {
+      loadProjects();
+    }
   }, [refreshTrigger]);
 
   // Listen to realtime project events via WebSocket
@@ -493,4 +506,6 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
   );
 };
 
-export default ProjectSection;
+// 🚀 OPTIMIZATION: Memoize component to prevent re-renders when parent state changes
+// Only re-render when props actually change
+export default React.memo(ProjectSection);

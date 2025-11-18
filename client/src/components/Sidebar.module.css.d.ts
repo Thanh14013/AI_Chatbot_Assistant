@@ -7,6 +7,8 @@ declare const styles: {
   readonly collapsed: string;
   readonly collapseToggleContainer: string;
   readonly collapseToggle: string;
+  readonly projectsContainer: string;
+  readonly hidden: string;
 };
 
 export default styles;

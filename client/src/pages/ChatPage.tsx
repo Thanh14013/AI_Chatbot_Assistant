@@ -184,6 +184,11 @@ const ChatPage: React.FC = () => {
   // Pinned messages refresh trigger
   const [pinnedRefreshTrigger, setPinnedRefreshTrigger] = useState(0);
 
+  // 🚀 OPTIMISTIC UI: Client-side pin state management
+  const [pinnedMessageIds, setPinnedMessageIds] = useState<Set<string>>(
+    new Set()
+  );
+
   // Unread tracking state (multi-tab)
   const [unreadConversations, setUnreadConversations] = useState<Set<string>>(
     new Set()
@@ -430,7 +435,7 @@ const ChatPage: React.FC = () => {
   const handleCreateSubmit = async (values: ConversationFormValues) => {
     const payload = {
       title: values.title,
-      model: values.model || "gpt-5-nano",
+      model: values.model || "GPT-5.1",
       context_window: values.context_window || 10,
     };
 
@@ -2768,10 +2773,22 @@ const ChatPage: React.FC = () => {
   }, [currentConversation?.id, antdMessage]);
 
   /**
-   * Handle pin toggle from MessageBubble with cache update
+   * Handle pin toggle from MessageBubble with OPTIMISTIC UPDATE
+   * Using Set for O(1) lookup performance
    */
   const handlePinToggle = async (messageId: string, isPinned: boolean) => {
-    // Update local state
+    // 🚀 OPTIMISTIC UPDATE: Update pinnedMessageIds Set immediately
+    setPinnedMessageIds((prev) => {
+      const newSet = new Set(prev);
+      if (isPinned) {
+        newSet.add(messageId);
+      } else {
+        newSet.delete(messageId);
+      }
+      return newSet;
+    });
+
+    // Update messages array (for message bubble UI)
     setMessages((prev) =>
       prev.map((msg) =>
         msg.id === messageId ? { ...msg, pinned: isPinned } : msg
@@ -2788,7 +2805,7 @@ const ChatPage: React.FC = () => {
       });
     }
 
-    // Trigger dropdown refresh
+    // Trigger dropdown refresh (still useful for fetching full message data)
     setPinnedRefreshTrigger((prev) => prev + 1);
   };
 
@@ -2803,6 +2820,13 @@ const ChatPage: React.FC = () => {
 
       // Only update if it's for the current conversation
       if (eventConvId === currentConversation?.id) {
+        // 🚀 OPTIMISTIC UPDATE: Add to pinnedMessageIds Set immediately
+        setPinnedMessageIds((prev) => {
+          const newSet = new Set(prev);
+          newSet.add(messageId);
+          return newSet;
+        });
+
         // Batch state updates together
         setMessages((prev) => {
           const exists = prev.some((msg) => msg.id === messageId);
@@ -2837,6 +2861,13 @@ const ChatPage: React.FC = () => {
 
       // Only update if it's for the current conversation
       if (eventConvId === currentConversation?.id) {
+        // 🚀 OPTIMISTIC UPDATE: Remove from pinnedMessageIds Set immediately
+        setPinnedMessageIds((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(messageId);
+          return newSet;
+        });
+
         setMessages((prev) => {
           // Check if already unpinned to avoid unnecessary update
           const currentMsg = prev.find((msg) => msg.id === messageId);
@@ -2964,6 +2995,7 @@ const ChatPage: React.FC = () => {
                     conversationId={currentConversation.id}
                     onMessageClick={handleSearchResultClick}
                     refreshTrigger={pinnedRefreshTrigger}
+                    pinnedMessageIds={pinnedMessageIds}
                   />
                 </div>
               </div>

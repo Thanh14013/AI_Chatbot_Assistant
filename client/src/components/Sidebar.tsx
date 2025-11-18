@@ -291,7 +291,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   );
 
   /**
-   * Handle drop on project
+   * 🚀 OPTIMIZED: Handle drop on project with INSTANT UI update
+   * Uses fire-and-forget API pattern - UI updates immediately, API in background
    */
   const handleProjectDrop = async (
     projectId: string,
@@ -305,35 +306,51 @@ const Sidebar: React.FC<SidebarProps> = ({
       return;
     }
 
-    try {
-      // Optimistic update - remove from conversations list immediately
-      setConversations((prev) => prev.filter((c) => c.id !== conversationId));
-      setFilteredConversations((prev) =>
-        prev.filter((c) => c.id !== conversationId)
-      );
+    // 🔥 STEP 1: Optimistic update - UI changes INSTANTLY
+    setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+    setFilteredConversations((prev) =>
+      prev.filter((c) => c.id !== conversationId)
+    );
 
-      // Move conversation to project
-      await moveConversationToProject(conversationId, projectId);
+    // 🔥 STEP 2: Dispatch event IMMEDIATELY for cross-component sync
+    window.dispatchEvent(
+      new CustomEvent("conversation:moved", {
+        detail: {
+          conversationId,
+          oldProjectId: sourceProjectId,
+          newProjectId: projectId,
+        },
+      })
+    );
 
-      antdMessage.success("Conversation moved to project");
+    // 🔥 STEP 3: Clear drag state immediately (smooth UX)
+    handleConversationDragEnd();
 
-      // Dispatch custom event - the event listener will handle reload
-      window.dispatchEvent(
-        new CustomEvent("conversation:moved", {
-          detail: {
-            conversationId,
-            oldProjectId: sourceProjectId,
-            newProjectId: projectId,
-          },
-        })
-      );
-    } catch (err: any) {
-      antdMessage.error(err?.message || "Failed to move conversation");
-      // Rollback optimistic update by reloading from server
-      await loadConversations({ reset: true });
-    } finally {
-      handleConversationDragEnd();
-    }
+    // 🔥 STEP 4: API call in background (fire-and-forget)
+    // This doesn't block UI - runs asynchronously
+    moveConversationToProject(conversationId, projectId)
+      .then(() => {
+        // Success: Show subtle confirmation
+        antdMessage.success("Conversation moved to project", 2);
+      })
+      .catch(async (err: any) => {
+        // 🔄 ROLLBACK: Restore state if API fails
+        antdMessage.error(err?.message || "Failed to move conversation");
+
+        // Reload from server to get correct state
+        await loadConversations({ reset: true });
+
+        // Re-dispatch event to sync other components
+        window.dispatchEvent(
+          new CustomEvent("conversation:moved", {
+            detail: {
+              conversationId,
+              oldProjectId: projectId, // Reversed: move back
+              newProjectId: sourceProjectId,
+            },
+          })
+        );
+      });
   };
   /**
    * Handle drag over "All Conversations" section - throttled
@@ -357,7 +374,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   );
 
   /**
-   * Handle drop on "All Conversations" section (remove from project)
+   * 🚀 OPTIMIZED: Handle drop on "All Conversations" with INSTANT UI update
+   * Uses fire-and-forget API pattern - no await blocking UI
    */
   const handleAllConversationsDrop = async (
     conversationId: string,
@@ -370,68 +388,80 @@ const Sidebar: React.FC<SidebarProps> = ({
       return;
     }
 
-    try {
-      // Check if conversation already in list (optimistic update)
-      const existingConv = conversations.find((c) => c.id === conversationId);
+    // 🔥 STEP 1: Optimistic UI update - INSTANT feedback
+    const existingConv = conversations.find((c) => c.id === conversationId);
 
-      if (existingConv) {
-        // Already in memory, just update and move to top
-        const updatedConv = { ...existingConv, project_id: null };
-        setConversations((prev) => [
-          updatedConv,
-          ...prev.filter((c) => c.id !== conversationId),
-        ]);
-        setFilteredConversations((prev) => [
-          updatedConv,
-          ...prev.filter((c) => c.id !== conversationId),
-        ]);
-      } else {
-        // Not in current list - fetch the conversation to add it
-        try {
-          const { getConversation } = await import("../services/chat.service");
-          const fetchedConv = await getConversation(conversationId);
+    if (existingConv) {
+      // Already in memory, just update and move to top
+      const updatedConv = { ...existingConv, project_id: null };
+      setConversations((prev) => [
+        updatedConv,
+        ...prev.filter((c) => c.id !== conversationId),
+      ]);
+      setFilteredConversations((prev) => [
+        updatedConv,
+        ...prev.filter((c) => c.id !== conversationId),
+      ]);
+    } else {
+      // Not in current list - fetch and add (background)
+      import("../services/chat.service")
+        .then(({ getConversation }) => getConversation(conversationId))
+        .then((fetchedConv) => {
           const convListItem: ConversationListItem = {
             id: fetchedConv.id,
             title: fetchedConv.title,
             model: fetchedConv.model,
             context_window: fetchedConv.context_window,
-            message_count: 0, // Will be updated on next load
+            message_count: 0,
             updatedAt: fetchedConv.updatedAt,
             tags: fetchedConv.tags || [],
-            project_id: null, // Remove from project
+            project_id: null,
             order_in_project: 0,
           };
-
           // Add to top of list
           setConversations((prev) => [convListItem, ...prev]);
           setFilteredConversations((prev) => [convListItem, ...prev]);
-        } catch (fetchError) {
-          // Continue with API call anyway
-        }
-      }
-
-      // Remove from project (set project_id to null)
-      await moveConversationToProject(conversationId, null);
-
-      antdMessage.success("Conversation moved to All Conversations");
-
-      // Dispatch custom event - the event listener will handle reload
-      window.dispatchEvent(
-        new CustomEvent("conversation:moved", {
-          detail: {
-            conversationId,
-            oldProjectId: sourceProjectId,
-            newProjectId: null,
-          },
         })
-      );
-    } catch (err: any) {
-      antdMessage.error(err?.message || "Failed to move conversation");
-      // Rollback optimistic update by reloading from server
-      await loadConversations({ reset: true });
-    } finally {
-      handleConversationDragEnd();
+        .catch(() => {
+          // Silent fail - will be corrected on next refresh
+        });
     }
+
+    // 🔥 STEP 2: Dispatch event IMMEDIATELY
+    window.dispatchEvent(
+      new CustomEvent("conversation:moved", {
+        detail: {
+          conversationId,
+          oldProjectId: sourceProjectId,
+          newProjectId: null,
+        },
+      })
+    );
+
+    // 🔥 STEP 3: Clear drag state immediately
+    handleConversationDragEnd();
+
+    // 🔥 STEP 4: API call in background (fire-and-forget)
+    moveConversationToProject(conversationId, null)
+      .then(() => {
+        antdMessage.success("Moved to All Conversations", 2);
+      })
+      .catch(async (err: any) => {
+        // 🔄 ROLLBACK on error
+        antdMessage.error(err?.message || "Failed to move conversation");
+        await loadConversations({ reset: true });
+
+        // Re-dispatch rollback event
+        window.dispatchEvent(
+          new CustomEvent("conversation:moved", {
+            detail: {
+              conversationId,
+              oldProjectId: null,
+              newProjectId: sourceProjectId,
+            },
+          })
+        );
+      });
   };
   /**
    * Handle drag leave (clear drop target)
@@ -469,7 +499,12 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Middle Section - Scrollable Conversations */}
       <div className={styles.middleSection}>
-        {!collapsed && (
+        {/* 🚀 OPTIMIZATION: Always render ProjectSection, hide with CSS to prevent unmount/remount */}
+        <div
+          className={`${styles.projectsContainer} ${
+            collapsed ? styles.hidden : ""
+          }`}
+        >
           <ProjectSection
             onSelectConversation={handleSelectConversation}
             onNewConversation={handleNewConversation}
@@ -485,7 +520,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             dropTargetProjectId={dragDropState.dropTarget?.projectId || null}
             isDropTargetValid={dragDropState.dropTarget?.isValid || false}
           />
-        )}
+        </div>
         {!semanticResults ? (
           <ConversationList
             conversations={filteredConversations}
