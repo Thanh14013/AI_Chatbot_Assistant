@@ -26,23 +26,20 @@ import sequelize from "../db/database.config.js";
 export const createConversation = async (
   data: CreateConversationInput
 ): Promise<ConversationResponse> => {
-  // Validate required fields (title can be empty string now)
-  if (!data.user_id) {
-    throw new Error("User ID is required");
+  // Validate required fields
+  if (!data.user_id || !data.title) {
+    throw new Error("User ID and title are required");
   }
-
-  // Allow empty title - will be auto-generated after first message
-  const title = data.title || "";
 
   // Use transaction to prevent race conditions
   const conversation = await sequelize.transaction(async (t) => {
-    // Only check for duplicate if title is not empty
-    // (multiple conversations with empty title are allowed)
-    if (title.trim() !== "") {
+    // Check for duplicate title in active conversations (prevent spam clicking)
+    // Skip check for "New Chat" to allow multiple new conversations
+    if (data.title !== "New Chat") {
       const existing = await Conversation.findOne({
         where: {
           user_id: data.user_id,
-          title: title,
+          title: data.title,
           deleted_at: null,
         },
         transaction: t,
@@ -67,7 +64,7 @@ export const createConversation = async (
     const newConversation = await Conversation.create(
       {
         user_id: data.user_id,
-        title: title,
+        title: data.title,
         model: data.model || "gpt-4o-mini",
         context_window: data.context_window || 10,
         total_tokens_used: 0,

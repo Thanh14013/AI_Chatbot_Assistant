@@ -46,14 +46,8 @@ export const create = async (req: Request, res: Response): Promise<void> => {
     // Extract conversation data from request body
     const { title, model, context_window, tags, project_id }: CreateConversationInput = req.body;
 
-    // Validate required fields
-    if (!title || title.trim().length === 0) {
-      res.status(400).json({
-        success: false,
-        message: "Conversation title is required",
-      });
-      return;
-    }
+    // Use default title if not provided (for auto-title flow)
+    const conversationTitle = title && title.trim().length > 0 ? title.trim() : "New Chat";
 
     // Validate tags if provided
     let validatedTags: string[] | undefined = undefined;
@@ -73,7 +67,7 @@ export const create = async (req: Request, res: Response): Promise<void> => {
     // Create conversation
     const conversationData: CreateConversationInput = {
       user_id: userId,
-      title: title.trim(),
+      title: conversationTitle,
       model: model || "GPT-5 mini",
       context_window: context_window || 10,
       tags: validatedTags || [],
