@@ -658,6 +658,49 @@ export const initializeSocketIO = (
               totalTokens: result.conversation.total_tokens_used,
             });
           }
+
+          // STEP 4: Auto-generate smart title for new conversations (like ChatGPT/Gemini)
+          // Only for first message exchange (when title is still "New Chat" or matches user message)
+          // NON-BLOCKING: Run in background, don't wait for title generation
+          if (result.conversation) {
+            const currentTitle = result.conversation.title;
+            const shouldAutoTitle =
+              currentTitle === "New Chat" ||
+              currentTitle.trim() === content.trim() ||
+              result.conversation.message_count === 2; // First exchange
+
+            if (shouldAutoTitle) {
+              // Don't await - let it run in background (non-blocking)
+              (async () => {
+                try {
+                  // Import conversation services
+                  const { generateConversationTitle, updateConversation } = await import(
+                    "./conversation.service.js"
+                  );
+
+                  // Generate smart title from user message and AI response
+                  const smartTitle = await generateConversationTitle(
+                    content,
+                    assistantContent || result.assistantMessage?.content || ""
+                  );
+
+                  // Update conversation with new title
+                  await updateConversation(conversationId, socket.userId!, {
+                    title: smartTitle,
+                  });
+
+                  // Broadcast title update to all user's sockets (multi-tab sync)
+                  broadcastToUser(socket.userId!, "conversation:update", {
+                    conversationId,
+                    update: { title: smartTitle },
+                  });
+                } catch (err) {
+                  // Silent fail - auto-titling is not critical
+                  // Title will remain as "New Chat" or user message
+                }
+              })();
+            }
+          }
         } catch (streamErr: any) {
           // CRITICAL FIX: Handle streaming errors properly
 

@@ -1629,27 +1629,10 @@ const ChatPage: React.FC = () => {
       setIsSendingMessage(true);
 
       try {
-        // Step 1: Generate title - nếu <= 4 từ thì dùng message, nếu > 4 từ thì dùng "New Chat"
-        const wordCount = content.trim().split(/\s+/).length;
-        let title: string;
-
-        if (wordCount <= 4) {
-          // Message ngắn: dùng trực tiếp làm title
-          title = content.trim();
-        } else {
-          // Message dài: dùng "New Chat"
-          title = "New Chat";
-        }
-
-        // Validate title before creating conversation
-        if (!title || title.trim().length === 0) {
-          title = "New Chat";
-        }
-
-        // Step 2: Create conversation
-
+        // Step 1: Create conversation with default title
+        // Server will auto-generate smart title after first message (like ChatGPT/Gemini)
         const newConversation = await apiCreateConversation({
-          title,
+          title: "New Chat",
           model: "GPT-5 mini",
           context_window: 10,
         });
