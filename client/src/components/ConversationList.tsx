@@ -204,8 +204,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
           />
         ))}
 
-
-        {/* Infinite scroll loader */
+        {/* Infinite scroll loader */}
         {isLoadingMore && (
           <div className={styles.loadMoreIndicator}>
             <Spin size="small" />

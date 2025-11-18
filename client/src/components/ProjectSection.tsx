@@ -210,7 +210,7 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
         });
 
         // Reload projects to update conversation count
-        loadProjects();
+        loadProjectsWithConversations();
       }
     };
 
@@ -228,7 +228,7 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
         loadProjectConversations(projectId);
 
         // Reload projects to update conversation count, latest updates, etc.
-        loadProjects();
+        loadProjectsWithConversations();
       }
     };
 
@@ -249,7 +249,7 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
       });
 
       // Reload projects to update conversation count
-      loadProjects();
+      loadProjectsWithConversations();
     };
 
     const handleConversationMoved = (e: Event) => {
@@ -361,7 +361,7 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
     try {
       await deleteProject(projectId);
       message.success("Project deleted successfully");
-      loadProjects();
+      loadProjectsWithConversations();
       // Refresh conversations list
       window.dispatchEvent(new Event("conversations:refresh"));
     } catch (error: any) {
@@ -386,8 +386,8 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
         message.success("Project updated successfully");
       }
       setModalVisible(false);
-      // Note: loadProjects() is called here as fallback, but realtime should handle it
-      await loadProjects();
+      // Note: loadProjectsWithConversations() is called here as fallback, but realtime should handle it
+      await loadProjectsWithConversations();
     } catch (error: any) {
       const errorMsg =
         error?.response?.data?.message || error?.message || "Operation failed";
@@ -438,7 +438,7 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
 
       // Reload projects to update conversation count (don't dispatch conversation:created
       // because loadProjectConversations already added it to the list, dispatching would cause duplication)
-      await loadProjects();
+      await loadProjectsWithConversations();
 
       // Refresh main conversation list
       window.dispatchEvent(new Event("conversations:refresh"));

@@ -151,6 +151,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     const currentPinned =
       !isPendingMessage(message) && (message.pinned || false);
 
+    // Narrowed message reference for use inside callbacks
+    const messageAs = message as Message;
+
     const newPinnedStatus = !currentPinned;
 
     // 🚀 STEP 1: Update local state immediately for instant UI feedback
@@ -165,9 +168,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     window.dispatchEvent(
       new CustomEvent(newPinnedStatus ? "message:pinned" : "message:unpinned", {
         detail: {
-          conversationId: message.conversation_id,
+          conversationId: messageAs.conversation_id,
           messageId: message.id,
-          message: newPinnedStatus ? message : undefined,
+          message: newPinnedStatus ? messageAs : undefined,
         },
       })
     );
@@ -200,9 +203,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             currentPinned ? "message:pinned" : "message:unpinned",
             {
               detail: {
-                conversationId: message.conversation_id,
+                conversationId: messageAs.conversation_id,
                 messageId: message.id,
-                message: currentPinned ? message : undefined,
+                message: currentPinned ? messageAs : undefined,
               },
             }
           )
@@ -225,48 +228,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       });
   };
 
-  /**
-   * Copy message content to clipboard
-   */
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(message.content);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000);
-    } catch (error: unknown) {
-      // ❌ API call failed - ROLLBACK optimistic update
-      setLocalPinned(currentPinned); // Revert local state
-
-      if (onPinToggle) {
-        onPinToggle(message.id, currentPinned); // Revert to original state
-      }
-
-      // Dispatch rollback event
-      window.dispatchEvent(
-        new CustomEvent(currentPinned ? "message:pinned" : "message:unpinned", {
-          detail: {
-            conversationId: message.conversation_id,
-            messageId: message.id,
-            message: currentPinned ? message : undefined,
-          },
-        })
-      );
-
-      // Show error message
-      if (error instanceof Error) {
-        antMessage.error(
-          error.message ||
-            `Failed to ${currentPinned ? "unpin" : "pin"} message`
-        );
-      } else {
-        antMessage.error(
-          `Failed to ${currentPinned ? "unpin" : "pin"} message`
-        );
-      }
-    } finally {
-      setIsPinning(false);
-    }
-  };
+  // Copy handler intentionally declared once later (keeps success UX)
 
   /**
    * Handle requesting follow-up suggestions
