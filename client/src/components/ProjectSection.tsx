@@ -100,6 +100,32 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
       // 🚀 UPDATE CENTRALIZED STORE
       sidebarStore.setProjects(data);
 
+      // 🔥 LOAD ALL PROJECT CONVERSATIONS for accurate badge counts
+      // This ensures the centralized store has complete data
+      const conversationPromises = data.map((project) =>
+        getProjectConversations(project.id)
+          .then((convs) => ({ projectId: project.id, conversations: convs }))
+          .catch(() => ({ projectId: project.id, conversations: [] }))
+      );
+
+      const results = await Promise.all(conversationPromises);
+
+      // Update local state
+      const conversationsMap: Record<string, ConversationListItem[]> = {};
+      const allConversations: ConversationListItem[] = [];
+
+      results.forEach(({ projectId, conversations }) => {
+        conversationsMap[projectId] = conversations;
+        allConversations.push(...conversations);
+      });
+
+      setProjectConversations(conversationsMap);
+
+      // 🔥 Merge all project conversations into store
+      if (allConversations.length > 0) {
+        sidebarStore.addConversations(allConversations);
+      }
+
       projectsLoadedRef.current = true;
     } catch (error: any) {
       message.error(error.message || "Failed to load projects");
@@ -117,10 +143,12 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
         ...prev,
         [projectId]: conversations,
       }));
-      // Sync to centralized store - these conversations already have projectId set
-      sidebarStore.setConversations(conversations);
+      // 🚀 MERGE into centralized store (don't replace entire store)
+      sidebarStore.addConversations(conversations);
+      return conversations; // Return for chaining
     } catch (error: any) {
       message.error(error.message || "Failed to load project conversations");
+      return [];
     }
   };
 
@@ -245,7 +273,7 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
         });
       }
 
-      // Reload new project conversations if moved to a project
+      // 🔥 OPTIMIZED: Only reload specific project conversations instead of ALL projects
       if (data.newProjectId) {
         loadProjectConversations(data.newProjectId);
 
@@ -257,8 +285,8 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
         });
       }
 
-      // Reload all projects to update conversation counts
-      loadProjects();
+      // 🔥 NO NEED to reload ALL projects - badge counts are now calculated from store
+      // The store already updated via optimistic update, so UI will reflect correct counts
     };
 
     // Listen to custom window events triggered by websocket service

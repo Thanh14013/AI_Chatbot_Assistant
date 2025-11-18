@@ -55,6 +55,7 @@ interface SidebarContextValue extends SidebarState {
 
   // Actions
   setConversations: (conversations: ConversationListItem[]) => void;
+  addConversations: (conversations: ConversationListItem[]) => void; // Merge without replacing
   setProjects: (projects: Project[]) => void;
 
   // Optimistic updates
@@ -171,6 +172,25 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
         ...prev,
         conversations: new Map(conversations.map((c) => [c.id, c])),
       }));
+    },
+    []
+  );
+
+  /**
+   * Add/merge conversations into existing store without replacing
+   */
+  const addConversations = useCallback(
+    (conversations: ConversationListItem[]) => {
+      setState((prev) => {
+        const newConversations = new Map(prev.conversations);
+        conversations.forEach((c) => {
+          newConversations.set(c.id, c);
+        });
+        return {
+          ...prev,
+          conversations: newConversations,
+        };
+      });
     },
     []
   );
@@ -517,6 +537,7 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
     projectConversationCount,
     allStandaloneConversations,
     setConversations,
+    addConversations,
     setProjects,
     moveConversationOptimistic,
     createConversationOptimistic,

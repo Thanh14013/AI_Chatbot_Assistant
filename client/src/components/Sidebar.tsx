@@ -112,19 +112,20 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         const standaloneConversations = result.conversations || [];
 
-        // 🚀 UPDATE CENTRALIZED STORE instead of local state
+        // 🚀 UPDATE CENTRALIZED STORE
         if (opts.reset || targetPage === 1) {
-          sidebarStore.setConversations(standaloneConversations);
-        } else {
-          // For pagination, merge with existing
-          const existingConvs = Array.from(sidebarStore.conversations.values());
-          const merged = [
-            ...existingConvs,
-            ...standaloneConversations.filter(
-              (c) => !existingConvs.find((e) => e.id === c.id)
-            ),
+          // On reset/first page: only set standalone conversations, don't touch project conversations
+          const existingProjectConvs = Array.from(
+            sidebarStore.conversations.values()
+          ).filter((c) => c.project_id !== null);
+          const allConvs = [
+            ...standaloneConversations,
+            ...existingProjectConvs,
           ];
-          sidebarStore.setConversations(merged);
+          sidebarStore.setConversations(allConvs);
+        } else {
+          // For pagination: merge new standalone conversations
+          sidebarStore.addConversations(standaloneConversations);
         }
 
         setPage(result.pagination.page);
