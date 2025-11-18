@@ -40,7 +40,7 @@ export async function testOpenAIConnection() {
 
   try {
     const response = await openai.chat.completions.create({
-      model: "GPT-5 mini",
+      model: "gpt-4.1-mini",
       messages: [{ role: "user", content: "Hello, can you hear me?" }],
     });
 
@@ -160,7 +160,7 @@ export async function getChatCompletion(
   // Set default values
   const {
     messages,
-    model = "GPT-5 mini",
+    model = "gpt-4o",
     temperature = 0.7,
     max_completion_tokens = 2000,
     stream = false,
