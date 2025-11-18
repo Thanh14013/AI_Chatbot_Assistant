@@ -214,7 +214,7 @@ const ConversationForm: React.FC<ConversationFormProps> = ({
             placeholder="Select AI model"
             optionLabelProp="label"
           >
-            {AI_MODELS.map((model) => (
+            {modelOptions.map((model) => (
               <Option key={model.value} value={model.value} label={model.label}>
                 <div className={styles.modelOption}>
                   <Text strong>{model.label}</Text>
