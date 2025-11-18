@@ -26,31 +26,37 @@ import sequelize from "../db/database.config.js";
 export const createConversation = async (
   data: CreateConversationInput
 ): Promise<ConversationResponse> => {
-  // Validate required fields
-  if (!data.user_id || !data.title) {
-    throw new Error("User ID and title are required");
+  // Validate required fields (title can be empty string now)
+  if (!data.user_id) {
+    throw new Error("User ID is required");
   }
+
+  // Allow empty title - will be auto-generated after first message
+  const title = data.title || "";
 
   // Use transaction to prevent race conditions
   const conversation = await sequelize.transaction(async (t) => {
-    // Check for duplicate title in active conversations (prevent spam clicking)
-    const existing = await Conversation.findOne({
-      where: {
-        user_id: data.user_id,
-        title: data.title,
-        deleted_at: null,
-      },
-      transaction: t,
-      lock: true, // Use row-level locking
-    });
+    // Only check for duplicate if title is not empty
+    // (multiple conversations with empty title are allowed)
+    if (title.trim() !== "") {
+      const existing = await Conversation.findOne({
+        where: {
+          user_id: data.user_id,
+          title: title,
+          deleted_at: null,
+        },
+        transaction: t,
+        lock: true, // Use row-level locking
+      });
 
-    if (existing) {
-      // If conversation with same title exists and was created within last 5 seconds,
-      // it's likely a duplicate request (spam click)
-      const timeDiff = Date.now() - new Date(existing.createdAt).getTime();
-      if (timeDiff < 5000) {
-        // Return existing conversation instead of creating duplicate
-        return existing;
+      if (existing) {
+        // If conversation with same title exists and was created within last 5 seconds,
+        // it's likely a duplicate request (spam click)
+        const timeDiff = Date.now() - new Date(existing.createdAt).getTime();
+        if (timeDiff < 5000) {
+          // Return existing conversation instead of creating duplicate
+          return existing;
+        }
       }
     }
 
@@ -61,7 +67,7 @@ export const createConversation = async (
     const newConversation = await Conversation.create(
       {
         user_id: data.user_id,
-        title: data.title,
+        title: title,
         model: data.model || "gpt-4o-mini",
         context_window: data.context_window || 10,
         total_tokens_used: 0,

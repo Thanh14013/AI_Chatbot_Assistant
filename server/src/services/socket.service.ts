@@ -660,18 +660,24 @@ export const initializeSocketIO = (
           }
 
           // STEP 4: Auto-generate smart title for new conversations (like ChatGPT/Gemini)
-          // Only for first message exchange (when title is still "New Chat" or matches user message)
+          // Only for first message exchange (when title is empty/default)
           // NON-BLOCKING: Run in background, don't wait for title generation
-          if (result.conversation) {
-            const currentTitle = result.conversation.title;
-            const shouldAutoTitle =
-              currentTitle === "New Chat" ||
-              currentTitle.trim() === content.trim() ||
-              result.conversation.message_count === 2; // First exchange
+          if (result.conversation && result.conversation.message_count === 2) {
+            // First message exchange - auto-generate title
+            const currentTitle = result.conversation.title || "";
+            const trimmedTitle = currentTitle.trim();
 
-            if (shouldAutoTitle) {
+            // Check if title is empty, default, or matches user message
+            const isDefaultTitle =
+              trimmedTitle === "" ||
+              trimmedTitle === "New Chat" ||
+              trimmedTitle === "New Conversation" ||
+              trimmedTitle === content.trim();
+
+            if (isDefaultTitle) {
               // Don't await - let it run in background (non-blocking)
-              (async () => {
+              // Use setImmediate to ensure it runs after current execution
+              setImmediate(async () => {
                 try {
                   // Import conversation services
                   const { generateConversationTitle, updateConversation } = await import(
@@ -684,21 +690,25 @@ export const initializeSocketIO = (
                     assistantContent || result.assistantMessage?.content || ""
                   );
 
-                  // Update conversation with new title
-                  await updateConversation(conversationId, socket.userId!, {
-                    title: smartTitle,
-                  });
+                  // Only update if title was actually generated
+                  if (smartTitle && smartTitle.trim() !== "") {
+                    // Update conversation with new title
+                    await updateConversation(conversationId, socket.userId!, {
+                      title: smartTitle,
+                    });
 
-                  // Broadcast title update to all user's sockets (multi-tab sync)
-                  broadcastToUser(socket.userId!, "conversation:update", {
-                    conversationId,
-                    update: { title: smartTitle },
-                  });
+                    // Broadcast title update to all user's sockets (multi-tab sync)
+                    broadcastToUser(socket.userId!, "conversation:update", {
+                      conversationId,
+                      update: { title: smartTitle },
+                    });
+                  }
                 } catch (err) {
                   // Silent fail - auto-titling is not critical
-                  // Title will remain as "New Chat" or user message
+                  // Log error for debugging but don't break the flow
+                  console.error("[Auto-title] Failed to generate title:", err);
                 }
-              })();
+              });
             }
           }
         } catch (streamErr: any) {

@@ -304,7 +304,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
       <div className={styles.details}>
         {/* Title in bold */}
         <div className={styles.title}>
-          {truncateText(conversation.title, 30)}
+          {truncateText(conversation.title || "New Chat", 30)}
         </div>
 
         {/* Tags as plain text with separators */}

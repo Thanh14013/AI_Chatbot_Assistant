@@ -1629,10 +1629,10 @@ const ChatPage: React.FC = () => {
       setIsSendingMessage(true);
 
       try {
-        // Step 1: Create conversation with default title
+        // Step 1: Create conversation with empty title
         // Server will auto-generate smart title after first message (like ChatGPT/Gemini)
         const newConversation = await apiCreateConversation({
-          title: "New Chat",
+          title: "",
           model: "GPT-5 mini",
           context_window: 10,
         });
@@ -3117,7 +3117,7 @@ const ChatPage: React.FC = () => {
                 <div className={styles.conversationHeaderLeft}>
                   <div className={styles.conversationTitleContainer}>
                     <Title level={4} className={styles.conversationTitle}>
-                      {currentConversation.title}
+                      {currentConversation.title || "New Chat"}
                     </Title>
                   </div>
                   <NetworkStatus position="inline" />
