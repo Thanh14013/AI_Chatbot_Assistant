@@ -235,8 +235,23 @@ const ChatPage: React.FC = () => {
       // Use cached data immediately - instant load!
       if (page === 1) {
         setMessages(cached.messages);
+
+        // 🔥 FIX: Initialize pinnedMessageIds from loaded messages
+        const pinnedIds = new Set(
+          cached.messages.filter((msg) => msg.pinned).map((msg) => msg.id)
+        );
+        setPinnedMessageIds(pinnedIds);
       } else {
         setMessages((prev) => [...cached.messages, ...prev]);
+
+        // 🔥 FIX: Merge pinned message IDs from older pages
+        setPinnedMessageIds((prev) => {
+          const newSet = new Set(prev);
+          cached.messages.forEach((msg) => {
+            if (msg.pinned) newSet.add(msg.id);
+          });
+          return newSet;
+        });
       }
       setMessagesPage(cached.pagination.page);
       setMessagesHasMore(cached.pagination.hasMore);
@@ -260,9 +275,24 @@ const ChatPage: React.FC = () => {
       if (page === 1) {
         // initial load: replace messages with the most recent page
         setMessages(result.messages);
+
+        // 🔥 FIX: Initialize pinnedMessageIds from loaded messages
+        const pinnedIds = new Set(
+          result.messages.filter((msg) => msg.pinned).map((msg) => msg.id)
+        );
+        setPinnedMessageIds(pinnedIds);
       } else {
         // older pages (page > 1): prepend older messages before existing list
         setMessages((prev) => [...result.messages, ...prev]);
+
+        // 🔥 FIX: Merge pinned message IDs from older pages
+        setPinnedMessageIds((prev) => {
+          const newSet = new Set(prev);
+          result.messages.forEach((msg) => {
+            if (msg.pinned) newSet.add(msg.id);
+          });
+          return newSet;
+        });
       }
       setMessagesPage(result.pagination.page);
       setMessagesHasMore(result.pagination.page < result.pagination.totalPages);
@@ -485,6 +515,9 @@ const ChatPage: React.FC = () => {
     setMessagesPage(1);
     setMessagesHasMore(false);
 
+    // 🔥 FIX: Clear pinned message IDs when creating new conversation
+    setPinnedMessageIds(new Set());
+
     // Load cached suggestions immediately (already in state from initialization)
     // User can click the refresh button if they want new suggestions
   };
@@ -619,6 +652,10 @@ const ChatPage: React.FC = () => {
       setMessages([]);
       setMessagesPage(1);
       setMessagesHasMore(false);
+
+      // 🔥 FIX: Clear pinned message IDs when navigating to home
+      setPinnedMessageIds(new Set());
+
       return;
     }
 
@@ -688,6 +725,13 @@ const ChatPage: React.FC = () => {
         setMessagesHasMore(
           result.pagination.page < result.pagination.totalPages
         );
+
+        // 🔥 FIX: Initialize pinnedMessageIds from loaded messages
+        const pinnedIds = new Set(
+          result.messages.filter((msg) => msg.pinned).map((msg) => msg.id)
+        );
+        setPinnedMessageIds(pinnedIds);
+
         // If navigation included a q param (from global search), and highlight not found,
         // call the conversation-local search API to find the bestMatch and highlight it.
         const searchParams = new URLSearchParams(location.search);
