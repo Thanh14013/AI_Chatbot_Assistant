@@ -435,7 +435,7 @@ const ChatPage: React.FC = () => {
   const handleCreateSubmit = async (values: ConversationFormValues) => {
     const payload = {
       title: values.title,
-      model: values.model || "GPT-5.1",
+      model: values.model || "GPT-5 mini",
       context_window: values.context_window || 10,
     };
 
@@ -1139,7 +1139,7 @@ const ChatPage: React.FC = () => {
           role: "assistant",
           content: "",
           tokens_used: 0,
-          model: currentConversation?.model || "GPT-5.1",
+          model: currentConversation?.model || "GPT-5 mini",
           createdAt: new Date().toISOString(),
           isTyping: true,
         };
@@ -1522,7 +1522,7 @@ const ChatPage: React.FC = () => {
 
         const newConversation = await apiCreateConversation({
           title,
-          model: "GPT-5.1",
+          model: "GPT-5 mini",
           context_window: 10,
         });
 

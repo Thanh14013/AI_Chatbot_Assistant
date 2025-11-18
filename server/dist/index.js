@@ -125,7 +125,7 @@ function tryListen(port, attemptsLeft) {
             process.exit(1);
         }
     });
-    httpServer.listen(port, () => {
+    httpServer.listen(port, "0.0.0.0", () => {
         logInfo(`Server listening on port ${port}`);
         logInfo(`API Documentation: http://localhost:${port}/docs`);
     });

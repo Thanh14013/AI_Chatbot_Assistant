@@ -28,7 +28,7 @@ export async function testOpenAIConnection() {
     }
     try {
         const response = await openai.chat.completions.create({
-            model: "gpt-5-nano",
+            model: "GPT-5 mini",
             messages: [{ role: "user", content: "Hello, can you hear me?" }],
         });
         const text = response?.choices?.[0]?.message?.content;
@@ -68,7 +68,7 @@ export async function getChatCompletion(params) {
     if (!apiKey) {
         throw new Error("OPENAI_API_KEY not configured. Please set it in your .env file.");
     }
-    const { messages, model = "gpt-5-nano", temperature = 0.7, max_completion_tokens = 2000, stream = false, } = params;
+    const { messages, model = "GPT-5 mini", temperature = 0.7, max_completion_tokens = 2000, stream = false, } = params;
     if (!messages || messages.length === 0) {
         throw new Error("Messages array cannot be empty");
     }
@@ -285,6 +285,6 @@ export function selectModelForContent(hasImages) {
     if (hasImages) {
         return "gpt-4o";
     }
-    return "gpt-5-nano";
+    return "GPT-5 mini";
 }
 export default openai;

@@ -43,7 +43,7 @@ export const create = async (req, res) => {
         const conversationData = {
             user_id: userId,
             title: title.trim(),
-            model: model || "gpt-5-nano",
+            model: model || "GPT-5 mini",
             context_window: context_window || 10,
             tags: validatedTags || [],
             ...(project_id && { project_id }),

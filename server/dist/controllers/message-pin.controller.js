@@ -73,6 +73,21 @@ export const pinMessage = async (req, res) => {
         }
         const updatedMessage = await Message.pinMessage(messageId);
         try {
+            const { updateMessageInCache } = await import("../services/message-cache.service.js");
+            await updateMessageInCache(message.conversation_id, updatedMessage.id, {
+                id: updatedMessage.id,
+                conversation_id: updatedMessage.conversation_id,
+                role: updatedMessage.role,
+                content: updatedMessage.content,
+                tokens_used: updatedMessage.tokens_used || undefined,
+                model: updatedMessage.model || undefined,
+                pinned: true,
+                createdAt: updatedMessage.createdAt,
+            });
+        }
+        catch (cacheError) {
+        }
+        try {
             await invalidateCachePattern(messageHistoryPattern(message.conversation_id));
         }
         catch (cacheError) {
@@ -210,6 +225,21 @@ export const unpinMessage = async (req, res) => {
             return;
         }
         const updatedMessage = await Message.unpinMessage(messageId);
+        try {
+            const { updateMessageInCache } = await import("../services/message-cache.service.js");
+            await updateMessageInCache(message.conversation_id, updatedMessage.id, {
+                id: updatedMessage.id,
+                conversation_id: updatedMessage.conversation_id,
+                role: updatedMessage.role,
+                content: updatedMessage.content,
+                tokens_used: updatedMessage.tokens_used || undefined,
+                model: updatedMessage.model || undefined,
+                pinned: false,
+                createdAt: updatedMessage.createdAt,
+            });
+        }
+        catch (cacheError) {
+        }
         try {
             await invalidateCachePattern(messageHistoryPattern(message.conversation_id));
         }

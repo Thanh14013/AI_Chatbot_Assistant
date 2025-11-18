@@ -16,7 +16,7 @@ Hãy tạo đúng 3 câu hỏi follow-up ngắn gọn, tự nhiên, sáng tạo 
 Chỉ trả về danh sách 3 câu hỏi, mỗi câu 1 dòng, không cần số thứ tự hay ký tự đặc biệt.
 3 câu hỏi này là 3 câu với vai trò là người dùng, danh xưng là tôi, hỏi trợ lý ảo.`;
         const response = await openai.chat.completions.create({
-            model: "gpt-5-nano",
+            model: "GPT-5 mini",
             messages: [
                 {
                     role: "system",
@@ -112,7 +112,7 @@ Các câu hỏi phải:
 - Dùng ngôi xưng "tôi" cho người dùng và "bạn" cho AI
 - Chỉ trả về 3 câu hỏi, mỗi câu 1 dòng, không cần số thứ tự hay ký tự đặc biệt`;
         const response = await openai.chat.completions.create({
-            model: "gpt-5-nano",
+            model: "GPT-5 mini",
             messages: [
                 {
                     role: "system",

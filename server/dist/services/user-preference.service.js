@@ -98,7 +98,34 @@ export const buildSystemPromptWithPreferences = async (userId, basePrompt = "You
             zh: "Chinese",
         };
         const languageName = languageNames[preferences.language] || "English";
-        let systemPrompt = `CRITICAL INSTRUCTION: You MUST respond ONLY in ${languageName} language. All your responses must be in ${languageName}, regardless of the language used in previous messages or context.\n\n${basePrompt}`;
+        let systemPrompt = `🔴 ABSOLUTE REQUIREMENT - LANGUAGE ENFORCEMENT 🔴
+YOU MUST RESPOND EXCLUSIVELY IN ${languageName.toUpperCase()} LANGUAGE.
+
+MANDATORY RULES:
+1. EVERY single response MUST be written in ${languageName} - NO EXCEPTIONS
+2. IGNORE the language of previous messages in the conversation history
+3. IGNORE the language used by the user in their current or past messages  
+4. DO NOT mix languages - use ONLY ${languageName}
+5. Even if the user writes in a different language, you MUST respond in ${languageName}
+6. This language requirement OVERRIDES all other instructions
+
+Current User's Selected Language: ${languageName}
+Your Response Language: ${languageName}
+
+${basePrompt}`;
+        if (preferences.custom_instructions && preferences.custom_instructions.trim()) {
+            systemPrompt += `\n\n📋 USER'S CUSTOM INSTRUCTIONS (High Priority):\n${preferences.custom_instructions.trim()}`;
+        }
+        const styleInstructions = {
+            concise: "Keep your responses brief and to the point. Avoid unnecessary details.",
+            detailed: "Provide comprehensive and detailed responses. Include examples and explanations where appropriate.",
+            balanced: "Provide clear responses with appropriate level of detail. Balance brevity with completeness.",
+            casual: "Use a friendly, conversational tone. Feel free to use casual language and be personable.",
+            professional: "Maintain a professional and formal tone. Use proper terminology and structured responses.",
+        };
+        if (preferences.response_style && styleInstructions[preferences.response_style]) {
+            systemPrompt += `\n\n💬 Response Style: ${styleInstructions[preferences.response_style]}`;
+        }
         systemPrompt += `\n\n📝 CRITICAL CODE FORMATTING RULE:
 When providing ANY code in your response, you MUST ALWAYS wrap it in markdown code blocks with triple backticks and language identifier.
 
@@ -138,20 +165,15 @@ your code
 \`\`\`
 
 ⚠️ IMPORTANT: This applies to ALL code snippets - even single lines, commands, or code fragments. NEVER provide raw code without the triple backtick wrapper and language identifier. This is essential for proper syntax highlighting and user experience.`;
-        const styleInstructions = {
-            concise: "Keep your responses brief and to the point. Avoid unnecessary details.",
-            detailed: "Provide comprehensive and detailed responses. Include examples and explanations where appropriate.",
-            balanced: "Provide clear responses with appropriate level of detail. Balance brevity with completeness.",
-            casual: "Use a friendly, conversational tone. Feel free to use casual language and be personable.",
-            professional: "Maintain a professional and formal tone. Use proper terminology and structured responses.",
-        };
-        if (preferences.response_style && styleInstructions[preferences.response_style]) {
-            systemPrompt += `\n\nResponse Style: ${styleInstructions[preferences.response_style]}`;
-        }
-        if (preferences.custom_instructions && preferences.custom_instructions.trim()) {
-            systemPrompt += `\n\nAdditional Instructions: ${preferences.custom_instructions.trim()}`;
-        }
-        systemPrompt += `\n\n🌍 REMINDER: Your response language is ${languageName}. Do not switch to any other language.`;
+        systemPrompt += `\n\n🔴 FINAL REMINDER - CRITICAL LANGUAGE REQUIREMENT 🔴
+Your ONLY allowed response language is: ${languageName.toUpperCase()}
+- Do NOT use Vietnamese if the user selected French
+- Do NOT use English if the user selected Japanese  
+- Do NOT use any language other than ${languageName}
+- This is an ABSOLUTE requirement that CANNOT be violated
+- Responding in the wrong language is a CRITICAL ERROR
+
+Response Language: ${languageName} (MANDATORY)`;
         return systemPrompt;
     }
     catch (error) {

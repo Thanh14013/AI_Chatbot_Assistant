@@ -101,13 +101,13 @@ export const pinMessage = async (req: Request, res: Response): Promise<void> => 
     // 🚀 Update cache with pinned status
     try {
       const { updateMessageInCache } = await import("../services/message-cache.service.js");
-      await updateMessageInCache(message.conversation_id, {
+      await updateMessageInCache(message.conversation_id, updatedMessage.id, {
         id: updatedMessage.id,
         conversation_id: updatedMessage.conversation_id,
         role: updatedMessage.role,
         content: updatedMessage.content,
-        tokens_used: updatedMessage.tokens_used,
-        model: updatedMessage.model,
+        tokens_used: updatedMessage.tokens_used || undefined,
+        model: updatedMessage.model || undefined,
         pinned: true,
         createdAt: updatedMessage.createdAt,
       });
@@ -282,13 +282,13 @@ export const unpinMessage = async (req: Request, res: Response): Promise<void> =
     // 🚀 Update cache with unpinned status
     try {
       const { updateMessageInCache } = await import("../services/message-cache.service.js");
-      await updateMessageInCache(message.conversation_id, {
+      await updateMessageInCache(message.conversation_id, updatedMessage.id, {
         id: updatedMessage.id,
         conversation_id: updatedMessage.conversation_id,
         role: updatedMessage.role,
         content: updatedMessage.content,
-        tokens_used: updatedMessage.tokens_used,
-        model: updatedMessage.model,
+        tokens_used: updatedMessage.tokens_used || undefined,
+        model: updatedMessage.model || undefined,
         pinned: false,
         createdAt: updatedMessage.createdAt,
       });

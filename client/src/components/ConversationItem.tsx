@@ -357,7 +357,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         mode="edit"
         initialValues={{
           title: fullConversation?.title || conversation.title,
-          model: fullConversation?.model || conversation.model || "GPT-5.1",
+          model: fullConversation?.model || conversation.model || "GPT-5 mini",
           context_window:
             fullConversation?.context_window ||
             conversation.context_window ||

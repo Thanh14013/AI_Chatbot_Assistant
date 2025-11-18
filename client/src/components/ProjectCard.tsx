@@ -19,6 +19,7 @@ import type { Project } from "../types/project.type";
 import type { ConversationListItem } from "../types/chat.type";
 import ConversationItem from "./ConversationItem";
 import { rafThrottle } from "../utils/performance.util";
+import { useSidebarStore } from "../stores/sidebar.store";
 import styles from "./ProjectCard.module.css";
 
 interface ProjectCardProps {
@@ -70,6 +71,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
 }) => {
   const { modal } = App.useApp();
   const [isHovered, setIsHovered] = useState(false);
+  const sidebarStore = useSidebarStore();
 
   // Menu items for 3-dot dropdown
   const menuItems: MenuProps["items"] = [
@@ -188,9 +190,9 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
           {/* Project Name */}
           <span className={styles.projectName}>{project.name}</span>
 
-          {/* Conversation Count Badge */}
+          {/* Conversation Count Badge - Uses calculated count from centralized store */}
           <Badge
-            count={project.conversationCount}
+            count={sidebarStore.projectConversationCount(project.id)}
             showZero
             className={styles.countBadge}
             style={{ backgroundColor: project.color }}

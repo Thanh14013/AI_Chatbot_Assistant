@@ -2,6 +2,7 @@ import redisClient from "../config/redis.config.js";
 import sequelize from "../db/database.config.js";
 import { getChatCompletion } from "./openai.service.js";
 import { generateEmbedding } from "./embedding.service.js";
+import { buildSystemPromptWithPreferences } from "./user-preference.service.js";
 const LTM_CONFIG = {
     REDIS_TTL: parseInt(process.env.LTM_REDIS_TTL || "604800"),
     META_MODEL: process.env.LTM_META_MODEL || "gpt-4o-mini",
@@ -522,10 +523,12 @@ Analyze the conversation and output JSON:`;
 }
 export async function buildMemoryEnhancedPrompt(userId, currentMessage, baseSystemPrompt, options = {}) {
     try {
-        if (!LTM_CONFIG.ENABLED)
-            return baseSystemPrompt;
+        if (!LTM_CONFIG.ENABLED) {
+            return await buildSystemPromptWithPreferences(userId, baseSystemPrompt);
+        }
         const { includeProfile = true, includeEvents = true, maxEvents = 5, minImportanceScore = 3, } = options;
-        let enhancedPrompt = baseSystemPrompt + "\n\n";
+        const promptWithPreferences = await buildSystemPromptWithPreferences(userId, baseSystemPrompt);
+        let enhancedPrompt = promptWithPreferences + "\n\n";
         const context = await getMemoryContext(userId, currentMessage, {
             includeProfile,
             includeEvents,
@@ -602,16 +605,23 @@ export async function buildMemoryEnhancedPrompt(userId, currentMessage, baseSyst
             });
             enhancedPrompt += "\n";
         }
-        enhancedPrompt += "## Instructions:\n";
+        enhancedPrompt += "## Memory Context Instructions:\n";
         enhancedPrompt += "- Use the user context above to personalize your responses\n";
         enhancedPrompt += "- Reference past interactions when relevant\n";
         enhancedPrompt += "- Be helpful, concise, and respectful\n";
         enhancedPrompt +=
             "- If the user mentions something you already know, acknowledge it naturally\n";
+        enhancedPrompt +=
+            "\n⚠️ IMPORTANT: User preferences (language, response style, custom instructions) specified at the beginning MUST be followed strictly. Memory context is supplementary information only.\n";
         return enhancedPrompt;
     }
     catch (error) {
-        return baseSystemPrompt;
+        try {
+            return await buildSystemPromptWithPreferences(userId, baseSystemPrompt);
+        }
+        catch {
+            return baseSystemPrompt;
+        }
     }
 }
 export async function getMemoryContext(userId, currentMessage, options = {}) {

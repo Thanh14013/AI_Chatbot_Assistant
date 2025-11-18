@@ -5,8 +5,9 @@ import { generateAndStoreEmbedding } from "./embedding.service.js";
 import { buildEnhancedContext } from "./context-builder.service.js";
 import { buildSystemPromptWithPreferences } from "./user-preference.service.js";
 import { Op } from "sequelize";
-import { cacheAside, CACHE_TTL, invalidateCachePattern } from "./cache.service.js";
-import { messageHistoryKey, messageHistoryPattern, contextPattern, conversationListPattern, } from "../utils/cache-key.util.js";
+import { invalidateCachePattern } from "./cache.service.js";
+import { messageHistoryPattern, contextPattern, conversationListPattern, } from "../utils/cache-key.util.js";
+import { getCachedRecentMessages, cacheRecentMessages, addMessageToCache, } from "./message-cache.service.js";
 export const createMessage = async (data) => {
     if (!data.conversation_id || !data.content || !data.role) {
         throw new Error("Conversation ID, content, and role are required");
@@ -30,6 +31,17 @@ export const createMessage = async (data) => {
     await invalidateCachePattern(messageHistoryPattern(data.conversation_id));
     await invalidateCachePattern(contextPattern(data.conversation_id));
     await invalidateCachePattern(conversationListPattern(conversation.user_id));
+    await addMessageToCache(data.conversation_id, {
+        id: message.id,
+        conversation_id: message.conversation_id,
+        role: message.role,
+        content: message.content,
+        tokens_used: message.tokens_used,
+        model: message.model || conversation.model,
+        pinned: message.pinned,
+        createdAt: message.createdAt,
+    }).catch(() => {
+    });
     generateAndStoreEmbedding(message.id, message.content).catch(() => {
     });
     return {
@@ -43,171 +55,162 @@ export const createMessage = async (data) => {
         createdAt: message.createdAt,
     };
 };
-export const getConversationMessages = async (conversationId, userId, page = 1, limit = 30, before) => {
-    const cacheKey = messageHistoryKey(conversationId, page, limit, before);
-    const fetchMessages = async () => {
-        const conversation = await Conversation.findOne({
-            where: {
-                id: conversationId,
-                deleted_at: null,
-            },
-        });
-        if (!conversation) {
-            throw new Error("Conversation not found");
-        }
-        if (conversation.user_id !== userId) {
-            throw new Error("Unauthorized access to conversation");
-        }
-        const total = await Message.count({
-            where: { conversation_id: conversationId },
-        });
-        const totalPages = Math.ceil(total / limit);
-        if (before) {
-            const beforeMsg = await Message.findByPk(before);
-            if (!beforeMsg || beforeMsg.conversation_id !== conversationId) {
-                throw new Error("Invalid 'before' message id");
+const attachMessagesData = async (messages) => {
+    const messageResponses = messages.map((msg) => ({
+        id: msg.id,
+        conversation_id: msg.conversation_id,
+        role: msg.role,
+        content: msg.content,
+        tokens_used: msg.tokens_used,
+        model: msg.model,
+        pinned: msg.pinned,
+        createdAt: msg.createdAt,
+    }));
+    const messageIds = messageResponses.map((m) => m.id);
+    if (messageIds.length > 0) {
+        try {
+            const { default: pool } = await import("../db/pool.js");
+            const attachmentsResult = await pool.query(`SELECT * FROM files_upload WHERE message_id = ANY($1) ORDER BY created_at ASC`, [messageIds]);
+            const attachmentsByMessage = new Map();
+            for (const att of attachmentsResult.rows) {
+                if (!attachmentsByMessage.has(att.message_id)) {
+                    attachmentsByMessage.set(att.message_id, []);
+                }
+                attachmentsByMessage.get(att.message_id).push({
+                    id: att.id,
+                    public_id: att.public_id,
+                    secure_url: att.secure_url,
+                    resource_type: att.resource_type,
+                    format: att.format,
+                    original_filename: att.original_filename,
+                    size_bytes: att.size_bytes,
+                    width: att.width,
+                    height: att.height,
+                    thumbnail_url: att.thumbnail_url,
+                    extracted_text: att.extracted_text,
+                    openai_file_id: att.openai_file_id,
+                });
             }
-            const beforeDate = beforeMsg.createdAt;
-            const beforeId = beforeMsg.id;
-            const olderMessages = await Message.findAll({
-                where: {
-                    conversation_id: conversationId,
-                    [Op.or]: [
-                        { createdAt: { [Op.lt]: beforeDate } },
-                        { createdAt: beforeDate, id: { [Op.lt]: beforeId } },
-                    ],
-                },
-                order: [
-                    ["createdAt", "ASC"],
-                    ["id", "ASC"],
-                ],
-                limit,
-            });
-            const messageResponses = olderMessages.map((msg) => ({
-                id: msg.id,
-                conversation_id: msg.conversation_id,
-                role: msg.role,
-                content: msg.content,
-                tokens_used: msg.tokens_used,
-                model: msg.model,
-                pinned: msg.pinned,
-                createdAt: msg.createdAt,
-            }));
-            const { default: fileUploadModel } = await import("../models/fileUpload.model.js");
             for (const msgResponse of messageResponses) {
-                try {
-                    const attachments = await fileUploadModel.findByMessageId(msgResponse.id);
-                    if (attachments && attachments.length > 0) {
-                        msgResponse.attachments = attachments.map((att) => ({
-                            id: att.id,
-                            public_id: att.public_id,
-                            secure_url: att.secure_url,
-                            resource_type: att.resource_type,
-                            format: att.format,
-                            original_filename: att.original_filename,
-                            size_bytes: att.size_bytes,
-                            width: att.width,
-                            height: att.height,
-                            thumbnail_url: att.thumbnail_url,
-                            extracted_text: att.extracted_text,
-                            openai_file_id: att.openai_file_id,
-                        }));
-                    }
-                }
-                catch (err) {
-                }
+                msgResponse.attachments = attachmentsByMessage.get(msgResponse.id) || [];
             }
-            let hasMore = false;
-            if (messageResponses.length > 0) {
-                const first = messageResponses[0];
-                const firstMsg = await Message.findByPk(first.id);
-                if (firstMsg) {
-                    const olderCount = await Message.count({
-                        where: {
-                            conversation_id: conversationId,
-                            [Op.or]: [
-                                { createdAt: { [Op.lt]: firstMsg.createdAt } },
-                                { createdAt: firstMsg.createdAt, id: { [Op.lt]: firstMsg.id } },
-                            ],
-                        },
-                    });
-                    hasMore = olderCount > 0;
-                }
-            }
+        }
+        catch (err) {
+        }
+    }
+    return messageResponses;
+};
+export const getConversationMessages = async (conversationId, userId, page = 1, limit = 50, before) => {
+    const conversation = await Conversation.findOne({
+        where: {
+            id: conversationId,
+            deleted_at: null,
+        },
+    });
+    if (!conversation) {
+        throw new Error("Conversation not found");
+    }
+    if (conversation.user_id !== userId) {
+        throw new Error("Unauthorized access to conversation");
+    }
+    if (page === 1 && !before) {
+        const cachedMessages = await getCachedRecentMessages(conversationId, limit);
+        if (cachedMessages && cachedMessages.length > 0) {
+            const total = await Message.count({
+                where: { conversation_id: conversationId },
+            });
             return {
-                messages: messageResponses,
+                messages: cachedMessages,
                 pagination: {
                     page: 1,
                     limit,
                     total,
-                    totalPages,
-                    hasMore,
+                    totalPages: Math.ceil(total / limit),
+                    hasMore: cachedMessages.length >= limit,
                 },
             };
         }
-        const allMessages = await Message.findAll({
-            where: { conversation_id: conversationId },
+    }
+    const total = await Message.count({
+        where: { conversation_id: conversationId },
+    });
+    const totalPages = Math.ceil(total / limit);
+    if (before) {
+        const beforeMsg = await Message.findByPk(before);
+        if (!beforeMsg || beforeMsg.conversation_id !== conversationId) {
+            throw new Error("Invalid 'before' message id");
+        }
+        const olderMessages = await Message.findAll({
+            where: {
+                conversation_id: conversationId,
+                [Op.or]: [
+                    { createdAt: { [Op.lt]: beforeMsg.createdAt } },
+                    {
+                        createdAt: beforeMsg.createdAt,
+                        id: { [Op.lt]: beforeMsg.id },
+                    },
+                ],
+            },
             order: [
                 ["createdAt", "ASC"],
                 ["id", "ASC"],
             ],
+            limit,
         });
-        const startIndex = Math.max(0, total - page * limit);
-        const endIndex = total - (page - 1) * limit;
-        const paginatedMessages = allMessages.slice(startIndex, endIndex);
-        const messageResponses = paginatedMessages.map((msg) => ({
-            id: msg.id,
-            conversation_id: msg.conversation_id,
-            role: msg.role,
-            content: msg.content,
-            tokens_used: msg.tokens_used,
-            model: msg.model,
-            pinned: msg.pinned,
-            createdAt: msg.createdAt,
-        }));
-        const messageIds = messageResponses.map((m) => m.id);
-        if (messageIds.length > 0) {
-            try {
-                const { default: pool } = await import("../db/pool.js");
-                const attachmentsResult = await pool.query(`SELECT * FROM files_upload WHERE message_id = ANY($1) ORDER BY created_at ASC`, [messageIds]);
-                const attachmentsByMessage = new Map();
-                for (const att of attachmentsResult.rows) {
-                    if (!attachmentsByMessage.has(att.message_id)) {
-                        attachmentsByMessage.set(att.message_id, []);
-                    }
-                    attachmentsByMessage.get(att.message_id).push({
-                        id: att.id,
-                        public_id: att.public_id,
-                        secure_url: att.secure_url,
-                        resource_type: att.resource_type,
-                        format: att.format,
-                        original_filename: att.original_filename,
-                        size_bytes: att.size_bytes,
-                        width: att.width,
-                        height: att.height,
-                        thumbnail_url: att.thumbnail_url,
-                        extracted_text: att.extracted_text,
-                    });
-                }
-                for (const msgResponse of messageResponses) {
-                    msgResponse.attachments = attachmentsByMessage.get(msgResponse.id) || [];
-                }
-            }
-            catch (err) {
-            }
+        const messageResponses = await attachMessagesData(olderMessages);
+        let hasMore = false;
+        if (messageResponses.length > 0) {
+            const firstMsg = olderMessages[0];
+            const olderCount = await Message.count({
+                where: {
+                    conversation_id: conversationId,
+                    [Op.or]: [
+                        { createdAt: { [Op.lt]: firstMsg.createdAt } },
+                        {
+                            createdAt: firstMsg.createdAt,
+                            id: { [Op.lt]: firstMsg.id },
+                        },
+                    ],
+                },
+            });
+            hasMore = olderCount > 0;
         }
         return {
             messages: messageResponses,
             pagination: {
-                page,
+                page: 1,
                 limit,
                 total,
                 totalPages,
-                hasMore: startIndex > 0,
+                hasMore,
             },
         };
+    }
+    const allMessages = await Message.findAll({
+        where: { conversation_id: conversationId },
+        order: [
+            ["createdAt", "ASC"],
+            ["id", "ASC"],
+        ],
+    });
+    const startIndex = Math.max(0, total - page * limit);
+    const endIndex = total - (page - 1) * limit;
+    const paginatedMessages = allMessages.slice(startIndex, endIndex);
+    const messageResponses = await attachMessagesData(paginatedMessages);
+    if (page === 1) {
+        await cacheRecentMessages(conversationId, messageResponses).catch(() => {
+        });
+    }
+    return {
+        messages: messageResponses,
+        pagination: {
+            page,
+            limit,
+            total,
+            totalPages,
+            hasMore: startIndex > 0,
+        },
     };
-    return await cacheAside(cacheKey, fetchMessages, CACHE_TTL.MESSAGE_HISTORY);
 };
 export const sendMessageAndStreamResponse = async (conversationId, userId, content, onChunk, onUserMessageCreated, attachments, metadata, enhancedSystemPrompt) => {
     if (!content || content.trim().length === 0) {

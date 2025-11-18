@@ -9,6 +9,7 @@ import { Layout, App } from "antd";
 import { useAuth, useDebounce } from "../hooks";
 import { getConversations } from "../services/chat.service";
 import { moveConversationToProject } from "../services/project.service";
+import { useSidebarStore } from "../stores/sidebar.store";
 import type { ConversationListItem } from "../types/chat.type";
 import type { DragDropState } from "../types/drag-drop.type";
 import SidebarHeader from "./SidebarHeader";
@@ -49,31 +50,33 @@ const Sidebar: React.FC<SidebarProps> = ({
   const navigate = useNavigate();
   const { message: antdMessage } = App.useApp();
 
-  const [conversations, setConversations] = useState<ConversationListItem[]>(
-    []
-  );
-  const [filteredConversations, setFilteredConversations] = useState<
-    ConversationListItem[]
-  >([]);
-  const [searchInput, setSearchInput] = useState(""); // Immediate input value
-  const [searchQuery, setSearchQuery] = useState(""); // Debounced value
-  const debouncedSearch = useDebounce(searchInput, 300); // 🚀 PERFORMANCE: Debounce search
+  // 🚀 USE CENTRALIZED SIDEBAR STORE
+  const sidebarStore = useSidebarStore();
+
+  // Local UI state
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebounce(searchInput, 300);
 
   // semantic search results returned from header (optional)
   const [semanticResults, setSemanticResults] = useState<
     import("../services/searchService").ConversationSearchResult[] | null
   >(null);
   const [currentSearchQuery, setCurrentSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // 🚀 PERFORMANCE: Update searchQuery only when debounced value changes
   useEffect(() => {
     setSearchQuery(debouncedSearch);
   }, [debouncedSearch]);
+
+  // 🚀 GET CONVERSATIONS FROM STORE (Single Source of Truth)
+  const conversations = sidebarStore.allStandaloneConversations;
+  const [filteredConversations, setFilteredConversations] = useState<
+    ConversationListItem[]
+  >([]);
 
   // Drag and drop state
   const [dragDropState, setDragDropState] = useState<DragDropState>({
@@ -91,14 +94,14 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       // If resetting, show main loader; otherwise show loading more
       if (opts.reset) {
-        setIsLoading(true);
+        sidebarStore.setLoading(true);
         setPage(1);
       } else {
         setIsLoadingMore(true);
       }
 
       loadingRef.current = true;
-      setError(null);
+      sidebarStore.setError(null);
 
       try {
         const result = await getConversations({
@@ -107,35 +110,34 @@ const Sidebar: React.FC<SidebarProps> = ({
           standalone: true, // Only fetch conversations without project_id
         });
 
-        // Server already filtered by project_id IS NULL, no need to filter again
         const standaloneConversations = result.conversations || [];
 
-        // sort by updatedAt desc
-        const sorted = standaloneConversations.slice().sort((a, b) => {
-          const ta = new Date(a.updatedAt).getTime();
-          const tb = new Date(b.updatedAt).getTime();
-          return tb - ta;
-        });
-
+        // 🚀 UPDATE CENTRALIZED STORE instead of local state
         if (opts.reset || targetPage === 1) {
-          setConversations(sorted);
-          setFilteredConversations(sorted);
+          sidebarStore.setConversations(standaloneConversations);
         } else {
-          setConversations((prev) => [...prev, ...sorted]);
-          setFilteredConversations((prev) => [...prev, ...sorted]);
+          // For pagination, merge with existing
+          const existingConvs = Array.from(sidebarStore.conversations.values());
+          const merged = [
+            ...existingConvs,
+            ...standaloneConversations.filter(
+              (c) => !existingConvs.find((e) => e.id === c.id)
+            ),
+          ];
+          sidebarStore.setConversations(merged);
         }
 
         setPage(result.pagination.page);
         setHasMore(result.pagination.page < result.pagination.totalPages);
       } catch (err) {
-        setError("Failed to load conversations");
+        sidebarStore.setError("Failed to load conversations");
       } finally {
         loadingRef.current = false;
-        setIsLoading(false);
+        sidebarStore.setLoading(false);
         setIsLoadingMore(false);
       }
     },
-    [page]
+    [page, sidebarStore]
   );
 
   // Initial load
@@ -216,8 +218,11 @@ const Sidebar: React.FC<SidebarProps> = ({
       if (newProjectId === null) {
         loadConversations({ reset: true });
       } else {
-        // If moved FROM "All Conversations" to a project, just remove from list
-        setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+        // If moved FROM "All Conversations" to a project, update store
+        sidebarStore.updateConversationOptimistic(conversationId, {
+          project_id: newProjectId,
+        });
+        // Also update filtered list
         setFilteredConversations((prev) =>
           prev.filter((c) => c.id !== conversationId)
         );
@@ -291,8 +296,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   );
 
   /**
-   * 🚀 OPTIMIZED: Handle drop on project with INSTANT UI update
-   * Uses fire-and-forget API pattern - UI updates immediately, API in background
+   * 🚀 OPTIMIZED: Handle drop on project with INSTANT UI update + Store integration
+   * Uses centralized store with optimistic updates and transaction rollback
    */
   const handleProjectDrop = async (
     projectId: string,
@@ -306,13 +311,17 @@ const Sidebar: React.FC<SidebarProps> = ({
       return;
     }
 
-    // 🔥 STEP 1: Optimistic update - UI changes INSTANTLY
-    setConversations((prev) => prev.filter((c) => c.id !== conversationId));
-    setFilteredConversations((prev) =>
-      prev.filter((c) => c.id !== conversationId)
+    // 🔥 STEP 1: Optimistic update via store - UI changes INSTANTLY
+    const transactionId = sidebarStore.moveConversationOptimistic(
+      conversationId,
+      sourceProjectId,
+      projectId
     );
 
-    // 🔥 STEP 2: Dispatch event IMMEDIATELY for cross-component sync
+    // 🔥 STEP 2: Clear drag state immediately (smooth UX)
+    handleConversationDragEnd();
+
+    // 🔥 STEP 3: Dispatch event IMMEDIATELY for cross-component sync
     window.dispatchEvent(
       new CustomEvent("conversation:moved", {
         detail: {
@@ -323,29 +332,24 @@ const Sidebar: React.FC<SidebarProps> = ({
       })
     );
 
-    // 🔥 STEP 3: Clear drag state immediately (smooth UX)
-    handleConversationDragEnd();
-
     // 🔥 STEP 4: API call in background (fire-and-forget)
-    // This doesn't block UI - runs asynchronously
     moveConversationToProject(conversationId, projectId)
       .then(() => {
-        // Success: Show subtle confirmation
+        // Success: Commit transaction
+        sidebarStore.commitTransaction(transactionId);
         antdMessage.success("Conversation moved to project", 2);
       })
       .catch(async (err: any) => {
         // 🔄 ROLLBACK: Restore state if API fails
+        sidebarStore.rollbackTransaction(transactionId);
         antdMessage.error(err?.message || "Failed to move conversation");
 
-        // Reload from server to get correct state
-        await loadConversations({ reset: true });
-
-        // Re-dispatch event to sync other components
+        // Re-dispatch rollback event
         window.dispatchEvent(
           new CustomEvent("conversation:moved", {
             detail: {
               conversationId,
-              oldProjectId: projectId, // Reversed: move back
+              oldProjectId: projectId,
               newProjectId: sourceProjectId,
             },
           })
@@ -374,8 +378,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   );
 
   /**
-   * 🚀 OPTIMIZED: Handle drop on "All Conversations" with INSTANT UI update
-   * Uses fire-and-forget API pattern - no await blocking UI
+   * 🚀 OPTIMIZED: Handle drop on "All Conversations" with INSTANT UI update + Store
+   * Uses centralized store with optimistic updates and transaction rollback
    */
   const handleAllConversationsDrop = async (
     conversationId: string,
@@ -388,46 +392,17 @@ const Sidebar: React.FC<SidebarProps> = ({
       return;
     }
 
-    // 🔥 STEP 1: Optimistic UI update - INSTANT feedback
-    const existingConv = conversations.find((c) => c.id === conversationId);
+    // 🔥 STEP 1: Optimistic update via store - INSTANT feedback
+    const transactionId = sidebarStore.moveConversationOptimistic(
+      conversationId,
+      sourceProjectId,
+      null
+    );
 
-    if (existingConv) {
-      // Already in memory, just update and move to top
-      const updatedConv = { ...existingConv, project_id: null };
-      setConversations((prev) => [
-        updatedConv,
-        ...prev.filter((c) => c.id !== conversationId),
-      ]);
-      setFilteredConversations((prev) => [
-        updatedConv,
-        ...prev.filter((c) => c.id !== conversationId),
-      ]);
-    } else {
-      // Not in current list - fetch and add (background)
-      import("../services/chat.service")
-        .then(({ getConversation }) => getConversation(conversationId))
-        .then((fetchedConv) => {
-          const convListItem: ConversationListItem = {
-            id: fetchedConv.id,
-            title: fetchedConv.title,
-            model: fetchedConv.model,
-            context_window: fetchedConv.context_window,
-            message_count: 0,
-            updatedAt: fetchedConv.updatedAt,
-            tags: fetchedConv.tags || [],
-            project_id: null,
-            order_in_project: 0,
-          };
-          // Add to top of list
-          setConversations((prev) => [convListItem, ...prev]);
-          setFilteredConversations((prev) => [convListItem, ...prev]);
-        })
-        .catch(() => {
-          // Silent fail - will be corrected on next refresh
-        });
-    }
+    // 🔥 STEP 2: Clear drag state immediately
+    handleConversationDragEnd();
 
-    // 🔥 STEP 2: Dispatch event IMMEDIATELY
+    // 🔥 STEP 3: Dispatch event IMMEDIATELY
     window.dispatchEvent(
       new CustomEvent("conversation:moved", {
         detail: {
@@ -438,18 +413,16 @@ const Sidebar: React.FC<SidebarProps> = ({
       })
     );
 
-    // 🔥 STEP 3: Clear drag state immediately
-    handleConversationDragEnd();
-
     // 🔥 STEP 4: API call in background (fire-and-forget)
     moveConversationToProject(conversationId, null)
       .then(() => {
+        sidebarStore.commitTransaction(transactionId);
         antdMessage.success("Moved to All Conversations", 2);
       })
       .catch(async (err: any) => {
         // 🔄 ROLLBACK on error
+        sidebarStore.rollbackTransaction(transactionId);
         antdMessage.error(err?.message || "Failed to move conversation");
-        await loadConversations({ reset: true });
 
         // Re-dispatch rollback event
         window.dispatchEvent(
@@ -526,8 +499,8 @@ const Sidebar: React.FC<SidebarProps> = ({
             conversations={filteredConversations}
             currentConversationId={currentConversationId}
             onSelectConversation={handleSelectConversation}
-            isLoading={isLoading}
-            error={error}
+            isLoading={sidebarStore.isLoading}
+            error={sidebarStore.error}
             searchQuery={searchQuery}
             onRefresh={() => loadConversations({ reset: true })}
             onLoadMore={loadMoreConversations}

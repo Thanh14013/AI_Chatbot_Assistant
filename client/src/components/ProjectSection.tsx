@@ -2,11 +2,13 @@
  * ProjectSection Component
  * Container for displaying all projects with their conversations
  * 🚀 OPTIMIZED: Memoized to prevent unnecessary re-renders on parent state changes
+ * 🚀 USES SIDEBAR STORE: Centralized state management with calculated badge counts
  */
 
 import React, { useState, useEffect, useRef } from "react";
 import { Button, App } from "antd";
 import { PlusOutlined, FolderOutlined } from "@ant-design/icons";
+import { useSidebarStore } from "../stores/sidebar.store";
 import type { Project } from "../types/project.type";
 import type { ConversationListItem } from "../types/chat.type";
 import ProjectCard from "./ProjectCard";
@@ -58,6 +60,10 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
   isDropTargetValid = false,
 }) => {
   const { message } = App.useApp();
+
+  // 🚀 USE CENTRALIZED SIDEBAR STORE
+  const sidebarStore = useSidebarStore();
+
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectConversations, setProjectConversations] = useState<
     Record<string, ConversationListItem[]>
@@ -90,6 +96,10 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
     try {
       const data = await getProjects();
       setProjects(data);
+
+      // 🚀 UPDATE CENTRALIZED STORE
+      sidebarStore.setProjects(data);
+
       projectsLoadedRef.current = true;
     } catch (error: any) {
       message.error(error.message || "Failed to load projects");
@@ -107,6 +117,8 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
         ...prev,
         [projectId]: conversations,
       }));
+      // Sync to centralized store - these conversations already have projectId set
+      sidebarStore.setConversations(conversations);
     } catch (error: any) {
       message.error(error.message || "Failed to load project conversations");
     }
@@ -457,7 +469,7 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
             <ProjectCard
               key={project.id}
               project={project}
-              conversations={projectConversations[project.id] || []}
+              conversations={sidebarStore.conversationsByProject(project.id)}
               isExpanded={expandedProjects.has(project.id)}
               onToggle={() => handleToggleProject(project.id)}
               onEdit={() => handleEditProject(project)}
