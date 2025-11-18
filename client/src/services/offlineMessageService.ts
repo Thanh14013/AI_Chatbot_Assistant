@@ -32,15 +32,53 @@ export function savePendingMessage(message: PendingMessage): void {
     const key = getStorageKey(message.conversationId);
     const existing = getPendingMessages(message.conversationId);
 
+    // 🔥 P1 FIX: Check for duplicates before adding to prevent duplication on reconnect
+    const isDuplicate = existing.some(
+      (m) =>
+        m.id === message.id ||
+        (m.content === message.content &&
+          Math.abs(m.timestamp - message.timestamp) < 1000)
+    );
+
+    if (isDuplicate) {
+      return; // Skip duplicate message
+    }
+
     // Prevent spam: limit max pending messages
     if (existing.length >= MAX_PENDING_MESSAGES) {
+      // 🔥 P1 FIX: Notify user instead of silent failure
+      try {
+        window.dispatchEvent(
+          new CustomEvent("offline:quota_exceeded", {
+            detail: {
+              message:
+                "Maximum pending messages reached. Please reconnect to send messages.",
+              conversationId: message.conversationId,
+            },
+          })
+        );
+      } catch {}
       return;
     }
 
     // Add new message
     const updated = [...existing, message];
     localStorage.setItem(key, JSON.stringify(updated));
-  } catch {
+  } catch (error) {
+    // 🔥 P1 FIX: Handle QuotaExceededError specifically
+    if (error instanceof DOMException && error.name === "QuotaExceededError") {
+      try {
+        window.dispatchEvent(
+          new CustomEvent("offline:storage_full", {
+            detail: {
+              message:
+                "Storage quota exceeded. Please clear browser data or remove old messages.",
+              conversationId: message.conversationId,
+            },
+          })
+        );
+      } catch {}
+    }
     // If localStorage is full or disabled, fail gracefully
   }
 }

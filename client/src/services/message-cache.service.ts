@@ -32,6 +32,31 @@ const MAX_CACHED_PAGES_PER_CONV = 3; // Maximum pages per conversation
 class MessageCacheService {
   private cache: ConversationCache = {};
   private accessOrder: string[] = []; // LRU tracking
+  // 🔥 P1 FIX: Add lock to prevent race conditions during cache operations
+  private operationLocks: Map<string, Promise<void>> = new Map();
+
+  /**
+   * 🔥 P1 FIX: Acquire lock for cache operation to prevent race conditions
+   */
+  private async acquireLock(key: string): Promise<() => void> {
+    // Wait for existing operation to complete
+    while (this.operationLocks.has(key)) {
+      await this.operationLocks.get(key);
+    }
+
+    // Create new lock
+    let releaseLock: () => void;
+    const lockPromise = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    this.operationLocks.set(key, lockPromise);
+
+    // Return release function
+    return () => {
+      this.operationLocks.delete(key);
+      releaseLock!();
+    };
+  }
 
   /**
    * Get cached messages for a conversation page
@@ -58,6 +83,55 @@ class MessageCacheService {
 
   /**
    * Set cached messages for a conversation page
+   * 🔥 P1 FIX: Added async locking to prevent race conditions
+   */
+  async setAsync(
+    conversationId: string,
+    page: number,
+    messages: Message[],
+    pagination: MessageCacheEntry["pagination"]
+  ): Promise<void> {
+    const lockKey = `set_${conversationId}_${page}`;
+    const release = await this.acquireLock(lockKey);
+
+    try {
+      // Ensure conversation cache exists
+      if (!this.cache[conversationId]) {
+        this.cache[conversationId] = {};
+        this.updateAccessOrder(conversationId);
+        this.evictIfNeeded();
+      }
+
+      // Cache the page data
+      this.cache[conversationId][page] = {
+        messages,
+        pagination,
+        timestamp: Date.now(),
+      };
+
+      // Evict old pages if exceeding limit
+      const pages = Object.keys(this.cache[conversationId]).map(Number);
+      if (pages.length > MAX_CACHED_PAGES_PER_CONV) {
+        // Sort pages by timestamp (oldest first)
+        pages.sort((a, b) => {
+          const aTime = this.cache[conversationId][a].timestamp;
+          const bTime = this.cache[conversationId][b].timestamp;
+          return aTime - bTime;
+        });
+
+        // Remove oldest pages
+        const toRemove = pages.length - MAX_CACHED_PAGES_PER_CONV;
+        for (let i = 0; i < toRemove; i++) {
+          delete this.cache[conversationId][pages[i]];
+        }
+      }
+    } finally {
+      release();
+    }
+  }
+
+  /**
+   * Set cached messages for a conversation page (synchronous version for backward compatibility)
    */
   set(
     conversationId: string,

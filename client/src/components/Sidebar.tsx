@@ -344,6 +344,15 @@ const Sidebar: React.FC<SidebarProps> = ({
         antdMessage.success("Conversation moved to project", 2);
       })
       .catch(async (err: any) => {
+        // 🔥 P0 FIX: Check if conversation still exists before rollback
+        const conversationExists =
+          sidebarStore.conversations.has(conversationId);
+        if (!conversationExists) {
+          // Conversation was deleted during optimistic update - commit instead of rollback
+          sidebarStore.commitTransaction(transactionId);
+          return;
+        }
+
         // 🔄 ROLLBACK: Restore state if API fails
         sidebarStore.rollbackTransaction(transactionId);
         antdMessage.error(err?.message || "Failed to move conversation");
@@ -423,6 +432,15 @@ const Sidebar: React.FC<SidebarProps> = ({
         antdMessage.success("Moved to All Conversations", 2);
       })
       .catch(async (err: any) => {
+        // 🔥 P0 FIX: Check if conversation still exists before rollback
+        const conversationExists =
+          sidebarStore.conversations.has(conversationId);
+        if (!conversationExists) {
+          // Conversation was deleted during optimistic update - commit instead of rollback
+          sidebarStore.commitTransaction(transactionId);
+          return;
+        }
+
         // 🔄 ROLLBACK on error
         sidebarStore.rollbackTransaction(transactionId);
         antdMessage.error(err?.message || "Failed to move conversation");

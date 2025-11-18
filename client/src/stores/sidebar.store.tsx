@@ -222,7 +222,8 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
       fromProjectId: string | null,
       toProjectId: string | null
     ): string => {
-      const transactionId = `move_${conversationId}_${Date.now()}`;
+      // 🔥 P1 FIX: Use crypto.randomUUID() instead of timestamp to prevent collision
+      const transactionId = `move_${conversationId}_${crypto.randomUUID()}`;
       const conversation = state.conversations.get(conversationId);
 
       if (!conversation) {
@@ -329,7 +330,8 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
    */
   const deleteConversationOptimistic = useCallback(
     (conversationId: string): string => {
-      const transactionId = `delete_${conversationId}_${Date.now()}`;
+      // 🔥 P1 FIX: Use crypto.randomUUID() instead of timestamp
+      const transactionId = `delete_${conversationId}_${crypto.randomUUID()}`;
       const conversation = state.conversations.get(conversationId);
 
       const rollback = () => {
@@ -413,7 +415,8 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
    */
   const deleteProjectOptimistic = useCallback(
     (projectId: string): string => {
-      const transactionId = `delete_project_${projectId}_${Date.now()}`;
+      // 🔥 P1 FIX: Use crypto.randomUUID() instead of timestamp
+      const transactionId = `delete_project_${projectId}_${crypto.randomUUID()}`;
       const project = state.projects.get(projectId);
 
       const rollback = () => {

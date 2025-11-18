@@ -814,12 +814,28 @@ const ChatPage: React.FC = () => {
   }, [params.id]);
 
   // WebSocket event listeners for real-time updates
+  // 🔥 P0 FIX: Buffer chunks during WebSocket disconnection
+  const chunkBufferRef = useRef<
+    Map<string, { content: string; timestamp: number }>
+  >(new Map());
+  const CHUNK_BUFFER_TIMEOUT = 5000; // 5 seconds
+
   useEffect(() => {
     if (!currentConversation) return;
 
     const handleMessageChunk = (event: CustomEvent) => {
       const { conversationId, chunk, content, messageId } = event.detail;
       if (conversationId !== currentConversation.id) return;
+
+      // 🔥 CRITICAL FIX: Buffer chunks if WebSocket disconnected
+      if (!isConnected) {
+        const bufferKey = `${conversationId}_${messageId || "streaming"}`;
+        chunkBufferRef.current.set(bufferKey, {
+          content,
+          timestamp: Date.now(),
+        });
+        return;
+      }
 
       // Update messages with streaming content. IMPORTANT: keep isTyping=true
       // so subsequent chunks continue to update the same typing placeholder.
@@ -842,6 +858,41 @@ const ChatPage: React.FC = () => {
         return foundTyping ? updated : prev;
       });
     };
+
+    // 🔥 P0 FIX: Apply buffered chunks when reconnected
+    const applyBufferedChunks = () => {
+      if (!isConnected || chunkBufferRef.current.size === 0) return;
+
+      const now = Date.now();
+      chunkBufferRef.current.forEach((buffer, key) => {
+        // Skip expired chunks (older than 5 seconds)
+        if (now - buffer.timestamp > CHUNK_BUFFER_TIMEOUT) {
+          chunkBufferRef.current.delete(key);
+          return;
+        }
+
+        // Apply buffered content
+        setMessages((prev) => {
+          let foundTyping = false;
+          const updated = prev.map((msg) => {
+            if (!foundTyping && msg.role === "assistant" && msg.isTyping) {
+              foundTyping = true;
+              return { ...msg, content: buffer.content };
+            }
+            return msg;
+          });
+          return foundTyping ? updated : prev;
+        });
+      });
+
+      // Clear buffer after applying
+      chunkBufferRef.current.clear();
+    };
+
+    // Apply buffered chunks when connection is established
+    if (isConnected) {
+      applyBufferedChunks();
+    }
 
     const handleMessageComplete = (event: CustomEvent) => {
       const { userMessage, assistantMessage, conversation } = event.detail;
