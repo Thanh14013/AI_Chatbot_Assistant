@@ -215,15 +215,19 @@ const Sidebar: React.FC<SidebarProps> = ({
       const detail = (e as CustomEvent).detail;
       const { conversationId, oldProjectId, newProjectId } = detail;
 
-      // If moved TO "All Conversations" (newProjectId = null), reload to show it
+      // 🔥 CRITICAL FIX: Don't reload! Store already updated optimistically
+      // Just update the store if not already done (e.g., from WebSocket event)
       if (newProjectId === null) {
-        loadConversations({ reset: true });
+        // Moved TO "All Conversations" - update store, don't reload from server
+        sidebarStore.updateConversationOptimistic(conversationId, {
+          project_id: null,
+        });
       } else {
-        // If moved FROM "All Conversations" to a project, update store
+        // Moved FROM "All Conversations" to a project - update store and remove from display
         sidebarStore.updateConversationOptimistic(conversationId, {
           project_id: newProjectId,
         });
-        // Also update filtered list
+        // Also update filtered list to hide it immediately
         setFilteredConversations((prev) =>
           prev.filter((c) => c.id !== conversationId)
         );

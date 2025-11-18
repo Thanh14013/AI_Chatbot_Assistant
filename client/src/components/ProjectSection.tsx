@@ -234,7 +234,7 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
         newProjectId: string | null;
       };
 
-      // 🔥 FIX: Remove from old project LOCAL STATE (for immediate UI update)
+      // 🔥 FIX: Remove from old project LOCAL STATE (immediate UI update)
       if (data.oldProjectId && typeof data.oldProjectId === "string") {
         setProjectConversations((prev) => {
           const updated = { ...prev };
@@ -247,8 +247,10 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
         });
       }
 
-      // 🔥 FIX: Load new project conversations AND add to local state
-      if (data.newProjectId) {
+      // 🔥 CRITICAL FIX: Only load NEW project conversations, don't reload old project
+      // This prevents the conversation from "jumping back" when WebSocket event arrives
+      if (data.newProjectId && typeof data.newProjectId === "string") {
+        // Load conversations for the NEW project
         loadProjectConversations(data.newProjectId);
 
         // Auto-expand the target project to show the moved conversation
@@ -260,6 +262,7 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
       }
 
       // 🔥 Store already updated via optimistic update, badge counts auto-calculated
+      // No need to reload old project - the removal already happened via filter above
     };
 
     // Listen to custom window events triggered by websocket service
