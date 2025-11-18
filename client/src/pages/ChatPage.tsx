@@ -1383,6 +1383,37 @@ const ChatPage: React.FC = () => {
   }, []);
 
   /**
+   * Listen for conversation updates (title changes, etc.) from WebSocket
+   */
+  useEffect(() => {
+    const handleConversationUpdated = (event: CustomEvent) => {
+      const { conversationId, update } = event.detail;
+
+      // Update current conversation if it matches
+      if (currentConversation && conversationId === currentConversation.id) {
+        setCurrentConversation((prev) =>
+          prev ? { ...prev, ...update } : null
+        );
+      }
+
+      // Update conversation in sidebar list
+      updateConversationOptimistic(conversationId, update);
+    };
+
+    window.addEventListener(
+      "conversation:updated",
+      handleConversationUpdated as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "conversation:updated",
+        handleConversationUpdated as EventListener
+      );
+    };
+  }, [currentConversation, updateConversationOptimistic]);
+
+  /**
    * 🔄 Background refresh of New Chat suggestions every 5 minutes after login
    * Load cached suggestions immediately (already done in useState initialization)
    * Refresh in background without showing loading state for smooth UX
