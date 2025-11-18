@@ -687,14 +687,12 @@ const ChatPage: React.FC = () => {
       // IMPORTANT: Don't load if we're in the middle of creating and sending
       // This prevents race condition where useEffect clears optimistic messages
       if (isCreatingAndSendingRef.current) {
-        console.log("[ChatPage] Skip load - creating and sending:", convId);
         return;
       }
 
       // IMPORTANT: Prevent concurrent loads of the same conversation
       // This fixes the freezing issue caused by race conditions
       if (loadingConversationRef.current === convId) {
-        console.log("[ChatPage] Skip load - already loading:", convId);
         return;
       }
 
@@ -1389,15 +1387,8 @@ const ChatPage: React.FC = () => {
     const handleConversationUpdated = (event: CustomEvent) => {
       const { conversationId, update } = event.detail;
 
-      console.log("[ChatPage] 📥 Received conversation:updated", {
-        conversationId,
-        update,
-        currentConversationId: currentConversation?.id,
-      });
-
       // Update current conversation if it matches
       if (currentConversation && conversationId === currentConversation.id) {
-        console.log("[ChatPage] ✅ Updating current conversation title");
         setCurrentConversation((prev) =>
           prev ? { ...prev, ...update } : null
         );
@@ -1405,7 +1396,6 @@ const ChatPage: React.FC = () => {
 
       // Update conversation in sidebar list
       updateConversationOptimistic(conversationId, update);
-      console.log("[ChatPage] ✅ Updated conversation in sidebar");
     };
 
     window.addEventListener(
@@ -1453,16 +1443,8 @@ const ChatPage: React.FC = () => {
     const handleConversationFollowupsResponse = (event: CustomEvent) => {
       const { conversationId, suggestions } = event.detail;
 
-      console.log("[ChatPage] 📥 Received conversation_followups_response", {
-        conversationId,
-        suggestionsCount: suggestions?.length,
-        suggestions,
-        currentConversationId: currentConversation?.id,
-      });
-
       // For current conversation suggestions (lightbulb in input)
       if (currentConversation && conversationId === currentConversation.id) {
-        console.log("[ChatPage] ✅ Setting conversation suggestions");
         setConversationSuggestions(suggestions);
         setIsLoadingConversationSuggestions(false);
       }
@@ -1471,27 +1453,18 @@ const ChatPage: React.FC = () => {
         !currentConversation &&
         conversationId === "new_chat_suggestions"
       ) {
-        console.log("[ChatPage] ✅ Setting new chat suggestions");
         setNewChatSuggestions(suggestions);
         setIsLoadingNewChatSuggestions(false);
 
         // CRITICAL: Cache suggestions for instant display on next visit
         saveSuggestionsToCache(suggestions);
-      } else {
-        console.log(
-          "[ChatPage] ⚠️ Conversation ID mismatch, ignoring response"
-        );
       }
     };
 
     const handleConversationFollowupsError = (event: CustomEvent) => {
       const { conversationId, error } = event.detail;
 
-      console.log("[ChatPage] ❌ Received conversation_followups_error", {
-        conversationId,
-        error,
-        currentConversationId: currentConversation?.id,
-      });
+      // Silently handle error
 
       // Check which type of suggestion request failed
       if (currentConversation && conversationId === currentConversation.id) {
@@ -2699,27 +2672,17 @@ const ChatPage: React.FC = () => {
    * 🔥 FIX: Always fetch fresh suggestions based on current context
    */
   const handleRequestConversationSuggestions = () => {
-    console.log("[ChatPage] 🔥 handleRequestConversationSuggestions called", {
-      isConnected,
-      userId: user?.id,
-      currentConversationId: currentConversation?.id,
-      messagesCount: messages.length,
-    });
-
     if (!isConnected) {
-      console.log("[ChatPage] ❌ WebSocket not connected");
       antdMessage.warning("Not connected to server");
       return;
     }
 
     if (!user?.id) {
-      console.log("[ChatPage] ❌ User not authenticated");
       antdMessage.warning("User not authenticated");
       return;
     }
 
     if (!currentConversation) {
-      console.log("[ChatPage] ❌ No active conversation");
       antdMessage.warning("No active conversation");
       return;
     }
@@ -2733,18 +2696,12 @@ const ChatPage: React.FC = () => {
         content: m.content,
       }));
 
-    console.log(
-      "[ChatPage] 📝 Recent messages for context:",
-      recentMessages.length
-    );
-
     if (recentMessages.length === 0) {
-      console.log("[ChatPage] ❌ No messages for context");
       antdMessage.info("Start a conversation to get suggestions");
       return;
     }
 
-    // 🔥 CRITICAL: Set loading state and clear old suggestions
+    // Set loading state and clear old suggestions
     setIsLoadingConversationSuggestions(true);
     setConversationSuggestions([]);
 
@@ -2752,18 +2709,11 @@ const ChatPage: React.FC = () => {
     // forceRegenerate = true ensures we always get new suggestions
     const sessionId = String(user.id);
 
-    console.log("[ChatPage] 🚀 Emitting request_conversation_followups", {
-      conversationId: currentConversation.id,
-      sessionId,
-      messagesCount: recentMessages.length,
-      forceRegenerate: true,
-    });
-
     websocketService.requestConversationFollowups(
       currentConversation.id,
       recentMessages,
       sessionId,
-      true // 🔥 FIX: Force regenerate on every lightbulb click
+      true // Force regenerate on every lightbulb click
     );
   };
 

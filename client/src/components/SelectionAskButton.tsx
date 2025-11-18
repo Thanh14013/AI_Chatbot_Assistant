@@ -54,26 +54,11 @@ const SelectionAskButton: React.FC<SelectionAskButtonProps> = ({
   // This ensures we don't miss the ref being set
   // Effect re-runs when messageId OR contentKey changes (new message or content update)
   useLayoutEffect(() => {
-    console.log("[SelectionAskButton] Layout effect:", {
-      messageId,
-      contentKey,
-      isAIMessage,
-      hasContainer: !!containerRef.current,
-    });
-
     // Use a small timeout to ensure DOM is fully rendered
     const timer = setTimeout(() => {
       if (containerRef.current && isAIMessage) {
-        console.log(
-          "[SelectionAskButton] Setting isReady=true for message",
-          messageId
-        );
         setIsReady(true);
       } else {
-        console.log(
-          "[SelectionAskButton] Setting isReady=false for message",
-          messageId
-        );
         setIsReady(false);
       }
     }, 0);
@@ -82,25 +67,11 @@ const SelectionAskButton: React.FC<SelectionAskButtonProps> = ({
   }, [isAIMessage, messageId, contentKey]); // Added contentKey to detect content changes
 
   useEffect(() => {
-    console.log("[SelectionAskButton] Attach listeners effect:", {
-      messageId,
-      isAIMessage,
-      isReady,
-      hasContainer: !!containerRef.current,
-    });
-
     if (!isAIMessage || !isReady || !containerRef.current) {
-      console.log(
-        "[SelectionAskButton] Early return - not attaching listeners"
-      );
       return;
     }
 
     const container = containerRef.current;
-    console.log(
-      "[SelectionAskButton] Attaching event listeners for message",
-      messageId
-    );
 
     const handleSelection = (event: MouseEvent) => {
       const selection = window.getSelection();

@@ -42,11 +42,9 @@ export const useAutoTitle = (
     // Long message: generate AI title
     try {
       setIsGenerating(true);
-      console.log("[AutoTitle] Generating AI title for long message...");
 
       const title = await generateConversationTitle(trimmedMessage);
 
-      console.log("[AutoTitle] Generated title:", title);
       return title;
     } catch (error) {
       console.error("[AutoTitle] Failed to generate AI title:", error);

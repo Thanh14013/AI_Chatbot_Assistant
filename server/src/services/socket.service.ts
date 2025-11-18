@@ -660,21 +660,22 @@ export const initializeSocketIO = (
           }
 
           // STEP 4: Auto-generate smart title for new conversations (like ChatGPT/Gemini)
-          // Only for first message exchange (when title is empty/default)
+          // Only for first message exchange (when title is still default)
           // NON-BLOCKING: Run in background, don't wait for title generation
-          if (result.conversation && result.conversation.message_count === 2) {
-            // First message exchange - auto-generate title
+          if (result.conversation) {
             const currentTitle = result.conversation.title || "";
             const trimmedTitle = currentTitle.trim();
+            const messageCount = result.conversation.message_count;
 
-            // Check if title is empty, default, or matches user message
+            // Check if this is first exchange (2 messages) AND title is still default
             const isDefaultTitle =
               trimmedTitle === "" ||
               trimmedTitle === "New Chat" ||
-              trimmedTitle === "New Conversation" ||
-              trimmedTitle === content.trim();
+              trimmedTitle === "New Conversation";
 
-            if (isDefaultTitle) {
+            const shouldAutoTitle = messageCount === 2 && isDefaultTitle;
+
+            if (shouldAutoTitle) {
               // Don't await - let it run in background (non-blocking)
               // Use setImmediate to ensure it runs after current execution
               setImmediate(async () => {

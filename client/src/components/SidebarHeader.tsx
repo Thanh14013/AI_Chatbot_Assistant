@@ -47,13 +47,6 @@ function parseQueryWithTags(query: string): {
   const tagPattern = /\s+v[oơôốớ]i\s+tag\s+([a-zA-Z0-9\s,\-_]+)/i;
   const match = query.match(tagPattern);
 
-  console.log("[ParseQuery] Debug:", {
-    originalQuery: query,
-    hasMatch: !!match,
-    matchIndex: match?.index,
-    capturedTags: match?.[1],
-  });
-
   if (match) {
     const keyword = query.slice(0, match.index).trim();
     const tagsString = match[1]?.trim() || "";
@@ -67,16 +60,9 @@ function parseQueryWithTags(query: string): {
             .filter((tag) => tag.length > 0)
         : [];
 
-    console.log("[ParseQuery] Result:", {
-      keyword,
-      tags,
-      tagsCount: tags.length,
-    });
-
     return { keyword, tags };
   }
 
-  console.log("[ParseQuery] No tag pattern found - using full query");
   return { keyword: query.trim(), tags: [] };
 }
 
@@ -155,26 +141,10 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
       // Parse query to extract keyword and tags
       const { keyword, tags } = parseQueryWithTags(trimmedQuery);
 
-      // CRITICAL: Log parsing result for debugging
-      console.log("[SidebarHeader] Parsed query:", {
-        originalQuery: trimmedQuery,
-        keyword,
-        tags,
-        tagsCount: tags.length,
-      });
-
       // Perform semantic search with optional tag filtering
       const res = await searchAllConversations({
         query: keyword || trimmedQuery, // Use keyword if parsed, otherwise full query
         tags: tags.length > 0 ? tags : undefined, // Only include tags if found
-        limit: 10,
-        messagesPerConversation: 2,
-      });
-
-      // CRITICAL: Log API request for debugging
-      console.log("[SidebarHeader] Search API request:", {
-        query: keyword || trimmedQuery,
-        tags: tags.length > 0 ? tags : undefined,
         limit: 10,
         messagesPerConversation: 2,
       });

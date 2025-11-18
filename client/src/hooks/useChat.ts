@@ -358,17 +358,6 @@ export const useChat = (options: UseChatOptions = {}): UseChatReturn => {
             const targetConv = updated[targetIndex];
             updated.splice(targetIndex, 1);
             updated.unshift(targetConv);
-            console.log(
-              "[useChat] Moved conversation to top:",
-              targetConv.title
-            );
-          } else if (targetIndex === 0) {
-            console.log("[useChat] Conversation already at top");
-          } else if (targetIndex === -1) {
-            // Conversation not in list yet - will be added by background refresh
-            console.log(
-              "[useChat] Conversation not found in list, waiting for background refresh"
-            );
           }
 
           return updated;

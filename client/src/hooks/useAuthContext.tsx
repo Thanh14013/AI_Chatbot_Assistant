@@ -37,26 +37,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const initializeAuth = async () => {
-      console.log("[AuthProvider] Init");
       try {
         const rawToken = getAccessToken();
         const authenticated = checkAuth();
-        console.log(
-          "[AuthProvider] Token:",
-          !!rawToken,
-          "Auth:",
-          authenticated
-        );
 
         if (!rawToken || !authenticated) {
-          console.log("[AuthProvider] No token");
           setAuthenticated(false);
           setUser(null);
           setLoading(false);
           return;
         }
 
-        console.log("[AuthProvider] Verifying...");
         setAuthenticated(true);
 
         try {
@@ -69,31 +60,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             timeoutPromise,
           ])) as any;
 
-          console.log("[AuthProvider] Response OK");
-
           if (response.success && response.data) {
             setUser(response.data);
 
             // 🔥 CRITICAL FIX: Start automatic token refresh monitor
             // Prevents UI freeze after 30 minutes of inactivity
             tokenRefreshService.start();
-            console.log("[AuthProvider] Token refresh monitor started");
           } else {
             setUser(null);
           }
         } catch (getCurrentUserError: any) {
-          console.log("[AuthProvider] Error:", getCurrentUserError);
-
           if (
             getCurrentUserError?.message === "Request timeout" ||
             !getCurrentUserError?.response
           ) {
-            console.log("[AuthProvider] Timeout");
             setAuthenticated(false);
             setUser(null);
             clearTokens();
           } else if (getCurrentUserError?.response?.status === 401) {
-            console.log("[AuthProvider] 401");
             setAuthenticated(false);
             setUser(null);
             clearTokens();
@@ -103,12 +87,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         }
       } catch (error) {
-        console.log("[AuthProvider] Fatal:", error);
+        console.error("[AuthProvider] Fatal error:", error);
         setAuthenticated(false);
         setUser(null);
         tokenRefreshService.stop();
       } finally {
-        console.log("[AuthProvider] Done");
         setLoading(false);
       }
     };
