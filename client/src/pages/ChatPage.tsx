@@ -1385,7 +1385,11 @@ const ChatPage: React.FC = () => {
    */
   useEffect(() => {
     const handleConversationUpdated = (event: CustomEvent) => {
-      const { conversationId, update } = event.detail;
+      const detail = event.detail as {
+        conversationId: string;
+        update: Partial<ConversationListItem>;
+      };
+      const { conversationId, update } = detail;
 
       // Update current conversation if it matches
       if (currentConversation && conversationId === currentConversation.id) {
