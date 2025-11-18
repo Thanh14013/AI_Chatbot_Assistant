@@ -68,7 +68,7 @@ export const create = async (req: Request, res: Response): Promise<void> => {
     const conversationData: CreateConversationInput = {
       user_id: userId,
       title: conversationTitle,
-      model: model || "GPT-5 mini",
+      model: model || "gpt-4o-mini",
       context_window: context_window || 10,
       tags: validatedTags || [],
       ...(project_id && { project_id }), // Assign to project if provided

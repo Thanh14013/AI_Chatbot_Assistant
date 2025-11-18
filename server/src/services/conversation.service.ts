@@ -449,7 +449,7 @@ Assistant: ${assistantMessage.substring(0, 200)}
 Title:`;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",

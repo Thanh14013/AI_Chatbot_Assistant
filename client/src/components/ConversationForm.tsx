@@ -44,24 +44,23 @@ export interface ConversationFormValues {
 /**
  * Available AI models with descriptions
  */
-const AI_MODELS = [
+const modelOptions = [
   {
-    value: "gpt-5-nano",
-    label: "GPT-5 Nano",
+    value: "gpt-4o-mini",
+    label: "GPT-4o Mini",
     description:
-      "Default lightweight model â€” fast, cost-efficient and good for everyday chats",
+      "Fast and efficient — best for everyday chats and quick responses",
   },
   {
-    value: "gpt-4.1-mini",
-    label: "GPT-4.1 Mini",
+    value: "gpt-4o",
+    label: "GPT-4o",
     description:
-      "Balanced model: good mix of speed and quality for general tasks",
+      "Most capable model: best for complex reasoning and detailed answers",
   },
   {
-    value: "gpt-4.1-nano",
-    label: "GPT-4.1 Nano",
-    description:
-      "Higher-quality responses for more complex reasoning and detailed answers",
+    value: "gpt-4-turbo",
+    label: "GPT-4 Turbo",
+    description: "Previous generation flagship model with strong performance",
   },
 ];
 
@@ -168,7 +167,7 @@ const ConversationForm: React.FC<ConversationFormProps> = ({
         layout="vertical"
         initialValues={{
           title: "",
-          model: "GPT-5 mini",
+          model: "gpt-4o-mini",
           context_window: 10,
           tags: [],
         }}

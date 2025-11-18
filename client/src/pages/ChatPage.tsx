@@ -465,7 +465,7 @@ const ChatPage: React.FC = () => {
   const handleCreateSubmit = async (values: ConversationFormValues) => {
     const payload = {
       title: values.title,
-      model: values.model || "GPT-5 mini",
+      model: values.model || "gpt-4o-mini",
       context_window: values.context_window || 10,
     };
 
@@ -1248,7 +1248,7 @@ const ChatPage: React.FC = () => {
           role: "assistant",
           content: "",
           tokens_used: 0,
-          model: currentConversation?.model || "GPT-5 mini",
+          model: currentConversation?.model || "gpt-4o-mini",
           createdAt: new Date().toISOString(),
           isTyping: true,
         };
@@ -1633,7 +1633,7 @@ const ChatPage: React.FC = () => {
         // Server will auto-generate smart title after first message (like ChatGPT/Gemini)
         const newConversation = await apiCreateConversation({
           title: "New Chat",
-          model: "GPT-5 mini",
+          model: "gpt-4o-mini",
           context_window: 10,
         });
 
