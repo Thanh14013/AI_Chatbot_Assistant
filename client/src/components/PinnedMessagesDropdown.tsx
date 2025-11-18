@@ -181,11 +181,12 @@ const PinnedMessagesDropdown: React.FC<PinnedMessagesDropdownProps> = ({
         }));
 
   /**
-   * Fetch pinned messages on mount and when conversation changes
+   * Fetch pinned messages only when conversation changes (not on refreshTrigger)
+   * Event listeners handle real-time updates for instant UX
    */
   useEffect(() => {
     fetchPinnedMessages();
-  }, [conversationId, refreshTrigger]);
+  }, [conversationId]);
 
   /**
    * Listen for pin/unpin events from websocket AND client-side optimistic updates

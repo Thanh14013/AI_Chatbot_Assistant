@@ -161,34 +161,78 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       onPinToggle(message.id, newPinnedStatus);
     }
 
+    // 🚀 STEP 3: Dispatch event immediately for instant sync
+    window.dispatchEvent(
+      new CustomEvent(newPinnedStatus ? "message:pinned" : "message:unpinned", {
+        detail: {
+          conversationId: message.conversation_id,
+          messageId: message.id,
+          message: newPinnedStatus ? message : undefined,
+        },
+      })
+    );
+
+    // 🚀 STEP 4: Fire-and-forget API call (no await for instant UX)
     setIsPinning(true);
+    const apiCall = currentPinned
+      ? unpinMessage(message.id)
+      : pinMessage(message.id);
+
+    apiCall
+      .then(() => {
+        // Success message
+        antMessage.success(
+          newPinnedStatus ? "Message pinned" : "Message unpinned",
+          0.5
+        );
+      })
+      .catch((error: unknown) => {
+        // ❌ API call failed - ROLLBACK optimistic update
+        setLocalPinned(currentPinned); // Revert local state
+
+        if (onPinToggle) {
+          onPinToggle(message.id, currentPinned); // Revert to original state
+        }
+
+        // Dispatch rollback event
+        window.dispatchEvent(
+          new CustomEvent(
+            currentPinned ? "message:pinned" : "message:unpinned",
+            {
+              detail: {
+                conversationId: message.conversation_id,
+                messageId: message.id,
+                message: currentPinned ? message : undefined,
+              },
+            }
+          )
+        );
+
+        // Show error message
+        if (error instanceof Error) {
+          antMessage.error(
+            error.message ||
+              `Failed to ${currentPinned ? "unpin" : "pin"} message`
+          );
+        } else {
+          antMessage.error(
+            `Failed to ${currentPinned ? "unpin" : "pin"} message`
+          );
+        }
+      })
+      .finally(() => {
+        setIsPinning(false);
+      });
+  };
+
+  /**
+   * Copy message content to clipboard
+   */
+  const handleCopy = async () => {
     try {
-      // 🚀 STEP 3: Make API call to server
-      if (currentPinned) {
-        await unpinMessage(message.id);
-      } else {
-        await pinMessage(message.id);
-      }
-
-      // 🚀 STEP 4: Dispatch event AFTER successful server sync
-      window.dispatchEvent(
-        new CustomEvent(
-          newPinnedStatus ? "message:pinned" : "message:unpinned",
-          {
-            detail: {
-              conversationId: message.conversation_id,
-              messageId: message.id,
-              message: newPinnedStatus ? message : undefined,
-            },
-          }
-        )
-      );
-
-      // Success message
-      antMessage.success(
-        newPinnedStatus ? "Message pinned" : "Message unpinned",
-        0.5
-      );
+      await navigator.clipboard.writeText(message.content);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
     } catch (error: unknown) {
       // ❌ API call failed - ROLLBACK optimistic update
       setLocalPinned(currentPinned); // Revert local state

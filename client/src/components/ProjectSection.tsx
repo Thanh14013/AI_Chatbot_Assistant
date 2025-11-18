@@ -86,19 +86,44 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
   const loadingProjectsRef = useRef(false);
   const projectsLoadedRef = useRef(false);
 
-  // Load projects (lazy load conversations only when expanded)
-  const loadProjects = async () => {
-    // Guard: Don't fetch if already loading or already loaded (unless forced refresh)
+  // 🚀 OPTIMIZED: Load projects AND all their conversations in parallel on init
+  const loadProjectsWithConversations = async () => {
+    // Guard: Don't fetch if already loading
     if (loadingProjectsRef.current) return;
 
     loadingProjectsRef.current = true;
     setLoading(true);
     try {
+      // Step 1: Load projects metadata
       const data = await getProjects();
       setProjects(data);
 
       // 🚀 UPDATE CENTRALIZED STORE
       sidebarStore.setProjects(data);
+
+      // Step 2: Load ALL project conversations in parallel for instant badge counts
+      if (data.length > 0) {
+        const conversationPromises = data.map((project) =>
+          getProjectConversations(project.id).catch(() => [])
+        );
+
+        const allProjectConversations = await Promise.all(conversationPromises);
+
+        // Update state with all conversations
+        const conversationsMap: Record<string, ConversationListItem[]> = {};
+        data.forEach((project, index) => {
+          conversationsMap[project.id] = allProjectConversations[index];
+        });
+
+        setProjectConversations(conversationsMap);
+
+        // Merge all into centralized store
+        const flatConversations = allProjectConversations.flat();
+        sidebarStore.addConversations(flatConversations);
+
+        // Auto-expand all projects for immediate visibility
+        setExpandedProjects(new Set(data.map((p) => p.id)));
+      }
 
       projectsLoadedRef.current = true;
     } catch (error: any) {
@@ -109,7 +134,7 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
     }
   };
 
-  // Load conversations for a specific project
+  // Load conversations for a specific project (kept for expand/refresh use cases)
   const loadProjectConversations = async (projectId: string) => {
     try {
       const conversations = await getProjectConversations(projectId);
@@ -126,10 +151,10 @@ const ProjectSection: React.FC<ProjectSectionProps> = ({
     }
   };
 
-  // 🚀 OPTIMIZATION: Initial load - only fetch if not already loaded
+  // 🚀 OPTIMIZATION: Initial load with all conversations for instant badge counts
   useEffect(() => {
     if (!projectsLoadedRef.current || refreshTrigger) {
-      loadProjects();
+      loadProjectsWithConversations();
     }
   }, [refreshTrigger]);
 

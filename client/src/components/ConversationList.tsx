@@ -141,33 +141,24 @@ const ConversationList: React.FC<ConversationListProps> = ({
         onDrop={handleDrop}
         onDragLeave={handleDragLeave}
       >
-        {isDropTarget ? (
-          <div className={styles.emptyDropZone}>
-            <MessageOutlined className={styles.dropZoneIcon} />
-            <div className={styles.dropZoneText}>
-              Drop here to move to All Conversations
+        <Empty
+          image={<MessageOutlined className={styles.emptyIcon} />}
+          description={
+            <div>
+              <span className={styles.emptyText}>
+                {searchQuery
+                  ? "No conversations found"
+                  : "No conversations yet"}
+              </span>
+              <br />
+              <span className={styles.emptySubtext}>
+                {searchQuery
+                  ? "Try a different search term"
+                  : "Start a new conversation to get started"}
+              </span>
             </div>
-          </div>
-        ) : (
-          <Empty
-            image={<MessageOutlined className={styles.emptyIcon} />}
-            description={
-              <div>
-                <span className={styles.emptyText}>
-                  {searchQuery
-                    ? "No conversations found"
-                    : "No conversations yet"}
-                </span>
-                <br />
-                <span className={styles.emptySubtext}>
-                  {searchQuery
-                    ? "Try a different search term"
-                    : "Start a new conversation to get started"}
-                </span>
-              </div>
-            }
-          />
-        )}
+          }
+        />
       </div>
     );
   }
@@ -213,14 +204,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
           />
         ))}
 
-        {/* Show drop zone hint when dragging and list is small */}
-        {isDropTarget && conversations.length < 3 && (
-          <div className={styles.dropZoneHint}>
-            Drop here to move to All Conversations
-          </div>
-        )}
-
-        {/* Infinite scroll loader */}
+        {/* Infinite scroll loader */
         {isLoadingMore && (
           <div className={styles.loadMoreIndicator}>
             <Spin size="small" />
