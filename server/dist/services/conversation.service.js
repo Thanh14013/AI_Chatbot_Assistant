@@ -252,11 +252,7 @@ Assistant: ${assistantMessage.substring(0, 200)}
 
 Title:`;
         const response = await openai.chat.completions.create({
-<<<<<<< HEAD
             model: "gpt-4.1-mini",
-=======
-            model: "gpt-4o-mini",
->>>>>>> b5a25b404b0fd5beee8e603d5df07ab1ee134af5
             messages: [
                 {
                     role: "system",

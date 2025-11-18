@@ -223,15 +223,27 @@ const ChatInput: React.FC<ChatInputProps> = ({
    * Handle lightbulb button click - Always fetch fresh suggestions
    */
   const handleRequestSuggestions = () => {
-    if (!conversationId || disabled) return;
+    console.log("[ChatInput] 🔥 Lightbulb clicked", {
+      conversationId,
+      disabled,
+      hasSuggestionHandler: !!onRequestSuggestions,
+    });
 
-    // 🔥 FIX: Always request fresh suggestions on every click
+    if (disabled) {
+      console.log("[ChatInput] ❌ Request blocked: input disabled");
+      return;
+    }
+
+    // 🔥 FIX: Allow suggestions even without conversationId (for New Chat)
     // Clear old suggestions first for better UX
     setDropdownVisible(true);
 
     // Always fetch new suggestions based on current context
     if (onRequestSuggestions) {
+      console.log("[ChatInput] ✅ Calling onRequestSuggestions handler");
       onRequestSuggestions();
+    } else {
+      console.log("[ChatInput] ⚠️ No onRequestSuggestions handler provided");
     }
   };
 
