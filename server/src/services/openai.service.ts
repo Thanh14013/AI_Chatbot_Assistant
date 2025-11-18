@@ -40,7 +40,7 @@ export async function testOpenAIConnection() {
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5-nano",
+      model: "GPT-5.1",
       messages: [{ role: "user", content: "Hello, can you hear me?" }],
     });
 
@@ -160,7 +160,7 @@ export async function getChatCompletion(
   // Set default values
   const {
     messages,
-    model = "gpt-5-nano",
+    model = "GPT-5.1",
     temperature = 0.7,
     max_completion_tokens = 2000,
     stream = false,
@@ -563,7 +563,7 @@ export function selectModelForContent(hasImages: boolean): string {
     // Use GPT-4 Vision for image analysis
     return "gpt-4o"; // or 'gpt-4-vision-preview'
   }
-  return "gpt-5-nano"; // Default model
+  return "GPT-5.1"; // Default model
 }
 
 export default openai;

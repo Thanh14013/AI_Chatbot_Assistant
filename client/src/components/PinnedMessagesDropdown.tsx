@@ -180,25 +180,41 @@ const PinnedMessagesDropdown: React.FC<PinnedMessagesDropdownProps> = ({
   }, [conversationId, refreshTrigger]);
 
   /**
-   * Listen for pin/unpin events from websocket
+   * Listen for pin/unpin events from websocket AND client-side optimistic updates
    */
   useEffect(() => {
-    const handleMessagePinned = (event: CustomEvent) => {
-      const { conversationId: eventConvId, message } = event.detail;
-      if (eventConvId === conversationId && message) {
-        setPinnedMessages((prev) => {
-          // Check if already exists
-          if (prev.some((msg) => msg.id === message.id)) return prev;
+    const handleMessagePinned = (event: Event) => {
+      const {
+        conversationId: eventConvId,
+        message,
+        messageId,
+      } = (event as CustomEvent).detail;
+
+      if (eventConvId !== conversationId) return;
+
+      // Optimistic update: add immediately even if we don't have full message
+      setPinnedMessages((prev) => {
+        // Check if already exists
+        if (prev.some((msg) => msg.id === (message?.id || messageId)))
+          return prev;
+
+        // If we have the full message, add it
+        if (message) {
           return [...prev, message];
-        });
-      }
+        }
+        // Otherwise, we'll fetch it from the server on next refresh
+        return prev;
+      });
     };
 
-    const handleMessageUnpinned = (event: CustomEvent) => {
-      const { conversationId: eventConvId, messageId } = event.detail;
-      if (eventConvId === conversationId) {
-        setPinnedMessages((prev) => prev.filter((msg) => msg.id !== messageId));
-      }
+    const handleMessageUnpinned = (event: Event) => {
+      const { conversationId: eventConvId, messageId } = (event as CustomEvent)
+        .detail;
+
+      if (eventConvId !== conversationId) return;
+
+      // Optimistic update: remove immediately
+      setPinnedMessages((prev) => prev.filter((msg) => msg.id !== messageId));
     };
 
     window.addEventListener(

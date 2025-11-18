@@ -21,7 +21,12 @@ class ErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // Error logging to console removed per request. Store error info in state.
+    // Log error details for debugging
+    console.error("[ErrorBoundary] Caught error:", {
+      error: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack,
+    });
     this.setState({ error, errorInfo });
   }
 
@@ -29,12 +34,21 @@ class ErrorBoundary extends React.Component<
     if (this.state.hasError) {
       return (
         <div className={styles.container}>
-          <h2>Something went wrong</h2>
+          <h2>⚠️ Something went wrong</h2>
           <p>
-            An unexpected error occurred. Check the developer console for more
-            details.
+            An unexpected error occurred. Please refresh the page or contact
+            support if the issue persists.
           </p>
-          <details className={styles.details}>
+          <button
+            onClick={() => window.location.reload()}
+            className={styles.refreshButton}
+          >
+            Refresh Page
+          </button>
+          <details className={`${styles.details} ${styles.errorDetails}`}>
+            <summary className={styles.errorSummary}>
+              Error Details (for developers)
+            </summary>
             {this.state.error && this.state.error.toString()}
             {"\n"}
             {this.state.errorInfo?.componentStack}

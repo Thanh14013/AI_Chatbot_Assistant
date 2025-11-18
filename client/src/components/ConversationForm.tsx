@@ -168,7 +168,7 @@ const ConversationForm: React.FC<ConversationFormProps> = ({
         layout="vertical"
         initialValues={{
           title: "",
-          model: "gpt-5-nano",
+          model: "GPT-5.1",
           context_window: 10,
           tags: [],
         }}

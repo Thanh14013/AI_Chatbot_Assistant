@@ -193,6 +193,9 @@ const ChatPage: React.FC = () => {
   const [conversationSuggestions, setConversationSuggestions] = useState<
     string[]
   >([]);
+
+  // Ref to prevent concurrent conversation loads (fixes freezing issue)
+  const loadingConversationRef = useRef<string | null>(null);
   const [
     isLoadingConversationSuggestions,
     setIsLoadingConversationSuggestions,
@@ -258,7 +261,13 @@ const ChatPage: React.FC = () => {
       }
       setMessagesPage(result.pagination.page);
       setMessagesHasMore(result.pagination.page < result.pagination.totalPages);
-    } catch (err) {
+    } catch (err: any) {
+      console.error("[ChatPage] Failed to load messages:", {
+        conversationId,
+        page,
+        error: err?.message || err,
+        response: err?.response?.data,
+      });
       antdMessage.error("Failed to load messages");
       setMessages([]);
     } finally {
@@ -460,7 +469,7 @@ const ChatPage: React.FC = () => {
   /**
    * Handle New Conversation button click
    * Navigate to home route to show empty chat (draft mode)
-   * IMPORTANT: When clicking +, generate NEW suggestions to replace cached ones
+   * Show cached suggestions immediately, don't regenerate
    */
   const handleNewConversation = () => {
     // Navigate to home route to show empty chat interface
@@ -471,9 +480,8 @@ const ChatPage: React.FC = () => {
     setMessagesPage(1);
     setMessagesHasMore(false);
 
-    // CRITICAL: Generate fresh suggestions when user clicks + button
-    // This overwrites the cached suggestions with new ones
-    fetchNewChatSuggestions(true); // forceRegenerate = true
+    // Load cached suggestions immediately (already in state from initialization)
+    // User can click the refresh button if they want new suggestions
   };
 
   /**
@@ -610,9 +618,27 @@ const ChatPage: React.FC = () => {
     }
 
     const loadConversation = async (convId: string) => {
+      // CRITICAL: Validate conversation ID
+      if (!convId || typeof convId !== "string" || convId.trim() === "") {
+        console.warn("[ChatPage] Invalid conversation ID:", convId);
+        setCurrentConversation(null);
+        setMessages([]);
+        loadingConversationRef.current = null;
+        setIsLoadingMessages(false);
+        return;
+      }
+
       // IMPORTANT: Don't load if we're in the middle of creating and sending
       // This prevents race condition where useEffect clears optimistic messages
       if (isCreatingAndSendingRef.current) {
+        console.log("[ChatPage] Skip load - creating and sending:", convId);
+        return;
+      }
+
+      // IMPORTANT: Prevent concurrent loads of the same conversation
+      // This fixes the freezing issue caused by race conditions
+      if (loadingConversationRef.current === convId) {
+        console.log("[ChatPage] Skip load - already loading:", convId);
         return;
       }
 
@@ -626,10 +652,17 @@ const ChatPage: React.FC = () => {
         return;
       }
 
+      loadingConversationRef.current = convId;
       setIsLoadingMessages(true);
       try {
         const svc = await import("../services/chat.service");
         const conv = await svc.getConversation(convId);
+
+        // CRITICAL: Validate conversation data before setting state
+        if (!conv || !conv.id) {
+          throw new Error("Invalid conversation data received from server");
+        }
+
         setCurrentConversation(conv as any);
 
         // Join WebSocket room for this conversation will be handled by useRealTimeChat effect
@@ -706,19 +739,30 @@ const ChatPage: React.FC = () => {
             }, 100);
           });
         }
-      } catch (err) {
-        antdMessage.error("Failed to load conversation");
+      } catch (err: any) {
+        console.error("[ChatPage] Failed to load conversation:", {
+          conversationId: convId,
+          error: err?.message || err,
+          response: err?.response?.data,
+          stack: err?.stack,
+        });
+        const errorMsg =
+          err?.response?.data?.message ||
+          err?.message ||
+          "Failed to load conversation";
+        antdMessage.error(errorMsg);
         setCurrentConversation(null);
         setMessages([]);
       } finally {
+        loadingConversationRef.current = null;
         setIsLoadingMessages(false);
       }
     };
 
     loadConversation(id);
     // Intentionally omit currentConversation from deps to avoid effect re-run
-    // Only depend on params.id and isConnected to prevent infinite loops
-  }, [params.id, isConnected]);
+    // Only depend on params.id (removed isConnected to fix freezing/race conditions)
+  }, [params.id]);
 
   // WebSocket event listeners for real-time updates
   useEffect(() => {
@@ -1090,7 +1134,7 @@ const ChatPage: React.FC = () => {
           role: "assistant",
           content: "",
           tokens_used: 0,
-          model: currentConversation?.model || "gpt-5-nano",
+          model: currentConversation?.model || "GPT-5.1",
           createdAt: new Date().toISOString(),
           isTyping: true,
         };
@@ -1225,20 +1269,21 @@ const ChatPage: React.FC = () => {
   }, []);
 
   /**
-   * 🔄 Auto-generate New Chat suggestions every 5 minutes after login
-   * Schedule starts immediately on login, then repeats every 5 minutes
-   * Stops when user logs out or component unmounts
+   * 🔄 Background refresh of New Chat suggestions every 5 minutes after login
+   * Load cached suggestions immediately (already done in useState initialization)
+   * Refresh in background without showing loading state for smooth UX
    */
   useEffect(() => {
     if (!user?.id) {
       return;
     }
-    // Generate immediately on login
-    fetchNewChatSuggestions(true);
 
-    // Then generate every 5 minutes
+    // Fetch fresh suggestions in background (don't clear cached ones)
+    fetchNewChatSuggestions(false);
+
+    // Then refresh every 5 minutes in background
     const intervalId = setInterval(() => {
-      fetchNewChatSuggestions(true);
+      fetchNewChatSuggestions(false);
     }, 5 * 60 * 1000); // 5 minutes in milliseconds
 
     // Cleanup: stop schedule when user logs out or component unmounts
@@ -1369,10 +1414,6 @@ const ChatPage: React.FC = () => {
       if (!queuedMsg) break;
 
       try {
-        console.log(
-          "[MessageQueue] Processing message:",
-          queuedMsg.content.substring(0, 50) + "..."
-        );
         await handleSendMessageInternal(
           queuedMsg.content,
           queuedMsg.attachments,
@@ -1476,7 +1517,7 @@ const ChatPage: React.FC = () => {
 
         const newConversation = await apiCreateConversation({
           title,
-          model: "gpt-5-nano",
+          model: "GPT-5.1",
           context_window: 10,
         });
 
@@ -2550,8 +2591,12 @@ const ChatPage: React.FC = () => {
     if (!user?.id) return;
 
     try {
-      setIsLoadingNewChatSuggestions(true);
-      setNewChatSuggestions([]);
+      // Only show loading if we're forcing regenerate (clicking + button)
+      if (forceRegenerate) {
+        setIsLoadingNewChatSuggestions(true);
+        setNewChatSuggestions([]);
+      }
+      // Otherwise, keep showing cached suggestions while fetching new ones in background
 
       // Ensure websocket is connected so we can use the conversation followups socket handler.
       // If it's not connected, attempt to connect first (this is fast and resolves when ready).
@@ -2576,12 +2621,16 @@ const ChatPage: React.FC = () => {
         );
       } else {
         // Could not connect to websocket; bail out and clear loading state
+        if (forceRegenerate) {
+          setIsLoadingNewChatSuggestions(false);
+          setNewChatSuggestions([]);
+        }
+      }
+    } catch (err) {
+      if (forceRegenerate) {
         setIsLoadingNewChatSuggestions(false);
         setNewChatSuggestions([]);
       }
-    } catch (err) {
-      setIsLoadingNewChatSuggestions(false);
-      setNewChatSuggestions([]);
     }
   };
 
