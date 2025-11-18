@@ -27,7 +27,7 @@ const { Sider } = Layout;
 interface SidebarProps {
   currentConversationId?: string | null;
   onSelectConversation?: (id: string) => void;
-  onNewConversation?: () => void;
+  onNewConversation?: (forceRegenerateOrProjectId?: boolean | string) => void;
   onHighlightMessage?: (messageId: string) => void;
   unreadConversations?: Set<string>; // For unread tracking (multi-tab)
   onSettingsClick?: () => void; // Add settings callback
@@ -189,11 +189,15 @@ const Sidebar: React.FC<SidebarProps> = ({
     setSearchInput(e.target.value); // 🚀 PERFORMANCE: Update input immediately for responsive UI
   };
 
-  const handleNewConversation = () => {
+  const handleNewConversation = (
+    forceRegenerateOrProjectId?: boolean | string
+  ) => {
     try {
-      const res = onNewConversation?.();
+      // Handle overloaded parameter: string = projectId, boolean = forceRegenerate
+      const res = onNewConversation?.(forceRegenerateOrProjectId);
+
       // If parent returns a promise, refresh after it resolves
-      if (res && typeof (res as any).then === "function") {
+      if (res !== undefined && typeof (res as any).then === "function") {
         (res as Promise<any>).finally(() => loadConversations());
       } else {
         // otherwise trigger immediate refresh

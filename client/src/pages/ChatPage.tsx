@@ -504,9 +504,21 @@ const ChatPage: React.FC = () => {
   /**
    * Handle New Conversation button click
    * Navigate to home route to show empty chat (draft mode)
-   * Show cached suggestions immediately, don't regenerate
+   * 🔥 OVERLOADED: Accepts boolean (forceRegenerate) or string (projectId)
    */
-  const handleNewConversation = () => {
+  const handleNewConversation = (
+    forceRegenerateOrProjectId: boolean | string = false
+  ) => {
+    // If string parameter (projectId), delegate to ProjectSection logic
+    if (typeof forceRegenerateOrProjectId === "string") {
+      // ProjectSection will handle creating conversation with projectId
+      // This code path shouldn't navigate or clear state
+      return;
+    }
+
+    // Boolean parameter: Handle double-click smart suggestion logic
+    const forceRegenerate = forceRegenerateOrProjectId;
+
     // Navigate to home route to show empty chat interface
     navigate("/");
     // Clear current conversation to show draft mode
@@ -518,8 +530,10 @@ const ChatPage: React.FC = () => {
     // 🔥 FIX: Clear pinned message IDs when creating new conversation
     setPinnedMessageIds(new Set());
 
-    // Load cached suggestions immediately (already in state from initialization)
-    // User can click the refresh button if they want new suggestions
+    // 🔥 SMART SUGGESTION LOADING:
+    // Single click (forceRegenerate=false): Show cached suggestions instantly
+    // Double click (forceRegenerate=true): Regenerate fresh suggestions from recent context
+    fetchNewChatSuggestions(forceRegenerate);
   };
 
   /**
@@ -2641,6 +2655,7 @@ const ChatPage: React.FC = () => {
 
   /**
    * Handle requesting conversation-based follow-up suggestions (for input lightbulb)
+   * 🔥 FIX: Always fetch fresh suggestions based on current context
    */
   const handleRequestConversationSuggestions = () => {
     if (!isConnected) {
@@ -2658,7 +2673,7 @@ const ChatPage: React.FC = () => {
       return;
     }
 
-    // Get up to 10 recent messages
+    // Get up to 10 recent messages for context
     const recentMessages = messages
       .filter((m) => m.role === "user" || m.role === "assistant")
       .slice(-10)
@@ -2672,15 +2687,18 @@ const ChatPage: React.FC = () => {
       return;
     }
 
+    // 🔥 CRITICAL: Set loading state and clear old suggestions
     setIsLoadingConversationSuggestions(true);
     setConversationSuggestions([]);
 
-    // Request suggestions via websocket
+    // Request fresh suggestions via websocket based on current context
+    // forceRegenerate = true ensures we always get new suggestions
     const sessionId = String(user.id);
     websocketService.requestConversationFollowups(
       currentConversation.id,
       recentMessages,
-      sessionId
+      sessionId,
+      true // 🔥 FIX: Force regenerate on every lightbulb click
     );
   };
 

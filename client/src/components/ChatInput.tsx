@@ -220,17 +220,17 @@ const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   /**
-   * Handle lightbulb button click - Toggle dropdown
+   * Handle lightbulb button click - Always fetch fresh suggestions
    */
   const handleRequestSuggestions = () => {
     if (!conversationId || disabled) return;
 
-    // Toggle dropdown visibility
-    const newVisibility = !dropdownVisible;
-    setDropdownVisible(newVisibility);
+    // 🔥 FIX: Always request fresh suggestions on every click
+    // Clear old suggestions first for better UX
+    setDropdownVisible(true);
 
-    // Only fetch new suggestions if opening and not already loading
-    if (newVisibility && onRequestSuggestions && !isLoadingSuggestions) {
+    // Always fetch new suggestions based on current context
+    if (onRequestSuggestions) {
       onRequestSuggestions();
     }
   };

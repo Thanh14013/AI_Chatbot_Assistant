@@ -15,7 +15,7 @@ import {
 } from "../services/searchService";
 
 interface SidebarHeaderProps {
-  onNewConversation: () => void;
+  onNewConversation: (forceRegenerate?: boolean) => void;
   searchQuery: string;
   onSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   collapsed?: boolean;
@@ -95,8 +95,47 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 🔥 Double-click detection for New Conversation button
+  const [clickCount, setClickCount] = useState(0);
+  const clickTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
   // keep localQuery in sync when parent clears
   useEffect(() => setLocalQuery(searchQuery || ""), [searchQuery]);
+
+  /**
+   * 🔥 Handle New Conversation button click with double-click detection
+   * - Single click: Show cached suggestions (fast)
+   * - Double click: Force regenerate new suggestions (fresh context)
+   */
+  const handleNewConversationClick = () => {
+    setClickCount((prev) => prev + 1);
+
+    // Clear existing timer
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current);
+    }
+
+    // Set new timer for double-click detection (300ms window)
+    clickTimerRef.current = setTimeout(() => {
+      if (clickCount + 1 === 1) {
+        // Single click: Use cached suggestions
+        onNewConversation(false);
+      } else if (clickCount + 1 >= 2) {
+        // Double click: Force regenerate
+        onNewConversation(true);
+      }
+      setClickCount(0);
+    }, 300);
+  };
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (clickTimerRef.current) {
+        clearTimeout(clickTimerRef.current);
+      }
+    };
+  }, []);
 
   // Manual search function - only called when user clicks search button
   const handleSearch = useCallback(async () => {
@@ -220,8 +259,8 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
               type="primary"
               icon={<PlusOutlined />}
               className={styles.newButton}
-              onClick={onNewConversation}
-              title="New Conversation"
+              onClick={handleNewConversationClick}
+              title="Single click: cached suggestions | Double click: regenerate fresh"
             />
 
             {/* Search bar with input */}
