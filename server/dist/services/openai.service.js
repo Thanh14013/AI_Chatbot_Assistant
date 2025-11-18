@@ -28,7 +28,7 @@ export async function testOpenAIConnection() {
     }
     try {
         const response = await openai.chat.completions.create({
-            model: "GPT-5 mini",
+            model: "gpt-4o-mini",
             messages: [{ role: "user", content: "Hello, can you hear me?" }],
         });
         const text = response?.choices?.[0]?.message?.content;

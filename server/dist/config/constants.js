@@ -46,7 +46,7 @@ export const FILE_UPLOAD = {
     ],
 };
 export const JWT = {
-    ACCESS_TOKEN_EXPIRY: "15m",
+    ACCESS_TOKEN_EXPIRY: "1h",
     REFRESH_TOKEN_EXPIRY: "7d",
     COOKIE_MAX_AGE: 7 * 24 * 60 * 60 * 1000,
 };

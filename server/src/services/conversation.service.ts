@@ -62,7 +62,7 @@ export const createConversation = async (
       {
         user_id: data.user_id,
         title: data.title,
-        model: data.model || "GPT-5 mini",
+        model: data.model || "gpt-4o-mini",
         context_window: data.context_window || 10,
         total_tokens_used: 0,
         message_count: 0,
@@ -446,7 +446,7 @@ Assistant: ${assistantMessage.substring(0, 200)}
 Title:`;
 
     const response = await openai.chat.completions.create({
-      model: "GPT-5 mini",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
