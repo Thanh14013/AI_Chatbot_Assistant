@@ -88,14 +88,11 @@
   font-size: 13px;
 }
 
-/* Drag & Drop hover effects */
+/* Drag & Drop hover effects - UI removed but functionality preserved */
 .projectCard.dragOver {
-  background: rgba(0, 122, 255, 0.05);
-  border: 2px solid #007aff;
-  box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.2);
+  /* Blue box UI removed per user request - drag-drop still works */
 }
 
 .projectCard.dragOverInvalid {
-  background: rgba(255, 59, 48, 0.05);
-  border: 2px solid #ff3b30;
+  /* Red box UI removed per user request - drag-drop still works */
 }
