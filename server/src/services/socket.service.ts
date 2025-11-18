@@ -698,9 +698,15 @@ export const initializeSocketIO = (
                     });
 
                     // Broadcast title update to all user's sockets (multi-tab sync)
-                    broadcastToUser(socket.userId!, "conversation:update", {
+                    broadcastToUser(socket.userId!, "conversation:updated", {
                       conversationId,
                       update: { title: smartTitle },
+                    });
+
+                    console.log("[Auto-title] ✅ Title updated and broadcast:", {
+                      conversationId,
+                      title: smartTitle,
+                      userId: socket.userId,
                     });
                   }
                 } catch (err) {

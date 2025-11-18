@@ -1389,8 +1389,15 @@ const ChatPage: React.FC = () => {
     const handleConversationUpdated = (event: CustomEvent) => {
       const { conversationId, update } = event.detail;
 
+      console.log("[ChatPage] 📥 Received conversation:updated", {
+        conversationId,
+        update,
+        currentConversationId: currentConversation?.id,
+      });
+
       // Update current conversation if it matches
       if (currentConversation && conversationId === currentConversation.id) {
+        console.log("[ChatPage] ✅ Updating current conversation title");
         setCurrentConversation((prev) =>
           prev ? { ...prev, ...update } : null
         );
@@ -1398,6 +1405,7 @@ const ChatPage: React.FC = () => {
 
       // Update conversation in sidebar list
       updateConversationOptimistic(conversationId, update);
+      console.log("[ChatPage] ✅ Updated conversation in sidebar");
     };
 
     window.addEventListener(
