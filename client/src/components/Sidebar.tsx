@@ -309,10 +309,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     conversationId: string,
     sourceProjectId: string | null
   ) => {
+    // 🔥 BUG FIX: Clear drag state FIRST to remove blue box immediately
+    handleConversationDragEnd();
+
     // Validate drop (can't drop on same project)
     if (sourceProjectId === projectId) {
       antdMessage.warning("Conversation is already in this project");
-      handleConversationDragEnd();
       return;
     }
 
@@ -323,10 +325,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       projectId
     );
 
-    // 🔥 STEP 2: Clear drag state immediately (smooth UX)
-    handleConversationDragEnd();
-
-    // 🔥 STEP 3: Dispatch event IMMEDIATELY for cross-component sync
+    // 🔥 STEP 2: Dispatch event IMMEDIATELY for cross-component sync
     window.dispatchEvent(
       new CustomEvent("conversation:moved", {
         detail: {
@@ -337,7 +336,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       })
     );
 
-    // 🔥 STEP 4: API call in background (fire-and-forget)
+    // 🔥 STEP 3: API call in background (fire-and-forget)
     moveConversationToProject(conversationId, projectId)
       .then(() => {
         // Success: Commit transaction
@@ -390,10 +389,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     conversationId: string,
     sourceProjectId: string | null
   ) => {
+    // 🔥 BUG FIX: Clear drag state FIRST to remove blue box immediately
+    handleConversationDragEnd();
+
     // Only allow if coming from a project
     if (!sourceProjectId) {
       antdMessage.warning("Conversation is already in All Conversations");
-      handleConversationDragEnd();
       return;
     }
 
@@ -404,10 +405,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       null
     );
 
-    // 🔥 STEP 2: Clear drag state immediately
-    handleConversationDragEnd();
-
-    // 🔥 STEP 3: Dispatch event IMMEDIATELY
+    // 🔥 STEP 2: Dispatch event IMMEDIATELY
     window.dispatchEvent(
       new CustomEvent("conversation:moved", {
         detail: {
@@ -418,7 +416,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       })
     );
 
-    // 🔥 STEP 4: API call in background (fire-and-forget)
+    // 🔥 STEP 3: API call in background (fire-and-forget)
     moveConversationToProject(conversationId, null)
       .then(() => {
         sidebarStore.commitTransaction(transactionId);

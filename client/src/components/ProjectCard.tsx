@@ -190,20 +190,9 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
           {/* Project Name */}
           <span className={styles.projectName}>{project.name}</span>
 
-          {/* Conversation Count Badge - Uses store count if available, fallback to server count */}
+          {/* Conversation Count Badge - Uses actual store count for accurate badge */}
           <Badge
-            count={(() => {
-              const storeCount = sidebarStore.projectConversationCount(
-                project.id
-              );
-              // Use store count if > 0 OR if conversations array is not empty (means we loaded it)
-              // Otherwise fallback to server count
-              return conversations.length > 0
-                ? storeCount
-                : storeCount > 0
-                ? storeCount
-                : project.conversationCount;
-            })()}
+            count={sidebarStore.projectConversationCount(project.id)}
             showZero
             className={styles.countBadge}
             style={{ backgroundColor: project.color }}
