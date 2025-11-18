@@ -153,35 +153,38 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
     const newPinnedStatus = !currentPinned;
 
-    // Update local state immediately for instant UI feedback
+    // 🚀 STEP 1: Update local state immediately for instant UI feedback
     setLocalPinned(newPinnedStatus);
 
-    // 🚀 OPTIMISTIC UPDATE - Update UI immediately BEFORE API call
+    // 🚀 STEP 2: Update client-side state FIRST (parent component)
     if (onPinToggle) {
       onPinToggle(message.id, newPinnedStatus);
     }
 
-    // Dispatch custom event immediately for instant UI feedback
-    window.dispatchEvent(
-      new CustomEvent(newPinnedStatus ? "message:pinned" : "message:unpinned", {
-        detail: {
-          conversationId: message.conversation_id,
-          messageId: message.id,
-          message: newPinnedStatus ? message : undefined,
-        },
-      })
-    );
-
     setIsPinning(true);
     try {
-      // Now make the API call in background
+      // 🚀 STEP 3: Make API call to server
       if (currentPinned) {
         await unpinMessage(message.id);
       } else {
         await pinMessage(message.id);
       }
 
-      // API call succeeded - state already updated optimistically
+      // 🚀 STEP 4: Dispatch event AFTER successful server sync
+      window.dispatchEvent(
+        new CustomEvent(
+          newPinnedStatus ? "message:pinned" : "message:unpinned",
+          {
+            detail: {
+              conversationId: message.conversation_id,
+              messageId: message.id,
+              message: newPinnedStatus ? message : undefined,
+            },
+          }
+        )
+      );
+
+      // Success message
       antMessage.success(
         newPinnedStatus ? "Message pinned" : "Message unpinned",
         0.5
