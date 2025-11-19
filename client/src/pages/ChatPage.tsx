@@ -21,7 +21,6 @@ import {
   ProfileModal,
   PinnedMessagesDropdown,
   NewChatSuggestions,
-  MemoryDashboard,
 } from "../components";
 // ConversationForm not used anymore in new draft mode flow
 // import ConversationForm, {
@@ -143,9 +142,6 @@ const ChatPage: React.FC = () => {
 
   // Profile modal state
   const [profileModalOpen, setProfileModalOpen] = useState(false);
-
-  // Memory Dashboard modal state
-  const [memoryDashboardOpen, setMemoryDashboardOpen] = useState(false);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -3166,7 +3162,6 @@ const ChatPage: React.FC = () => {
           unreadConversations={unreadConversations}
           onSettingsClick={() => setSettingsModalOpen(true)}
           onProfileClick={() => setProfileModalOpen(true)}
-          onMemoryClick={() => setMemoryDashboardOpen(true)}
         />
 
         {/* Main content area */}
@@ -3311,12 +3306,6 @@ const ChatPage: React.FC = () => {
       <ProfileModal
         open={profileModalOpen}
         onCancel={() => setProfileModalOpen(false)}
-      />
-
-      {/* Memory Dashboard Modal */}
-      <MemoryDashboard
-        visible={memoryDashboardOpen}
-        onClose={() => setMemoryDashboardOpen(false)}
       />
     </Layout>
   );
