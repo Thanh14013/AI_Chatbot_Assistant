@@ -49,8 +49,12 @@ const PinnedMessagesDropdown: React.FC<PinnedMessagesDropdownProps> = ({
     try {
       const messages = await getPinnedMessages(conversationId);
       setPinnedMessages(messages);
-    } catch (error) {
-      antMessage.error("Failed to load pinned messages");
+    } catch (error: any) {
+      // Don't show error toast if conversation was deleted (403/404)
+      const status = error?.response?.status;
+      if (status !== 403 && status !== 404) {
+        antMessage.error("Failed to load pinned messages");
+      }
     } finally {
       setLoading(false);
     }

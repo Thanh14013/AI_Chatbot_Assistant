@@ -303,7 +303,12 @@ const ChatPage: React.FC = () => {
         error: err?.message || err,
         response: err?.response?.data,
       });
-      antdMessage.error("Failed to load messages");
+
+      // Don't show error toast if conversation was deleted (403/404)
+      const status = err?.response?.status;
+      if (status !== 403 && status !== 404) {
+        antdMessage.error("Failed to load messages");
+      }
       setMessages([]);
     } finally {
       setIsLoadingMessages(false);
@@ -807,11 +812,16 @@ const ChatPage: React.FC = () => {
           response: err?.response?.data,
           stack: err?.stack,
         });
-        const errorMsg =
-          err?.response?.data?.message ||
-          err?.message ||
-          "Failed to load conversation";
-        antdMessage.error(errorMsg);
+
+        // Don't show error toast if conversation was deleted (403/404)
+        const status = err?.response?.status;
+        if (status !== 403 && status !== 404) {
+          const errorMsg =
+            err?.response?.data?.message ||
+            err?.message ||
+            "Failed to load conversation";
+          antdMessage.error(errorMsg);
+        }
         setCurrentConversation(null);
         setMessages([]);
       } finally {
@@ -1222,8 +1232,18 @@ const ChatPage: React.FC = () => {
       );
       messageCache.invalidate(conversationId);
 
-      // If current conversation is deleted, redirect to home
+      // If current conversation is deleted, clear state IMMEDIATELY before navigation
+      // This prevents pending API calls from trying to load data for deleted conversation
       if (conversationId === currentConversation?.id) {
+        // Clear all state first
+        setCurrentConversation(null);
+        setMessages([]);
+        setMessagesPage(1);
+        setMessagesHasMore(false);
+        setPinnedMessageIds(new Set());
+        setIsLoadingMessages(false);
+
+        // Then navigate
         navigate("/", { replace: true });
       }
     };
