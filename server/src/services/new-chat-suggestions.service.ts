@@ -216,11 +216,32 @@ export const getNewChatSuggestions = async (
   // Try to get from cache first
   const cached = await getCachedSuggestions(userId);
   if (cached) {
+    // Check if cached suggestions are the default ones
+    const isDefaultCached =
+      cached.length === DEFAULT_NEW_USER_SUGGESTIONS.length &&
+      cached.every((s, i) => s === DEFAULT_NEW_USER_SUGGESTIONS[i]);
+
+    // If we have default cached but user has conversations, regenerate
+    if (isDefaultCached) {
+      try {
+        const conversationsResult = await getUserConversations(userId, 1, 1);
+        const hasConversations = conversationsResult.conversations.length > 0;
+
+        if (hasConversations) {
+          // User has conversations but only default suggestions cached
+          // Generate personalized ones
+          return generateAndCacheSuggestions(userId);
+        }
+      } catch (err) {
+        // If error checking conversations, return cached defaults
+        return cached;
+      }
+    }
+
     return cached;
   }
 
-  // Cache miss - Return default suggestions for new users instead of empty array
-  // This ensures users always see helpful prompts on the new chat screen
-  // Generation should only occur when user explicitly clicks "+ New Chat" button (forceRegenerate = true)
-  return DEFAULT_NEW_USER_SUGGESTIONS;
+  // Cache miss - Generate personalized suggestions for existing users
+  // Only return defaults if generation fails
+  return generateAndCacheSuggestions(userId);
 };

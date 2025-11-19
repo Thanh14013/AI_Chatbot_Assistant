@@ -609,7 +609,18 @@ const ChatPage: React.FC = () => {
   useEffect(() => {
     if (user?.id) {
       const cached = loadCachedSuggestions(user.id);
-      setNewChatSuggestions(cached);
+      // If cached suggestions are the default ones, don't use them
+      // This prevents multiple users from seeing identical defaults
+      const isDefaultSuggestions =
+        cached.length === DEFAULT_NEW_CHAT_SUGGESTIONS.length &&
+        cached.every((s, i) => s === DEFAULT_NEW_CHAT_SUGGESTIONS[i]);
+
+      if (!isDefaultSuggestions) {
+        setNewChatSuggestions(cached);
+      } else {
+        // Don't show defaults, let the background fetch generate personalized ones
+        setNewChatSuggestions([]);
+      }
     } else {
       // If no user, show default suggestions
       setNewChatSuggestions(DEFAULT_NEW_CHAT_SUGGESTIONS);
@@ -1478,8 +1489,20 @@ const ChatPage: React.FC = () => {
       return;
     }
 
-    // Fetch fresh suggestions in background (don't clear cached ones)
-    fetchNewChatSuggestions(false);
+    // Check if we have cached suggestions
+    const cached = loadCachedSuggestions(user.id);
+    const isDefaultOrEmpty =
+      cached.length === 0 ||
+      (cached.length === DEFAULT_NEW_CHAT_SUGGESTIONS.length &&
+        cached.every((s, i) => s === DEFAULT_NEW_CHAT_SUGGESTIONS[i]));
+
+    // If we only have defaults or no cache, force regenerate once
+    if (isDefaultOrEmpty) {
+      fetchNewChatSuggestions(true); // Force generation for personalized suggestions
+    } else {
+      // Otherwise fetch in background (respects server cache)
+      fetchNewChatSuggestions(false);
+    }
 
     // Then refresh every 5 minutes in background
     const intervalId = setInterval(() => {
