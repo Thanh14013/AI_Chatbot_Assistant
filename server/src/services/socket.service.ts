@@ -704,12 +704,13 @@ export const initializeSocketIO = (
                       update: { title: smartTitle },
                     });
 
-                  if (process.env.NODE_ENV !== "production") {
-                    console.log("[Auto-title] ✅ Title updated and broadcast:", {
-                      conversationId,
-                      title: smartTitle,
-                      userId: socket.userId,
-                    });
+                    if (process.env.NODE_ENV !== "production") {
+                      console.log("[Auto-title] ✅ Title updated and broadcast:", {
+                        conversationId,
+                        title: smartTitle,
+                        userId: socket.userId,
+                      });
+                    }
                   }
                 } catch (err) {
                   // Silent fail - auto-titling is not critical

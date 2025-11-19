@@ -375,6 +375,42 @@ export const initializeSocketIO = (httpServer) => {
                             totalTokens: result.conversation.total_tokens_used,
                         });
                     }
+                    if (result.conversation) {
+                        const currentTitle = result.conversation.title || "";
+                        const trimmedTitle = currentTitle.trim();
+                        const messageCount = result.conversation.message_count;
+                        const isDefaultTitle = trimmedTitle === "" ||
+                            trimmedTitle === "New Chat" ||
+                            trimmedTitle === "New Conversation";
+                        const shouldAutoTitle = messageCount === 2 && isDefaultTitle;
+                        if (shouldAutoTitle) {
+                            setImmediate(async () => {
+                                try {
+                                    const { generateConversationTitle, updateConversation } = await import("./conversation.service.js");
+                                    const smartTitle = await generateConversationTitle(content, assistantContent || result.assistantMessage?.content || "");
+                                    if (smartTitle && smartTitle.trim() !== "") {
+                                        await updateConversation(conversationId, socket.userId, {
+                                            title: smartTitle,
+                                        });
+                                        broadcastToUser(socket.userId, "conversation:updated", {
+                                            conversationId,
+                                            update: { title: smartTitle },
+                                        });
+                                        if (process.env.NODE_ENV !== "production") {
+                                            console.log("[Auto-title] ✅ Title updated and broadcast:", {
+                                                conversationId,
+                                                title: smartTitle,
+                                                userId: socket.userId,
+                                            });
+                                        }
+                                    }
+                                }
+                                catch (err) {
+                                    console.error("[Auto-title] Failed to generate title:", err);
+                                }
+                            });
+                        }
+                    }
                 }
                 catch (streamErr) {
                     io.to(`conversation:${conversationId}`).emit("error", {

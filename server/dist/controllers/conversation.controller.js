@@ -20,13 +20,7 @@ export const create = async (req, res) => {
             return;
         }
         const { title, model, context_window, tags, project_id } = req.body;
-        if (!title || title.trim().length === 0) {
-            res.status(400).json({
-                success: false,
-                message: "Conversation title is required",
-            });
-            return;
-        }
+        const conversationTitle = title && title.trim().length > 0 ? title.trim() : "New Chat";
         let validatedTags = undefined;
         if (tags !== undefined) {
             const tagValidation = validateAndNormalizeTags(tags);
@@ -42,8 +36,8 @@ export const create = async (req, res) => {
         }
         const conversationData = {
             user_id: userId,
-            title: title.trim(),
-            model: model || "GPT-5 mini",
+            title: conversationTitle,
+            model: model || "gpt-4o-mini",
             context_window: context_window || 10,
             tags: validatedTags || [],
             ...(project_id && { project_id }),

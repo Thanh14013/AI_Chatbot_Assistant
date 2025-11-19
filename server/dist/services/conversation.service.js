@@ -10,19 +10,21 @@ export const createConversation = async (data) => {
         throw new Error("User ID and title are required");
     }
     const conversation = await sequelize.transaction(async (t) => {
-        const existing = await Conversation.findOne({
-            where: {
-                user_id: data.user_id,
-                title: data.title,
-                deleted_at: null,
-            },
-            transaction: t,
-            lock: true,
-        });
-        if (existing) {
-            const timeDiff = Date.now() - new Date(existing.createdAt).getTime();
-            if (timeDiff < 5000) {
-                return existing;
+        if (data.title !== "New Chat") {
+            const existing = await Conversation.findOne({
+                where: {
+                    user_id: data.user_id,
+                    title: data.title,
+                    deleted_at: null,
+                },
+                transaction: t,
+                lock: true,
+            });
+            if (existing) {
+                const timeDiff = Date.now() - new Date(existing.createdAt).getTime();
+                if (timeDiff < 5000) {
+                    return existing;
+                }
             }
         }
         const tags = sanitizeTags(data.tags || []);
@@ -252,7 +254,7 @@ Assistant: ${assistantMessage.substring(0, 200)}
 
 Title:`;
         const response = await openai.chat.completions.create({
-            model: "gpt-4.1-mini",
+            model: "gpt-4o-mini",
             messages: [
                 {
                     role: "system",

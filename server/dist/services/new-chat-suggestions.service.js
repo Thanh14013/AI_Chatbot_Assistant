@@ -9,6 +9,9 @@ const DEFAULT_NEW_USER_SUGGESTIONS = [
     "Tạo một kế hoạch học tập để thành thạo React trong 3 tháng",
 ];
 const getCacheKey = (userId) => {
+    if (!userId || typeof userId !== "string" || userId.trim() === "") {
+        throw new Error("Invalid userId: cannot generate cache key without valid userId");
+    }
     return `user:${userId}:new_chat_suggestions`;
 };
 export const getCachedSuggestions = async (userId) => {
@@ -124,5 +127,5 @@ export const getNewChatSuggestions = async (userId, forceRegenerate = false) => 
     if (cached) {
         return cached;
     }
-    return [];
+    return DEFAULT_NEW_USER_SUGGESTIONS;
 };

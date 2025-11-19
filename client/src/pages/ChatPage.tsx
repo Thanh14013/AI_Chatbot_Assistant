@@ -52,9 +52,9 @@ const { Title } = Typography;
  * LocalStorage key prefix for cached new chat suggestions (per user)
  */
 const NEW_CHAT_SUGGESTIONS_CACHE_KEY_PREFIX = "newChatSuggestionsCache";
-const getCacheKey = (userId: string | undefined) =>
+const getCacheKey = (userId: string | number | undefined) =>
   userId
-    ? `${NEW_CHAT_SUGGESTIONS_CACHE_KEY_PREFIX}_${userId}`
+    ? `${NEW_CHAT_SUGGESTIONS_CACHE_KEY_PREFIX}_${String(userId)}`
     : NEW_CHAT_SUGGESTIONS_CACHE_KEY_PREFIX;
 
 /**
@@ -69,7 +69,9 @@ const DEFAULT_NEW_CHAT_SUGGESTIONS = [
 /**
  * Helper function to load cached suggestions from localStorage
  */
-const loadCachedSuggestions = (userId: string | undefined): string[] => {
+const loadCachedSuggestions = (
+  userId: string | number | undefined
+): string[] => {
   try {
     const cached = localStorage.getItem(getCacheKey(userId));
     if (cached) {
@@ -92,7 +94,7 @@ const loadCachedSuggestions = (userId: string | undefined): string[] => {
  */
 const saveSuggestionsToCache = (
   suggestions: string[],
-  userId: string | undefined
+  userId: string | number | undefined
 ): void => {
   try {
     if (!userId) {
@@ -1531,9 +1533,7 @@ const ChatPage: React.FC = () => {
       ) {
         setIsLoadingNewChatSuggestions(false);
         // Show default suggestions for new users if server returns empty
-        setNewChatSuggestions(
-          suggestions.length > 0 ? suggestions : DEFAULT_NEW_CHAT_SUGGESTIONS
-        );
+        setNewChatSuggestions(DEFAULT_NEW_CHAT_SUGGESTIONS);
       }
     };
 

@@ -1,5 +1,8 @@
 import { registerUser, loginUser, refreshAccessToken, logoutUser, } from "../services/auth.service.js";
 import User from "../models/user.model.js";
+import { clearCachedSuggestions } from "../services/new-chat-suggestions.service.js";
+import { clearUserProfile } from "../services/memory.service.js";
+import jwt from "jsonwebtoken";
 export const register = async (req, res) => {
     try {
         const { name, email, password, confirmPassword } = req.body;
@@ -121,7 +124,21 @@ export const logout = async (req, res) => {
             res.status(200).json({ success: true, message: "Logout successful" });
             return;
         }
+        let userId = null;
+        try {
+            const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || "refresh_secret");
+            userId = decoded?.id || null;
+        }
+        catch (err) {
+        }
         await logoutUser(refreshToken);
+        if (userId) {
+            try {
+                await Promise.all([clearCachedSuggestions(userId), clearUserProfile(userId)]);
+            }
+            catch (cacheErr) {
+            }
+        }
         res.clearCookie("refreshToken", cookieOptions);
         res.status(200).json({ success: true, message: "Logout successful" });
     }

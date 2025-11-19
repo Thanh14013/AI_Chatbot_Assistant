@@ -28,7 +28,7 @@ export async function testOpenAIConnection() {
     }
     try {
         const response = await openai.chat.completions.create({
-            model: "gpt-4.1-mini",
+            model: "gpt-4o-mini",
             messages: [{ role: "user", content: "Hello, can you hear me?" }],
         });
         const text = response?.choices?.[0]?.message?.content;
@@ -285,6 +285,6 @@ export function selectModelForContent(hasImages) {
     if (hasImages) {
         return "gpt-4o";
     }
-    return "GPT-5 mini";
+    return "gpt-4o-mini";
 }
 export default openai;
