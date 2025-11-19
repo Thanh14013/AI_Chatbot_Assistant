@@ -9,6 +9,7 @@ import { useAuthContext } from "./useAuthContext";
 import type { LoginRequest, RegisterRequest } from "../types";
 import * as authService from "../services/auth.service";
 import { tokenRefreshService } from "../services/token-refresh.service";
+import { websocketService } from "../services/websocket.service";
 
 /**
  * Custom hook for authentication operations
@@ -39,6 +40,14 @@ export const useAuth = () => {
 
           // 🔥 CRITICAL FIX: Start token refresh monitor on login
           tokenRefreshService.start();
+
+          // 🔥 CRITICAL FIX: Reconnect WebSocket with new token
+          // Wait longer for cookie to be set by browser before reconnecting
+          // Cookie needs time to be processed from Set-Cookie header
+          websocketService.disconnect();
+          setTimeout(() => {
+            websocketService.connect();
+          }, 500); // Increased from 100ms to 500ms to ensure cookie is set
 
           navigate("/"); // Redirect to home after login
         }
@@ -89,6 +98,9 @@ export const useAuth = () => {
       // 🔥 CRITICAL FIX: Stop token refresh monitor on logout
       tokenRefreshService.stop();
 
+      // 🔥 CRITICAL FIX: Disconnect WebSocket before logout
+      websocketService.disconnect();
+
       await authService.logout();
       setUser(null);
       setAuthenticated(false);
@@ -96,6 +108,7 @@ export const useAuth = () => {
     } catch {
       // Even if API call fails, clear local state
       tokenRefreshService.stop();
+      websocketService.disconnect();
       setUser(null);
       setAuthenticated(false);
       navigate("/login");
