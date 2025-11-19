@@ -227,7 +227,7 @@ export const SidebarProvider: React.FC<SidebarProviderProps> = ({
       const conversation = state.conversations.get(conversationId);
 
       if (!conversation) {
-        console.warn(`Conversation ${conversationId} not found for move`);
+        // Conversation not found, skip move
         return transactionId;
       }
 

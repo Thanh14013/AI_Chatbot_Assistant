@@ -704,6 +704,7 @@ export const initializeSocketIO = (
                       update: { title: smartTitle },
                     });
 
+                  if (process.env.NODE_ENV !== "production") {
                     console.log("[Auto-title] ✅ Title updated and broadcast:", {
                       conversationId,
                       title: smartTitle,

@@ -681,7 +681,9 @@ const ChatPage: React.FC = () => {
     const loadConversation = async (convId: string) => {
       // CRITICAL: Validate conversation ID
       if (!convId || typeof convId !== "string" || convId.trim() === "") {
-        console.warn("[ChatPage] Invalid conversation ID:", convId);
+        if (import.meta.env.DEV) {
+          console.warn("[ChatPage] Invalid conversation ID:", convId);
+        }
         setCurrentConversation(null);
         setMessages([]);
         loadingConversationRef.current = null;

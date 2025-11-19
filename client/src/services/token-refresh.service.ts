@@ -53,7 +53,9 @@ class TokenRefreshService {
    * Start monitoring token expiry
    */
   start(): void {
-    console.log("[TokenRefresh] Starting monitor...");
+    if (import.meta.env.DEV) {
+      console.log("[TokenRefresh] Starting monitor...");
+    }
     this.stop(); // Clear any existing timer
     this.scheduleNextRefresh();
 
@@ -65,7 +67,9 @@ class TokenRefreshService {
    * Stop monitoring
    */
   stop(): void {
-    console.log("[TokenRefresh] Stopping monitor...");
+    if (import.meta.env.DEV) {
+      console.log("[TokenRefresh] Stopping monitor...");
+    }
     if (this.refreshTimer) {
       clearTimeout(this.refreshTimer);
       this.refreshTimer = null;
@@ -78,9 +82,11 @@ class TokenRefreshService {
    */
   private handleStorageChange = (event: StorageEvent): void => {
     if (event.key === "access_token" && event.newValue) {
-      console.log(
-        "[TokenRefresh] Token updated in another tab, rescheduling..."
-      );
+      if (import.meta.env.DEV) {
+        console.log(
+          "[TokenRefresh] Token updated in another tab, rescheduling..."
+        );
+      }
       this.scheduleNextRefresh();
     }
   };
@@ -92,13 +98,17 @@ class TokenRefreshService {
   private getRefreshDelay(): number {
     const token = getAccessToken();
     if (!token) {
-      console.log("[TokenRefresh] No token found");
+      if (import.meta.env.DEV) {
+        console.log("[TokenRefresh] No token found");
+      }
       return -1;
     }
 
     const expiry = getTokenExpiry(token);
     if (!expiry) {
-      console.log("[TokenRefresh] Cannot decode token expiry");
+      if (import.meta.env.DEV) {
+        console.log("[TokenRefresh] Cannot decode token expiry");
+      }
       return -1;
     }
 
@@ -109,19 +119,23 @@ class TokenRefreshService {
     const refreshBuffer = 2 * 60 * 1000; // 2 minutes in ms
     const delay = expiryTime - now - refreshBuffer;
 
-    console.log(
-      "[TokenRefresh] Token expires at:",
-      expiry.toLocaleTimeString()
-    );
-    console.log(
-      "[TokenRefresh] Will refresh in:",
-      Math.round(delay / 1000),
-      "seconds"
-    );
+    if (import.meta.env.DEV) {
+      console.log(
+        "[TokenRefresh] Token expires at:",
+        expiry.toLocaleTimeString()
+      );
+      console.log(
+        "[TokenRefresh] Will refresh in:",
+        Math.round(delay / 1000),
+        "seconds"
+      );
+    }
 
     // If token expires in less than 1 minute, refresh immediately
     if (delay < 60 * 1000) {
-      console.log("[TokenRefresh] Token expiring soon, refresh now");
+      if (import.meta.env.DEV) {
+        console.log("[TokenRefresh] Token expiring soon, refresh now");
+      }
       return 0;
     }
 
@@ -142,7 +156,9 @@ class TokenRefreshService {
 
     if (delay < 0) {
       // No valid token, stop monitoring
-      console.log("[TokenRefresh] Invalid token, stopping monitor");
+      if (import.meta.env.DEV) {
+        console.log("[TokenRefresh] Invalid token, stopping monitor");
+      }
       return;
     }
 
@@ -151,11 +167,13 @@ class TokenRefreshService {
       this.performRefresh();
     }, Math.max(delay, 0));
 
-    console.log(
-      "[TokenRefresh] Next refresh scheduled in",
-      Math.round(delay / 1000),
-      "seconds"
-    );
+    if (import.meta.env.DEV) {
+      console.log(
+        "[TokenRefresh] Next refresh scheduled in",
+        Math.round(delay / 1000),
+        "seconds"
+      );
+    }
   }
 
   /**
@@ -163,18 +181,24 @@ class TokenRefreshService {
    */
   private async performRefresh(): Promise<void> {
     if (this.isRefreshing) {
-      console.log("[TokenRefresh] Already refreshing, skip");
+      if (import.meta.env.DEV) {
+        console.log("[TokenRefresh] Already refreshing, skip");
+      }
       return;
     }
 
     // Check if token is actually expired or close to expiration
     const token = getAccessToken();
     if (!token || isTokenExpired(token, 120)) {
-      console.log(
-        "[TokenRefresh] Token expired or expiring soon, refreshing..."
-      );
+      if (import.meta.env.DEV) {
+        console.log(
+          "[TokenRefresh] Token expired or expiring soon, refreshing..."
+        );
+      }
     } else {
-      console.log("[TokenRefresh] Token still valid, rescheduling...");
+      if (import.meta.env.DEV) {
+        console.log("[TokenRefresh] Token still valid, rescheduling...");
+      }
       this.scheduleNextRefresh();
       return;
     }
@@ -185,7 +209,9 @@ class TokenRefreshService {
       const baseURL = this.getBackendURL();
       const refreshUrl = `${baseURL}/auth/refresh`;
 
-      console.log("[TokenRefresh] Calling refresh endpoint:", refreshUrl);
+      if (import.meta.env.DEV) {
+        console.log("[TokenRefresh] Calling refresh endpoint:", refreshUrl);
+      }
 
       const response = await axios.post<RefreshTokenResponse>(
         refreshUrl,
@@ -206,7 +232,9 @@ class TokenRefreshService {
       ) {
         const { accessToken } = response.data.data;
 
-        console.log("[TokenRefresh] ✅ Token refreshed successfully");
+        if (import.meta.env.DEV) {
+          console.log("[TokenRefresh] ✅ Token refreshed successfully");
+        }
 
         // Update token
         setAccessToken(accessToken);
@@ -219,10 +247,12 @@ class TokenRefreshService {
           const { websocketService } = await import("./websocket.service");
           websocketService.updateToken();
         } catch (wsError) {
-          console.warn(
-            "[TokenRefresh] WebSocket token update failed:",
-            wsError
-          );
+          if (import.meta.env.DEV) {
+            console.warn(
+              "[TokenRefresh] WebSocket token update failed:",
+              wsError
+            );
+          }
         }
 
         // Dispatch event for other components
@@ -254,9 +284,11 @@ class TokenRefreshService {
         responseStatus === 403 ||
         this.refreshAttempts >= this.maxRefreshAttempts
       ) {
-        console.error(
-          "[TokenRefresh] Refresh token expired or max attempts reached, logging out"
-        );
+        if (import.meta.env.DEV) {
+          console.error(
+            "[TokenRefresh] Refresh token expired or max attempts reached, logging out"
+          );
+        }
 
         clearTokens();
         this.stop();
@@ -265,7 +297,9 @@ class TokenRefreshService {
         window.location.href = "/login";
       } else {
         // Retry after 10 seconds
-        console.log("[TokenRefresh] Retrying in 10 seconds...");
+        if (import.meta.env.DEV) {
+          console.log("[TokenRefresh] Retrying in 10 seconds...");
+        }
         this.refreshTimer = setTimeout(() => {
           this.performRefresh();
         }, 10000);

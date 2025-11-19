@@ -82,15 +82,18 @@ axiosInstance.interceptors.request.use(
     if (import.meta.env.DEV && token) {
       const expired = isTokenExpired(token);
       const expiry = getTokenExpiry(token);
-      console.log("[Axios Request] Token state:", {
-        url: config.url,
-        hasToken: !!token,
-        expired,
-        expiresAt: expiry?.toISOString(),
-        timeUntilExpiry: expiry
-          ? Math.round((expiry.getTime() - Date.now()) / 1000) + "s"
-          : "N/A",
-      });
+      // Development logging only
+      if (import.meta.env.DEV) {
+        console.log("[Axios Request] Token state:", {
+          url: config.url,
+          hasToken: !!token,
+          expired,
+          expiresAt: expiry?.toISOString(),
+          timeUntilExpiry: expiry
+            ? Math.round((expiry.getTime() - Date.now()) / 1000) + "s"
+            : "N/A",
+        });
+      }
     }
 
     // Attach token to Authorization header if available
