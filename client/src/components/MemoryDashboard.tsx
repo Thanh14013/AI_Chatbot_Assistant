@@ -56,20 +56,28 @@ export const MemoryDashboard: React.FC<MemoryDashboardProps> = ({
   const loadMemoryData = async () => {
     try {
       setLoading(true);
+      // Reset state before loading to ensure clean slate
+      setProfile(null);
+      setStats(null);
 
       const [profileRes, statsRes] = await Promise.all([
         getMemoryProfile(),
         getMemoryStats(),
       ]);
 
-      if (profileRes.success && profileRes.data) {
-        setProfile(profileRes.data);
+      // Always set the state, even if null
+      if (profileRes.success) {
+        setProfile(profileRes.data || null);
       }
 
-      if (statsRes.success && statsRes.data) {
-        setStats(statsRes.data);
+      if (statsRes.success) {
+        setStats(statsRes.data || null);
       }
     } catch (error: any) {
+      // Reset state on error to show empty state
+      setProfile(null);
+      setStats(null);
+
       // Check if it's an authentication error
       if (error?.response?.status === 401) {
         message.error("Session expired. Please login again.");
@@ -87,6 +95,10 @@ export const MemoryDashboard: React.FC<MemoryDashboardProps> = ({
   useEffect(() => {
     if (visible) {
       loadMemoryData();
+    } else {
+      // Reset state when modal closes to ensure clean state on next open
+      setProfile(null);
+      setStats(null);
     }
   }, [visible]);
 
