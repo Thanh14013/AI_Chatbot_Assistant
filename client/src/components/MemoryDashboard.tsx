@@ -258,7 +258,17 @@ export const MemoryDashboard: React.FC<MemoryDashboardProps> = ({
                 )}
             </>
           ) : (
-            <Empty description="No memory profile available" />
+            <Empty
+              description={
+                <div>
+                  <Paragraph>No memory profile available yet</Paragraph>
+                  <Text type="secondary">
+                    I'll start learning about you as we chat. Have some
+                    conversations with me to help build your memory profile!
+                  </Text>
+                </div>
+              }
+            />
           )}
         </div>
       )}

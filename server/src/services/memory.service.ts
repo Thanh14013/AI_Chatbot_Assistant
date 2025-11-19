@@ -623,11 +623,18 @@ export async function extractMemoryFromConversation(
 
       analysis = JSON.parse(content);
     } catch (parseError) {
+      if (process.env.NODE_ENV !== "production") {
+        console.error("[Memory] Failed to parse LLM response:", parseError);
+        console.error("[Memory] Raw response:", response.content);
+      }
       return { facts: {}, events: [], conversation_summary: null };
     }
 
     return analysis;
   } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.error("[Memory] Extraction failed:", error);
+    }
     return { facts: {}, events: [], conversation_summary: null };
   }
 }
@@ -1072,6 +1079,10 @@ export async function analyzeAndUpdateMemory(
     await pruneUserEvents(userId);
   } catch (error) {
     // Don't throw - this is background processing
+    // But log the error for debugging
+    if (process.env.NODE_ENV !== "production") {
+      console.error("[Memory] Background analysis failed:", error);
+    }
   }
 }
 

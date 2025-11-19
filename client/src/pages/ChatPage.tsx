@@ -158,6 +158,10 @@ const ChatPage: React.FC = () => {
   const [highlightedMessageId, setHighlightedMessageId] = useState<
     string | null
   >(null);
+  // Track highlight timeout to clear it when needed
+  const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Track processed highlight params to prevent re-processing
+  const processedHighlightRef = useRef<string | null>(null);
 
   const {
     conversations,
@@ -384,9 +388,15 @@ const ChatPage: React.FC = () => {
         // Add highlight
         setHighlightedMessageId(messageId);
 
+        // Clear any existing highlight timeout
+        if (highlightTimeoutRef.current) {
+          clearTimeout(highlightTimeoutRef.current);
+        }
+
         // Remove highlight after 3 seconds
-        setTimeout(() => {
+        highlightTimeoutRef.current = setTimeout(() => {
           setHighlightedMessageId(null);
+          highlightTimeoutRef.current = null;
         }, 3000);
 
         return true;
@@ -450,7 +460,16 @@ const ChatPage: React.FC = () => {
           } catch {}
 
           setHighlightedMessageId(messageId);
-          setTimeout(() => setHighlightedMessageId(null), 3000);
+
+          // Clear any existing highlight timeout
+          if (highlightTimeoutRef.current) {
+            clearTimeout(highlightTimeoutRef.current);
+          }
+
+          highlightTimeoutRef.current = setTimeout(() => {
+            setHighlightedMessageId(null);
+            highlightTimeoutRef.current = null;
+          }, 3000);
           return true;
         }
       }
@@ -716,6 +735,14 @@ const ChatPage: React.FC = () => {
 
       // 🔥 FIX: Clear pinned message IDs when navigating to home
       setPinnedMessageIds(new Set());
+
+      // Clear highlight state and timeout when leaving conversation
+      setHighlightedMessageId(null);
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
+        highlightTimeoutRef.current = null;
+      }
+      processedHighlightRef.current = null;
 
       return;
     }
@@ -1586,7 +1613,14 @@ const ChatPage: React.FC = () => {
     const searchParams = new URLSearchParams(location.search);
     const highlightParam = searchParams.get("highlight");
 
-    if (highlightParam && currentConversation && messages.length > 0) {
+    // Only process if we have a new highlight param that hasn't been processed yet
+    if (
+      highlightParam &&
+      currentConversation &&
+      highlightParam !== processedHighlightRef.current
+    ) {
+      // Mark as processed immediately to prevent re-processing
+      processedHighlightRef.current = highlightParam;
       // Try to find and highlight the message
       const tryHighlight = async (attemptsLeft = 6) => {
         // Give React a moment to render refs
@@ -1617,8 +1651,11 @@ const ChatPage: React.FC = () => {
       };
 
       void tryHighlight();
+    } else if (!highlightParam && processedHighlightRef.current) {
+      // Reset processed highlight when URL param is cleared
+      processedHighlightRef.current = null;
     }
-  }, [location.search, currentConversation, messages.length, messagesHasMore]);
+  }, [location.search, currentConversation]);
 
   /**
    * Process message queue sequentially to prevent race conditions
@@ -2175,6 +2212,13 @@ const ChatPage: React.FC = () => {
 
     setMessages((prev) => [...prev, userMsg]);
     setIsSendingMessage(true);
+
+    // Clear highlight state when user sends a new message
+    setHighlightedMessageId(null);
+    if (highlightTimeoutRef.current) {
+      clearTimeout(highlightTimeoutRef.current);
+      highlightTimeoutRef.current = null;
+    }
 
     const typingId = `typing_${Date.now()}`;
     const typingMsg: Message = {

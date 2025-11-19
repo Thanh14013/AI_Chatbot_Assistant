@@ -125,7 +125,21 @@ export const getNewChatSuggestions = async (userId, forceRegenerate = false) => 
     }
     const cached = await getCachedSuggestions(userId);
     if (cached) {
+        const isDefaultCached = cached.length === DEFAULT_NEW_USER_SUGGESTIONS.length &&
+            cached.every((s, i) => s === DEFAULT_NEW_USER_SUGGESTIONS[i]);
+        if (isDefaultCached) {
+            try {
+                const conversationsResult = await getUserConversations(userId, 1, 1);
+                const hasConversations = conversationsResult.conversations.length > 0;
+                if (hasConversations) {
+                    return generateAndCacheSuggestions(userId);
+                }
+            }
+            catch (err) {
+                return cached;
+            }
+        }
         return cached;
     }
-    return DEFAULT_NEW_USER_SUGGESTIONS;
+    return generateAndCacheSuggestions(userId);
 };
