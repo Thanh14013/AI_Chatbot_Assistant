@@ -57,6 +57,7 @@ export const clearTokens = (): void => {
     if (
       key &&
       (key.startsWith("newChatSuggestionsCache") ||
+        key.startsWith("user-preferences-") ||
         key.startsWith("user_") ||
         key.startsWith("preferences_") ||
         key.startsWith("settings_"))

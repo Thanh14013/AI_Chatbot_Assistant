@@ -1,6 +1,7 @@
 ﻿/**
  * User Preferences Context
  * Client-side cache for user preferences to avoid repeated API calls
+ * Cache is user-specific to prevent data leakage between accounts
  */
 
 import React, {
@@ -17,6 +18,7 @@ import {
   type UserPreference,
   type UpdateUserPreferencesInput,
 } from "../services/user-preference.service";
+import { useAuthContext } from "../hooks/useAuthContext";
 
 interface PreferencesContextType {
   // State
@@ -39,6 +41,14 @@ const PreferencesContext = createContext<PreferencesContextType | undefined>(
 // Cache duration: 5 minutes
 const CACHE_DURATION = 5 * 60 * 1000;
 
+/**
+ * Generate cache keys with userId to prevent data leakage
+ */
+const getCacheKey = (userId: string | number | undefined, suffix: string) =>
+  userId
+    ? `user-preferences-${userId}-${suffix}`
+    : `user-preferences-${suffix}`;
+
 interface PreferencesProviderProps {
   children: ReactNode;
 }
@@ -46,15 +56,25 @@ interface PreferencesProviderProps {
 export const PreferencesProvider: React.FC<PreferencesProviderProps> = ({
   children,
 }) => {
+  const { user } = useAuthContext();
   const [preferences, setPreferences] = useState<UserPreference | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastFetched, setLastFetched] = useState<number | null>(null);
 
-  // Load from localStorage on mount
+  // Load from localStorage on mount or when user changes
   useEffect(() => {
-    const cached = localStorage.getItem("user-preferences");
-    const cachedTimestamp = localStorage.getItem("user-preferences-timestamp");
+    if (!user?.id) {
+      // No user, clear preferences
+      setPreferences(null);
+      setLastFetched(null);
+      return;
+    }
+
+    const cached = localStorage.getItem(getCacheKey(user.id, "data"));
+    const cachedTimestamp = localStorage.getItem(
+      getCacheKey(user.id, "timestamp")
+    );
 
     if (cached && cachedTimestamp) {
       const timestamp = parseInt(cachedTimestamp, 10);
@@ -67,29 +87,32 @@ export const PreferencesProvider: React.FC<PreferencesProviderProps> = ({
           setPreferences(parsedPreferences);
           setLastFetched(timestamp);
         } catch (err) {
-          localStorage.removeItem("user-preferences");
-          localStorage.removeItem("user-preferences-timestamp");
+          localStorage.removeItem(getCacheKey(user.id, "data"));
+          localStorage.removeItem(getCacheKey(user.id, "timestamp"));
         }
       } else {
         // Cache expired
-        localStorage.removeItem("user-preferences");
-        localStorage.removeItem("user-preferences-timestamp");
+        localStorage.removeItem(getCacheKey(user.id, "data"));
+        localStorage.removeItem(getCacheKey(user.id, "timestamp"));
       }
     }
-  }, []);
+  }, [user?.id]);
 
   // Save to localStorage when preferences change
   useEffect(() => {
-    if (preferences) {
-      localStorage.setItem("user-preferences", JSON.stringify(preferences));
+    if (preferences && user?.id) {
+      localStorage.setItem(
+        getCacheKey(user.id, "data"),
+        JSON.stringify(preferences)
+      );
       if (lastFetched) {
         localStorage.setItem(
-          "user-preferences-timestamp",
+          getCacheKey(user.id, "timestamp"),
           lastFetched.toString()
         );
       }
     }
-  }, [preferences, lastFetched]);
+  }, [preferences, lastFetched, user?.id]);
 
   // Check if should refetch
   const shouldRefetch = useCallback(() => {
@@ -158,8 +181,16 @@ export const PreferencesProvider: React.FC<PreferencesProviderProps> = ({
     setPreferences(null);
     setLastFetched(null);
     setError(null);
-    localStorage.removeItem("user-preferences");
-    localStorage.removeItem("user-preferences-timestamp");
+
+    // Clear all user-preferences cache entries (for all users)
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("user-preferences-")) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
   }, []);
 
   const value: PreferencesContextType = {
