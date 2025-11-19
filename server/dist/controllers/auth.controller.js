@@ -61,11 +61,17 @@ export const login = async (req, res) => {
         const cookieOptions = {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
+            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
             path: "/",
             maxAge: 7 * 24 * 60 * 60 * 1000,
         };
         res.cookie("refreshToken", result.refreshToken, cookieOptions);
+        if (process.env.NODE_ENV !== "production") {
+            console.log("[Login] Set refreshToken cookie:", {
+                cookieOptions,
+                hasRefreshToken: !!result.refreshToken,
+            });
+        }
         res.status(200).json({
             success: true,
             message: "Login successful",
@@ -116,7 +122,7 @@ export const logout = async (req, res) => {
         const cookieOptions = {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
+            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
             path: "/",
         };
         if (!refreshToken) {
@@ -146,7 +152,7 @@ export const logout = async (req, res) => {
         res.clearCookie("refreshToken", {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
+            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
             path: "/",
         });
         const errorMessage = error instanceof Error ? error.message : "Logout failed";

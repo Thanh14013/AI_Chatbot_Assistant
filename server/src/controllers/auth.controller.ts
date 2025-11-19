@@ -109,12 +109,19 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax" as const,
+      sameSite: process.env.NODE_ENV === "production" ? ("none" as const) : ("lax" as const), // 'none' for cross-domain in production
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     };
 
     res.cookie("refreshToken", result.refreshToken, cookieOptions);
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[Login] Set refreshToken cookie:", {
+        cookieOptions,
+        hasRefreshToken: !!result.refreshToken,
+      });
+    }
 
     res.status(200).json({
       success: true,
@@ -194,7 +201,7 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
     const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax" as const,
+      sameSite: process.env.NODE_ENV === "production" ? ("none" as const) : ("lax" as const),
       path: "/",
     };
 
@@ -236,7 +243,7 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
     res.clearCookie("refreshToken", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax" as const,
+      sameSite: process.env.NODE_ENV === "production" ? ("none" as const) : ("lax" as const),
       path: "/",
     });
 
