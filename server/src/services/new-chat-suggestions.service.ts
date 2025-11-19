@@ -28,8 +28,12 @@ const DEFAULT_NEW_USER_SUGGESTIONS = [
 
 /**
  * Generate cache key for user's new chat suggestions
+ * @throws Error if userId is invalid (null, undefined, empty, or not a string)
  */
 const getCacheKey = (userId: string): string => {
+  if (!userId || typeof userId !== "string" || userId.trim() === "") {
+    throw new Error("Invalid userId: cannot generate cache key without valid userId");
+  }
   return `user:${userId}:new_chat_suggestions`;
 };
 
@@ -215,12 +219,8 @@ export const getNewChatSuggestions = async (
     return cached;
   }
 
-  // Cache miss - DO NOT auto-generate here. Generation should only occur when
-  // the user explicitly requests it (forceRegenerate = true), e.g. by clicking
-  // the "+ New Chat" button. This prevents unexpected AI calls on mount.
-
-  // Return empty list to indicate no cached suggestions available. The client
-  // will show defaults for brand-new users (handled above) or an empty state
-  // and can trigger generation when the user clicks the New Chat button.
-  return [];
+  // Cache miss - Return default suggestions for new users instead of empty array
+  // This ensures users always see helpful prompts on the new chat screen
+  // Generation should only occur when user explicitly clicks "+ New Chat" button (forceRegenerate = true)
+  return DEFAULT_NEW_USER_SUGGESTIONS;
 };

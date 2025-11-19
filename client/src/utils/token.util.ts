@@ -43,10 +43,28 @@ export const setTokens = (
 };
 
 /**
- * Clear stored tokens. This only clears the access token; the server-side refresh cookie must be cleared by calling the logout endpoint.
+ * Clear stored tokens and user-specific cached data.
+ * This clears the access token and all user-specific cache entries.
+ * The server-side refresh cookie must be cleared by calling the logout endpoint.
  */
 export const clearTokens = (): void => {
   removeAccessToken();
+
+  // Clear all user-specific cached data to prevent data leakage between users
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (
+      key &&
+      (key.startsWith("newChatSuggestionsCache") ||
+        key.startsWith("user_") ||
+        key.startsWith("preferences_") ||
+        key.startsWith("settings_"))
+    ) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach((key) => localStorage.removeItem(key));
 };
 
 /**

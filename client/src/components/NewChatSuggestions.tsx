@@ -33,6 +33,7 @@ const NewChatSuggestions: React.FC<NewChatSuggestionsProps> = ({
   }
 
   if (!suggestions || suggestions.length === 0) {
+    // Don't show anything if truly empty (will show default suggestions from parent)
     return null;
   }
 

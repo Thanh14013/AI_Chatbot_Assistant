@@ -49,16 +49,29 @@ const { Content } = Layout;
 const { Title } = Typography;
 
 /**
- * LocalStorage key for cached new chat suggestions
+ * LocalStorage key prefix for cached new chat suggestions (per user)
  */
-const NEW_CHAT_SUGGESTIONS_CACHE_KEY = "newChatSuggestionsCache";
+const NEW_CHAT_SUGGESTIONS_CACHE_KEY_PREFIX = "newChatSuggestionsCache";
+const getCacheKey = (userId: string | undefined) =>
+  userId
+    ? `${NEW_CHAT_SUGGESTIONS_CACHE_KEY_PREFIX}_${userId}`
+    : NEW_CHAT_SUGGESTIONS_CACHE_KEY_PREFIX;
+
+/**
+ * Default suggestions for new users with no conversations
+ */
+const DEFAULT_NEW_CHAT_SUGGESTIONS = [
+  "What can you help me with today?",
+  "Tell me about your capabilities",
+  "How can I get started?",
+];
 
 /**
  * Helper function to load cached suggestions from localStorage
  */
-const loadCachedSuggestions = (): string[] => {
+const loadCachedSuggestions = (userId: string | undefined): string[] => {
   try {
-    const cached = localStorage.getItem(NEW_CHAT_SUGGESTIONS_CACHE_KEY);
+    const cached = localStorage.getItem(getCacheKey(userId));
     if (cached) {
       const parsed = JSON.parse(cached);
       if (Array.isArray(parsed) && parsed.length > 0) {
@@ -68,18 +81,25 @@ const loadCachedSuggestions = (): string[] => {
   } catch (err) {
     console.error("[Cache] Failed to load cached suggestions:", err);
   }
-  return [];
+  // Return default suggestions for new users
+  return DEFAULT_NEW_CHAT_SUGGESTIONS;
 };
 
 /**
  * Helper function to save suggestions to localStorage
+ * @param suggestions - Array of suggestion strings
+ * @param userId - User ID for cache key generation
  */
-const saveSuggestionsToCache = (suggestions: string[]): void => {
+const saveSuggestionsToCache = (
+  suggestions: string[],
+  userId: string | undefined
+): void => {
   try {
-    localStorage.setItem(
-      NEW_CHAT_SUGGESTIONS_CACHE_KEY,
-      JSON.stringify(suggestions)
-    );
+    if (!userId) {
+      console.warn("[Cache] Cannot save suggestions without userId");
+      return;
+    }
+    localStorage.setItem(getCacheKey(userId), JSON.stringify(suggestions));
   } catch (err) {
     console.error("[Cache] Failed to save suggestions to cache:", err);
   }
@@ -207,10 +227,8 @@ const ChatPage: React.FC = () => {
   ] = useState(false);
 
   // New Chat suggestions state (for empty chat screen)
-  // Initialize with cached suggestions for instant display
-  const [newChatSuggestions, setNewChatSuggestions] = useState<string[]>(
-    loadCachedSuggestions()
-  );
+  // Initialize with empty array, will be loaded in useEffect when user is available
+  const [newChatSuggestions, setNewChatSuggestions] = useState<string[]>([]);
   const [isLoadingNewChatSuggestions, setIsLoadingNewChatSuggestions] =
     useState(false);
 
@@ -584,6 +602,17 @@ const ChatPage: React.FC = () => {
   useEffect(() => {
     fetchPreferences().catch((err) => {});
   }, [fetchPreferences]);
+
+  // Load cached suggestions when user changes (for account switching)
+  useEffect(() => {
+    if (user?.id) {
+      const cached = loadCachedSuggestions(user.id);
+      setNewChatSuggestions(cached);
+    } else {
+      // If no user, show default suggestions
+      setNewChatSuggestions(DEFAULT_NEW_CHAT_SUGGESTIONS);
+    }
+  }, [user?.id]);
 
   // Cleanup effect to prevent memory leaks
   useEffect(() => {
@@ -1483,7 +1512,7 @@ const ChatPage: React.FC = () => {
         setIsLoadingNewChatSuggestions(false);
 
         // CRITICAL: Cache suggestions for instant display on next visit
-        saveSuggestionsToCache(suggestions);
+        saveSuggestionsToCache(suggestions, user?.id);
       }
     };
 
@@ -1501,7 +1530,10 @@ const ChatPage: React.FC = () => {
         conversationId === "new_chat_suggestions"
       ) {
         setIsLoadingNewChatSuggestions(false);
-        setNewChatSuggestions([]);
+        // Show default suggestions for new users if server returns empty
+        setNewChatSuggestions(
+          suggestions.length > 0 ? suggestions : DEFAULT_NEW_CHAT_SUGGESTIONS
+        );
       }
     };
 

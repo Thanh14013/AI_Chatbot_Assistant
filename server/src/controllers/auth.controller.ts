@@ -12,6 +12,9 @@ import {
 } from "../services/auth.service.js";
 import User from "../models/user.model.js";
 import type { RegisterInput, LoginInput } from "../types/user.type.js";
+import { clearCachedSuggestions } from "../services/new-chat-suggestions.service.js";
+import { clearUserProfile } from "../services/memory.service.js";
+import jwt from "jsonwebtoken";
 
 /**
  * Register a new user
@@ -201,8 +204,29 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Extract userId from token to clear user-specific cache
+    let userId: string | null = null;
+    try {
+      const decoded = jwt.verify(
+        refreshToken,
+        process.env.JWT_REFRESH_SECRET || "refresh_secret"
+      ) as any;
+      userId = decoded?.id || null;
+    } catch (err) {
+      // Token might be invalid, continue with logout
+    }
+
     // Revoke the token in database
     await logoutUser(refreshToken);
+
+    // Clear user-specific Redis cache to prevent data leakage
+    if (userId) {
+      try {
+        await Promise.all([clearCachedSuggestions(userId), clearUserProfile(userId)]);
+      } catch (cacheErr) {
+        // Silent fail - cache clearing is not critical for logout
+      }
+    }
 
     // Clear cookie and respond
     res.clearCookie("refreshToken", cookieOptions);

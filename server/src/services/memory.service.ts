@@ -54,6 +54,11 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   try {
     if (!LTM_CONFIG.ENABLED) return null;
 
+    // Validate userId to prevent cache key collision
+    if (!userId || typeof userId !== "string" || userId.trim() === "") {
+      throw new Error("Invalid userId: cannot get user profile without valid userId");
+    }
+
     const profileJson = await redisClient.get(`user:${userId}:profile`);
     if (!profileJson) {
       return null;
@@ -73,6 +78,11 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 export async function updateUserProfile(userId: string, facts: Partial<UserFacts>): Promise<void> {
   try {
     if (!LTM_CONFIG.ENABLED) return;
+
+    // Validate userId to prevent cache key collision
+    if (!userId || typeof userId !== "string" || userId.trim() === "") {
+      throw new Error("Invalid userId: cannot update user profile without valid userId");
+    }
 
     // Get current profile or create new one
     const current = (await getUserProfile(userId)) || {
@@ -146,6 +156,11 @@ export async function updateUserProfile(userId: string, facts: Partial<UserFacts
  */
 export async function clearUserProfile(userId: string): Promise<void> {
   try {
+    // Validate userId to prevent cache key collision
+    if (!userId || typeof userId !== "string" || userId.trim() === "") {
+      throw new Error("Invalid userId: cannot clear user profile without valid userId");
+    }
+
     await redisClient.del(`user:${userId}:profile`);
   } catch (error) {
     throw error;
