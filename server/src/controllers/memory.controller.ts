@@ -56,7 +56,10 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    const profile = await getUserProfile(userId);
+    // Convert userId to string to ensure consistency
+    const userIdStr = String(userId);
+
+    const profile = await getUserProfile(userIdStr);
 
     // Transform profile data to match client expectations
     if (profile) {
@@ -127,7 +130,7 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
       }
 
       // Get recent topics from recent conversations
-      const recentConversations = await getRecentConversationSummaries(userId, 5);
+      const recentConversations = await getRecentConversationSummaries(userIdStr, 5);
       const recentTopics = new Set<string>();
       recentConversations.forEach((conv) => {
         if (conv.key_topics) {
@@ -194,11 +197,14 @@ export const getEvents = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Convert userId to string to ensure consistency
+    const userIdStr = String(userId);
+
     const page = parseInt(req.query.page as string) || 1;
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 100); // Max 100
     const offset = (page - 1) * limit;
 
-    const { events, total } = await getUserEvents(userId, limit, offset);
+    const { events, total } = await getUserEvents(userIdStr, limit, offset);
 
     res.status(200).json({
       success: true,
@@ -249,10 +255,13 @@ export const getSuggestions = async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    // Convert userId to string to ensure consistency
+    const userIdStr = String(userId);
+
     // Get suggestions and recent conversations in parallel
     const [suggestions, recentConversations] = await Promise.all([
-      generateChatSuggestions(userId),
-      getRecentConversationSummaries(userId, 5),
+      generateChatSuggestions(userIdStr),
+      getRecentConversationSummaries(userIdStr, 5),
     ]);
 
     // Extract recent topics
@@ -305,20 +314,23 @@ export const clearMemory = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
+    // Convert userId to string to ensure consistency
+    const userIdStr = String(userId);
+
     // Delete in parallel
     const [eventsResult, summariesResult] = await Promise.all([
       // Delete events
       sequelize.query(`DELETE FROM user_memory_events WHERE user_id = :userId`, {
-        replacements: { userId },
+        replacements: { userId: userIdStr },
       }),
       // Delete summaries
       sequelize.query(`DELETE FROM user_conversation_summary WHERE user_id = :userId`, {
-        replacements: { userId },
+        replacements: { userId: userIdStr },
       }),
     ]);
 
     // Clear Redis profile
-    await clearUserProfile(userId);
+    await clearUserProfile(userIdStr);
 
     const eventsDeleted = (eventsResult[0] as any).rowCount || 0;
     const summariesDeleted = (summariesResult[0] as any).rowCount || 0;
@@ -367,9 +379,12 @@ export const getStats = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Convert userId to string to ensure consistency
+    const userIdStr = String(userId);
+
     // Get statistics
     const [profile, eventsStats, summariesStats, topicStats, eventTypeStats] = await Promise.all([
-      getUserProfile(userId),
+      getUserProfile(userIdStr),
       sequelize.query(
         `
         SELECT 
@@ -378,7 +393,7 @@ export const getStats = async (req: Request, res: Response): Promise<void> => {
         FROM user_memory_events
         WHERE user_id = :userId
       `,
-        { replacements: { userId } }
+        { replacements: { userId: userIdStr } }
       ),
       sequelize.query(
         `
@@ -386,7 +401,7 @@ export const getStats = async (req: Request, res: Response): Promise<void> => {
         FROM user_conversation_summary
         WHERE user_id = :userId
       `,
-        { replacements: { userId } }
+        { replacements: { userId: userIdStr } }
       ),
       sequelize.query(
         `
@@ -397,7 +412,7 @@ export const getStats = async (req: Request, res: Response): Promise<void> => {
         ORDER BY count DESC
         LIMIT 10
       `,
-        { replacements: { userId } }
+        { replacements: { userId: userIdStr } }
       ),
       sequelize.query(
         `
@@ -407,7 +422,7 @@ export const getStats = async (req: Request, res: Response): Promise<void> => {
         GROUP BY event_type
         ORDER BY count DESC
       `,
-        { replacements: { userId } }
+        { replacements: { userId: userIdStr } }
       ),
     ]);
 
