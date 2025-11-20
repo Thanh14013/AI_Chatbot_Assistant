@@ -30,10 +30,11 @@
   padding: 0 16px 12px 16px;
 }
 
-/* Middle Section - Single scrollbar for all content */
+/* Middle Section - Use clip-path instead of overflow to prevent dropdown clipping */
 .middleSection {
   flex: 1;
   min-height: 0;
+  /* Use overflow but ensure dropdowns escape via portal */
   overflow-y: auto;
   overflow-x: hidden;
   background: #fff;
@@ -45,6 +46,8 @@
   scrollbar-width: none; /* Hide scrollbar for Firefox */
   -ms-overflow-style: none; /* Hide scrollbar for IE/Edge */
   will-change: padding, opacity;
+  /* Allow content to escape for dropdowns */
+  contain: none;
 }
 
 /* Hide scrollbar for Chrome/Safari */

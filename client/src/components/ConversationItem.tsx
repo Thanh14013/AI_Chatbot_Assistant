@@ -323,6 +323,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         trigger={["click"]}
         placement="bottomRight"
         getPopupContainer={() => document.body}
+        align={{ overflow: { adjustX: true, adjustY: true } }}
       >
         <div className={styles.moreButton} onClick={(e) => e.stopPropagation()}>
           <MoreOutlined />

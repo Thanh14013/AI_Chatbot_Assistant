@@ -205,6 +205,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
             menu={{ items: menuItems }}
             trigger={["click"]}
             getPopupContainer={() => document.body}
+            align={{ overflow: { adjustX: true, adjustY: true } }}
           >
             <Button
               type="text"

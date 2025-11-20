@@ -128,6 +128,11 @@ form .ant-btn:hover {
 .ant-dropdown {
   z-index: 99999 !important;
   pointer-events: auto !important;
+  /* Ensure dropdown is never clipped */
+  position: fixed !important;
+  /* Force GPU acceleration */
+  transform: translateZ(0);
+  will-change: transform, opacity;
 }
 
 /* Ensure dropdown menu items are interactive and not blocked by elements below */
@@ -137,6 +142,10 @@ form .ant-btn:hover {
   background: white !important;
   box-shadow: 0 3px 6px -4px rgba(0, 0, 0, 0.12),
     0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 9px 28px 8px rgba(0, 0, 0, 0.05) !important;
+  /* Prevent clipping */
+  position: fixed !important;
+  /* Escape any parent overflow */
+  transform: translateZ(0);
 }
 
 .ant-dropdown-menu-item,

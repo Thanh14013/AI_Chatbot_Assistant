@@ -143,6 +143,7 @@ const UserSection: React.FC<UserSectionProps> = ({
         trigger={["click"]}
         className={styles.dropdown}
         getPopupContainer={() => document.body}
+        align={{ overflow: { adjustX: true, adjustY: true } }}
       >
         {collapsed ? (
           <Tooltip
