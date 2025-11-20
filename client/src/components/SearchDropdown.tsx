@@ -48,7 +48,12 @@ const SearchDropdown: React.FC<SearchDropdownProps> = ({ value, onChange }) => {
   };
 
   return (
-    <Dropdown menu={{ items: menuItems }} trigger={["click"]}>
+    <Dropdown
+      menu={{ items: menuItems }}
+      trigger={["click"]}
+      getPopupContainer={() => document.body}
+      align={{ overflow: { adjustX: true, adjustY: true } }}
+    >
       <Button size="small" className={styles.dropdownButton}>
         {getIcon()}
         <DownOutlined className={styles.arrow} />
