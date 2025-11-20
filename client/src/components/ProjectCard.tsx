@@ -206,6 +206,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
             trigger={["click"]}
             getPopupContainer={() => document.body}
             align={{ overflow: { adjustX: true, adjustY: true } }}
+            overlayStyle={{ minWidth: 180 }}
           >
             <Button
               type="text"
