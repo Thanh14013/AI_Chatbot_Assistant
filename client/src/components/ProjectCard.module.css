@@ -2,10 +2,15 @@
   margin-bottom: 8px;
   border-radius: 8px;
   background: transparent;
+  /* Ensure project cards and their dropdowns render above conversation list */
+  position: relative;
+  z-index: 10;
 }
 
 .projectCard:hover {
   background: rgba(0, 0, 0, 0.02);
+  /* Increase z-index on hover to ensure dropdown is on top */
+  z-index: 100;
 }
 
 .projectHeader {

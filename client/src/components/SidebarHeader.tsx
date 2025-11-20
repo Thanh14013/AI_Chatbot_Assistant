@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useState, useCallback } from "react";
-import { Button, Input, Tooltip } from "antd";
+import { Button, Input } from "antd";
 import {
   PlusOutlined,
   SearchOutlined,
@@ -204,26 +204,18 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
     <div className={`${styles.header} ${collapsed ? styles.collapsed : ""}`}>
       {/* Single horizontal row with all controls */}
       <div className={styles.headerRow}>
-        {/* Toggle sidebar button (menu icon) */}
-        <Tooltip
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          placement="right"
-          getPopupContainer={(trigger) =>
-            trigger.parentElement || document.body
-          }
+        {/* Toggle sidebar button (menu icon) - No tooltip to prevent blocking clicks */}
+        <button
+          className={styles.toggleButton}
+          onClick={onToggle}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          <button
-            className={styles.toggleButton}
-            onClick={onToggle}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {collapsed ? (
-              <RightOutlined className={styles.toggleIcon} />
-            ) : (
-              <LeftOutlined className={styles.toggleIcon} />
-            )}
-          </button>
-        </Tooltip>
+          {collapsed ? (
+            <RightOutlined className={styles.toggleIcon} />
+          ) : (
+            <LeftOutlined className={styles.toggleIcon} />
+          )}
+        </button>
 
         {!collapsed && (
           <>

@@ -2,6 +2,9 @@
 .projectSection {
   margin-bottom: 8px;
   border-bottom: 1px solid #f0f0f0;
+  /* Ensure projects section renders above conversation list items */
+  position: relative;
+  z-index: 10;
 }
 
 /* Compact Header - Single line with + button only */
