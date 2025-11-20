@@ -259,7 +259,7 @@ const PinnedMessagesDropdown: React.FC<PinnedMessagesDropdownProps> = ({
       onOpenChange={setDropdownOpen}
       placement="bottomRight"
       overlayClassName={styles.pinnedMessagesDropdown}
-      getPopupContainer={(trigger) => trigger.parentElement || document.body}
+      getPopupContainer={() => document.body}
     >
       <Badge count={displayMessages.length} offset={[-5, 5]} showZero={false}>
         <Button

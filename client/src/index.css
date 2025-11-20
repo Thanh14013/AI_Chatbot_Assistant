@@ -126,16 +126,22 @@ form .ant-btn:hover {
 
 /* Fix Ant Design dropdown z-index to ensure they appear above all content */
 .ant-dropdown {
-  z-index: 9999 !important;
+  z-index: 99999 !important;
+  pointer-events: auto !important;
 }
 
 /* Ensure dropdown menu items are interactive and not blocked by elements below */
 .ant-dropdown-menu {
-  z-index: 9999 !important;
+  z-index: 99999 !important;
+  pointer-events: auto !important;
+  background: white !important;
+  box-shadow: 0 3px 6px -4px rgba(0, 0, 0, 0.12),
+    0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 9px 28px 8px rgba(0, 0, 0, 0.05) !important;
 }
 
 .ant-dropdown-menu-item,
 .ant-dropdown-menu-submenu-title {
   position: relative;
   z-index: 1;
+  pointer-events: auto !important;
 }

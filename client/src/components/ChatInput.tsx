@@ -334,9 +334,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           onVisibleChange={setDropdownVisible}
           placement="topLeft"
           disabled={!conversationId || disabled}
-          getPopupContainer={(trigger) =>
-            trigger.parentElement || document.body
-          }
+          getPopupContainer={() => document.body}
         >
           <Button
             type="text"

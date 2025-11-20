@@ -322,7 +322,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         menu={{ items: menuItems }}
         trigger={["click"]}
         placement="bottomRight"
-        getPopupContainer={(trigger) => trigger.parentElement || document.body}
+        getPopupContainer={() => document.body}
       >
         <div className={styles.moreButton} onClick={(e) => e.stopPropagation()}>
           <MoreOutlined />

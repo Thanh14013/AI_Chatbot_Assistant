@@ -204,9 +204,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
           <Dropdown
             menu={{ items: menuItems }}
             trigger={["click"]}
-            getPopupContainer={(trigger) =>
-              trigger.parentElement || document.body
-            }
+            getPopupContainer={() => document.body}
           >
             <Button
               type="text"
