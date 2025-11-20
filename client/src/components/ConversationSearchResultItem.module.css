@@ -86,19 +86,17 @@
   outline-offset: 2px;
 }
 
-/* Dropdown panel */
+/* Dropdown panel - rendered via Portal to document.body */
 .dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
+  position: fixed;
   background-color: white;
   border: 1px solid #e5e5e6;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  z-index: 1000;
-  margin-top: 4px;
+  z-index: 10000;
   animation: fadeInSlideDown 0.2s ease-out;
+  max-width: 280px;
+  min-width: 240px;
 }
 
 /* Remove the dropdown's box-shadow while hovering over its message list

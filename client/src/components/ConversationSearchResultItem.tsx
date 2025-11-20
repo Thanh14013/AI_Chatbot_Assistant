@@ -1,4 +1,5 @@
 ﻿import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { MessageOutlined } from "@ant-design/icons";
 import {
   ConversationSearchResult,
@@ -18,6 +19,8 @@ export const ConversationSearchResultItem: React.FC<
 > = ({ result, query, onMessageClick, tags }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const badgeRef = useRef<HTMLDivElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -35,6 +38,21 @@ export const ConversationSearchResultItem: React.FC<
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  // Calculate dropdown position when opened
+  useEffect(() => {
+    if (isDropdownOpen && badgeRef.current && dropdownRef.current) {
+      const rect = badgeRef.current.getBoundingClientRect();
+      const top = rect.bottom + 4;
+      const left = rect.left - 240 + rect.width; // Align right edge
+
+      setDropdownPosition({ top, left });
+
+      // Apply position to dropdown element
+      dropdownRef.current.style.top = `${top}px`;
+      dropdownRef.current.style.left = `${left}px`;
+    }
+  }, [isDropdownOpen]);
 
   const handleBadgeClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -96,6 +114,7 @@ export const ConversationSearchResultItem: React.FC<
 
         {/* Badge with matched messages count */}
         <div
+          ref={badgeRef}
           className={styles.badge}
           onClick={handleBadgeClick}
           role="button"
@@ -111,28 +130,33 @@ export const ConversationSearchResultItem: React.FC<
         </div>
       </div>
 
-      {/* Dropdown panel with message previews */}
-      {isDropdownOpen && (
-        <div className={styles.dropdown}>
-          <div className={styles.dropdownHeader}>Matched Messages</div>
-          <div className={styles.messageList}>
-            {result.top_messages.map((message, index) => (
-              <div
-                key={message.message_id}
-                className={styles.messagePreview}
-                onClick={() => handleMessagePreviewClick(message)}
-              >
-                <div className={styles.messageRole}>
-                  {message.role === "user" ? "You" : "Assistant"}
+      {/* Dropdown panel with message previews - rendered via Portal to escape overflow */}
+      {isDropdownOpen &&
+        createPortal(
+          <div className={styles.dropdown} ref={dropdownRef}>
+            <div className={styles.dropdownHeader}>Matched Messages</div>
+            <div className={styles.messageList}>
+              {result.top_messages.map((message, index) => (
+                <div
+                  key={message.message_id}
+                  className={styles.messagePreview}
+                  onClick={() => handleMessagePreviewClick(message)}
+                >
+                  <div className={styles.messageRole}>
+                    {message.role === "user" ? "You" : "Assistant"}
+                  </div>
+                  <div className={styles.messageContent}>
+                    {highlightKeyword(
+                      truncateText(message.content, 150),
+                      query
+                    )}
+                  </div>
                 </div>
-                <div className={styles.messageContent}>
-                  {highlightKeyword(truncateText(message.content, 150), query)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+              ))}
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };
