@@ -44,7 +44,7 @@ export const getUserPreferences = async (userId: string): Promise<UserPreference
     if (!preferences) {
       preferences = await UserPreference.create({
         user_id: userId,
-        language: "en",
+        language: "vi",
         response_style: "balanced",
         custom_instructions: null,
       });

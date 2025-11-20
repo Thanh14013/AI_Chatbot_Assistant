@@ -1,6 +1,6 @@
 /* ConversationList Styles - No scroll, let parent handle */
 .conversationsList {
-  flex: 1;
+  /* Don't use flex: 1 which can prevent parent overflow */
   transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   border-radius: 12px;
   padding: 4px;
@@ -225,9 +225,8 @@
 }
 
 .conversationsScrollContainer {
-  height: 100%;
+  /* Let parent handle scrolling - don't set height or overflow */
   min-height: 200px; /* Ensure enough space for drop zone */
-  padding-right: 8px;
 }
 
 .loadMoreIndicator {

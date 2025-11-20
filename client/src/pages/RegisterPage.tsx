@@ -29,6 +29,12 @@ const RegisterPage: React.FC = () => {
   const [password, setPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
 
+  // Validation patterns
+  const nameRe = /^[A-Za-z\p{L}\s'\-]{2,50}$/u; // allow unicode letters, spaces, apostrophes, hyphens
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  // Password: min 8 chars, at least 1 upper, 1 lower, 1 digit, 1 special
+  const passwordRe = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
+
   /**
    * Handle form submission
    * Validates early and sends registration data to API
@@ -37,33 +43,59 @@ const RegisterPage: React.FC = () => {
     e.preventDefault();
     setError("");
 
-    // Early client-side validation
-    if (!name || name.trim().length < 2) {
-      const msg = "Please enter your name (at least 2 characters).";
-      setError(msg);
-      message.error(msg);
-      return;
+    const errors: string[] = [];
+
+    // Name checks
+    if (!name || name.trim().length === 0) {
+      errors.push("Name: required");
+    } else if (!nameRe.test(name.trim())) {
+      errors.push(
+        "Name: invalid format (only letters, spaces, apostrophes, hyphens; 2-50 characters)"
+      );
     }
 
-    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email || !emailRe.test(email)) {
-      const msg = "Please enter a valid email address.";
-      setError(msg);
-      message.error(msg);
-      return;
+    // Email checks
+    if (!email || email.trim().length === 0) {
+      errors.push("Email: required");
+    } else if (!emailRe.test(email)) {
+      errors.push("Email: invalid format (example: yourname@example.com)");
     }
 
-    if (!password || password.length < 6) {
-      const msg = "Password must be at least 6 characters.";
-      setError(msg);
-      message.error(msg);
-      return;
+    // Password checks
+    if (!password) {
+      errors.push("Password: required");
+    } else {
+      if (password.length < 8) {
+        errors.push("Password: must be at least 8 characters");
+      }
+      if (!/[A-Z]/.test(password)) {
+        errors.push("Password: must include at least one uppercase letter");
+      }
+      if (!/[a-z]/.test(password)) {
+        errors.push("Password: must include at least one lowercase letter");
+      }
+      if (!/\d/.test(password)) {
+        errors.push("Password: must include at least one number");
+      }
+      if (!/[^A-Za-z\d]/.test(password)) {
+        errors.push("Password: must include at least one special character");
+      }
+      // Optional combined regex check
+      if (!passwordRe.test(password)) {
+        // no-op; individual messages above give more detail
+      }
     }
 
+    // Confirm password
     if (password !== confirmPassword) {
-      const msg = "Passwords do not match.";
-      setError(msg);
-      message.error(msg);
+      errors.push("Confirm Password: does not match password");
+    }
+
+    if (errors.length > 0) {
+      const combined = errors.join(". ");
+      setError(errors[0]);
+      // Show a clear toast with each failing field/requirement
+      message.error(combined, 6);
       return;
     }
 
@@ -131,7 +163,11 @@ const RegisterPage: React.FC = () => {
             label="Full Name"
             rules={[
               { required: true, message: "Please input your name!" },
-              { min: 2, message: "Name must be at least 2 characters!" },
+              {
+                pattern: nameRe,
+                message:
+                  "Name may only contain letters, spaces, apostrophes and hyphens (2-50 characters)",
+              },
             ]}
           >
             <Input
@@ -169,7 +205,19 @@ const RegisterPage: React.FC = () => {
             label="Password"
             rules={[
               { required: true, message: "Please input your password!" },
-              { min: 6, message: "Password must be at least 6 characters!" },
+              () => ({
+                validator(_, value) {
+                  if (!value) return Promise.resolve();
+                  if (!passwordRe.test(value)) {
+                    return Promise.reject(
+                      new Error(
+                        "Password must be at least 8 characters and include uppercase, lowercase, a number and a special character"
+                      )
+                    );
+                  }
+                  return Promise.resolve();
+                },
+              }),
             ]}
           >
             <Input.Password
