@@ -123,3 +123,19 @@ form .ant-btn:hover {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Fix Ant Design dropdown z-index to ensure they appear above all content */
+.ant-dropdown {
+  z-index: 9999 !important;
+}
+
+/* Ensure dropdown menu items are interactive and not blocked by elements below */
+.ant-dropdown-menu {
+  z-index: 9999 !important;
+}
+
+.ant-dropdown-menu-item,
+.ant-dropdown-menu-submenu-title {
+  position: relative;
+  z-index: 1;
+}

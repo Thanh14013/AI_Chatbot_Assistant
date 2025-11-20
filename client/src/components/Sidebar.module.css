@@ -34,17 +34,22 @@
 .middleSection {
   flex: 1;
   min-height: 0;
-  overflow-y: scroll !important; /* Force scrollbar to always show */
+  overflow-y: auto;
   overflow-x: hidden;
   background: #fff;
   position: relative;
   padding-left: 2px;
-  padding-right: 8px; /* More space for scrollbar */
+  padding-right: 2px;
   padding-bottom: 72px; /* Space for fixed bottom section */
   transition: padding 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
-  scrollbar-width: auto; /* Use default width for better visibility */
-  scrollbar-color: #999 #f0f0f0;
+  scrollbar-width: none; /* Hide scrollbar for Firefox */
+  -ms-overflow-style: none; /* Hide scrollbar for IE/Edge */
   will-change: padding, opacity;
+}
+
+/* Hide scrollbar for Chrome/Safari */
+.middleSection::-webkit-scrollbar {
+  display: none;
 }
 
 .middleSection > * {
@@ -65,33 +70,6 @@
 .collapsed .middleSection > * {
   opacity: 0;
   transform: translateX(-10px);
-}
-
-/* Webkit scrollbar - Make it more visible and always present */
-.middleSection::-webkit-scrollbar {
-  width: 8px; /* Wider for better visibility */
-}
-
-.middleSection::-webkit-scrollbar-track {
-  background: #f0f0f0;
-  border-radius: 4px;
-  margin: 4px 0; /* Add margin to track */
-}
-
-.middleSection::-webkit-scrollbar-thumb {
-  background-color: #999;
-  border-radius: 4px;
-  border: 2px solid #f0f0f0; /* Border for better contrast */
-  transition: background-color 0.2s ease;
-  min-height: 40px; /* Ensure thumb is always grabbable */
-}
-
-.middleSection::-webkit-scrollbar-thumb:hover {
-  background-color: #666;
-}
-
-.middleSection::-webkit-scrollbar-thumb:active {
-  background-color: #444;
 }
 
 /* Collapsed middle section - better padding */

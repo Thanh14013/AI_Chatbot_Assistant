@@ -1,7 +1,7 @@
 /* ConversationItem Component Styles - Modern Minimal Design */
 
 .conversationItem {
-  position: relative;
+  /* Remove position: relative to avoid creating stacking context that blocks dropdowns */
   display: flex;
   align-items: center;
   gap: 12px;
@@ -13,6 +13,8 @@
   background-color: transparent;
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
     sans-serif;
+  /* Prevent item from blocking dropdown menus */
+  isolation: auto;
 }
 
 .conversationItem:hover {
