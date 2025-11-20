@@ -206,7 +206,11 @@ const NetworkStatus: React.FC<NetworkStatusProps> = ({
         />
       )}
 
-      <Tooltip title={config.tooltip} placement="top">
+      <Tooltip
+        title={config.tooltip}
+        placement="top"
+        getPopupContainer={(trigger) => trigger.parentElement || document.body}
+      >
         {statusElement}
       </Tooltip>
     </>

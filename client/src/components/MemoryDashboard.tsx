@@ -141,6 +141,9 @@ export const MemoryDashboard: React.FC<MemoryDashboardProps> = ({
           okText="Yes"
           cancelText="No"
           okButtonProps={{ danger: true }}
+          getPopupContainer={(trigger) =>
+            trigger.parentElement || document.body
+          }
         >
           <Button danger icon={<DeleteOutlined />} loading={clearingMemory}>
             Clear All Memory

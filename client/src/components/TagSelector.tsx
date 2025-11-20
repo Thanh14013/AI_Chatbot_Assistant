@@ -74,6 +74,7 @@ export const TagSelector: React.FC<TagSelectorProps> = ({
         className={styles.select}
         suffixIcon={<TagOutlined />}
         notFoundContent={loading ? <Spin size="small" /> : null}
+        getPopupContainer={(trigger) => trigger.parentElement || document.body}
       />
 
       {popularTags.length > 0 && (

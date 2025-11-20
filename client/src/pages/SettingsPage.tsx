@@ -210,6 +210,9 @@ const SettingsPage: React.FC = () => {
               placeholder="Select language"
               options={LANGUAGE_OPTIONS}
               disabled={isSaving}
+              getPopupContainer={(trigger) =>
+                trigger.parentElement || document.body
+              }
             />
           </Form.Item>
 
@@ -232,6 +235,9 @@ const SettingsPage: React.FC = () => {
               size="large"
               placeholder="Select response style"
               disabled={isSaving}
+              getPopupContainer={(trigger) =>
+                trigger.parentElement || document.body
+              }
             >
               {RESPONSE_STYLE_OPTIONS.map((option) => (
                 <Select.Option key={option.value} value={option.value}>

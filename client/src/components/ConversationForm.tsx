@@ -213,6 +213,9 @@ const ConversationForm: React.FC<ConversationFormProps> = ({
             size="large"
             placeholder="Select AI model"
             optionLabelProp="label"
+            getPopupContainer={(trigger) =>
+              trigger.parentElement || document.body
+            }
           >
             {modelOptions.map((model) => (
               <Option key={model.value} value={model.value} label={model.label}>

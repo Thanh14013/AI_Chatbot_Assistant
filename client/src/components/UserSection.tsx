@@ -142,6 +142,7 @@ const UserSection: React.FC<UserSectionProps> = ({
         placement="topLeft"
         trigger={["click"]}
         className={styles.dropdown}
+        getPopupContainer={(trigger) => trigger.parentElement || document.body}
       >
         {collapsed ? (
           <Tooltip
@@ -156,6 +157,9 @@ const UserSection: React.FC<UserSectionProps> = ({
               </div>
             }
             placement="right"
+            getPopupContainer={(trigger) =>
+              trigger.parentElement || document.body
+            }
           >
             {userContent}
           </Tooltip>

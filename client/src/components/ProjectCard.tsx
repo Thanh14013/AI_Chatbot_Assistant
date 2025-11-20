@@ -201,7 +201,13 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
 
         {/* 3-dot Menu (shown on hover) */}
         {isHovered && (
-          <Dropdown menu={{ items: menuItems }} trigger={["click"]}>
+          <Dropdown
+            menu={{ items: menuItems }}
+            trigger={["click"]}
+            getPopupContainer={(trigger) =>
+              trigger.parentElement || document.body
+            }
+          >
             <Button
               type="text"
               size="small"

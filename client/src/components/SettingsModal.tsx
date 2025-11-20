@@ -340,6 +340,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onCancel }) => {
                 options={LANGUAGE_OPTIONS}
                 disabled={isLoading || isSaving}
                 loading={isLoading}
+                getPopupContainer={(trigger) =>
+                  trigger.parentElement || document.body
+                }
               />
             </Form.Item>
           </div>
@@ -364,6 +367,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onCancel }) => {
                 placeholder="Select response style"
                 disabled={isLoading || isSaving}
                 loading={isLoading}
+                getPopupContainer={(trigger) =>
+                  trigger.parentElement || document.body
+                }
               >
                 {RESPONSE_STYLE_OPTIONS.map((option) => (
                   <Select.Option key={option.value} value={option.value}>

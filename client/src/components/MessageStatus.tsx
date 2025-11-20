@@ -97,7 +97,11 @@ const MessageStatus: React.FC<MessageStatusProps> = ({
   }
 
   return (
-    <Tooltip title={config.tooltip} placement="top">
+    <Tooltip
+      title={config.tooltip}
+      placement="top"
+      getPopupContainer={(trigger) => trigger.parentElement || document.body}
+    >
       {iconElement}
     </Tooltip>
   );

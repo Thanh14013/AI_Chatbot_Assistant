@@ -208,6 +208,9 @@ const SidebarHeader: React.FC<SidebarHeaderProps> = ({
         <Tooltip
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           placement="right"
+          getPopupContainer={(trigger) =>
+            trigger.parentElement || document.body
+          }
         >
           <button
             className={styles.toggleButton}

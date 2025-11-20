@@ -173,7 +173,13 @@ const SelectionAskButton: React.FC<SelectionAskButtonProps> = ({
             className={styles.floatingButton}
             data-position="true"
           >
-            <Tooltip title="Ask AI about this" placement="top">
+            <Tooltip
+              title="Ask AI about this"
+              placement="top"
+              getPopupContainer={(trigger) =>
+                trigger.parentElement || document.body
+              }
+            >
               <Button
                 type="primary"
                 shape="circle"
